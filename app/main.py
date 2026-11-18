@@ -30,6 +30,8 @@ class H(BaseHTTPRequestHandler):
    b=(Path(__file__).parent/"index.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-prediction-welcome.html":
    b=(Path(__file__).parent/"sh-prediction-welcome.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p=="/sh-prediction-icon.png":
+   b=(Path(__file__).parent/"sh-prediction-icon.png").read_bytes();self.send_response(200);self.send_header("Content-Type","image/png");self.send_header("Cache-Control","public, max-age=86400");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/icon.svg":
    b=(Path(__file__).parent/"icon.svg").read_bytes();self.send_response(200);self.send_header("Content-Type","image/svg+xml");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION"})
