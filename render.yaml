@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sh-prediction-api
+    runtime: python
+    plan: starter
+    buildCommand: echo ready
+    startCommand: python app/main.py
+    envVars:
+      - key: SH_PREDICTION_ADMIN_TOKEN
+        generateValue: true
+      - key: SH_PREDICTION_DB
+        value: /var/data/prediction.sqlite3
+    disk:
+      name: sh-prediction-data
+      mountPath: /var/data
+      sizeGB: 1
