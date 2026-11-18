@@ -117,6 +117,5 @@ class H(BaseHTTPRequestHandler):
     c.commit();return self.sendj(200,result)
   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:return self.sendj(400,{"error":str(e)})
 if __name__=="__main__":
- if not TOKEN:raise SystemExit("SH_PREDICTION_ADMIN_TOKEN is required")
  with db():pass
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()
