@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SH PREDICTION | Original Match Centre Prototype</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#060d1b;color:#eef4ff}
+*{box-sizing:border-box}body{margin:0}header{padding:16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #273650;background:#0a1428}
+header img{width:56px;height:56px;object-fit:contain}h1{font-size:20px;margin:0;letter-spacing:.08em}small{color:#9daecb}
+main{max-width:1060px;margin:auto;padding:18px}.switch{display:grid;grid-template-columns:1fr 1fr;background:#111f38;padding:5px;border-radius:15px;gap:5px;margin-bottom:22px}
+button{cursor:pointer;background:#172843;color:#cbd8ec;border:1px solid #344765;padding:11px 15px;border-radius:10px;font-weight:650}
+button.active{background:linear-gradient(110deg,#b91837,#2458b9);border-color:transparent;color:white}
+h2{margin:0 0 8px;font-size:25px}.intro{color:#9caec8;line-height:1.6}
+.nav,.subnav{display:flex;overflow:auto;gap:8px;padding:12px 0;scrollbar-width:thin}.nav button,.subnav button{flex-shrink:0}
+.panel{background:linear-gradient(145deg,#142541,#0b162c);border:1px solid #2c4162;border-radius:18px;padding:20px;margin-top:16px}
+.card{background:#0c1a31;border:1px solid #263c5a;border-radius:14px;padding:17px;margin-top:12px}
+.muted{color:#a5b5cc}.eyebrow{color:#eeb7c6;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.empty{text-align:center;padding:35px 15px;border:1px dashed #3b506c;border-radius:12px;color:#b3c2d8}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+@media(max-width:480px){main{padding:12px}header{padding:10px}h1{font-size:17px}}
+</style></head><body>
+<header><img src="/sh-prediction-icon.png" alt="SH PREDICTION"><div><h1>SH PREDICTION</h1><small>Independent sports intelligence • concept preview</small></div></header>
+<main><div class="switch" id="sports"><button class="active" data-sport="CRICKET">CRICKET</button><button data-sport="WORLD">WORLD</button></div>
+<p class="eyebrow">Original experience / Prototype 01</p><h2 id="heading">Cricket Intelligence Hub</h2>
+<p class="intro">Research-inspired functionality with an independent SH interface. No third-party feeds, copied designs, or invented results.</p>
+<div class="nav" id="nav"></div><section class="panel"><h2 id="sectiontitle">Matches</h2><p class="muted" id="sectiondesc"></p><div id="sectionbody"></div></section>
+</main>
+<script>
+const pages=["Home","Matches","Series","Teams","Players","Rankings","Archive","Predictions","Accuracy","More"];
+const matchTabs=["Overview","Live","Scorecard","Commentary","Playing XI","Toss","Pitch","Weather","Head to Head","Prediction","Win Probability","Partnerships","Wickets","Graphs","Odds Price History","Records","Match Info"];
+let sport="CRICKET",page="Matches",matchTab="Overview";
+const nav=document.querySelector("#nav"),body=document.querySelector("#sectionbody");
+function button(label,active,action){const b=document.createElement("button");b.textContent=label;b.className=active?"active":"";b.onclick=action;return b}
+function empty(label="No verified data yet"){const d=document.createElement("div");d.className="empty";d.textContent=label;return d}
+function render(){document.querySelector("#heading").textContent=sport==="CRICKET"?"Cricket Intelligence Hub":"World Sports Hub";
+document.querySelectorAll("#sports button").forEach(b=>b.classList.toggle("active",b.dataset.sport===sport));
+nav.replaceChildren(...pages.map(p=>button(p,p===page,()=>{page=p;render()})));
+document.querySelector("#sectiontitle").textContent=page;
+document.querySelector("#sectiondesc").textContent=page==="Matches"?"Explore the original 17-section Match Centre below. Verified data will appear only when an authorized source is connected.":"Independent SH PREDICTION workspace — awaiting verified information.";
+body.replaceChildren();
+if(page==="Matches"&&sport==="CRICKET"){
+const card=document.createElement("div");card.className="card";
+const h=document.createElement("h3");h.textContent="Match Centre • Interactive Blueprint";card.append(h);
+const sub=document.createElement("div");sub.className="subnav";
+sub.append(...matchTabs.map(t=>button(t,t===matchTab,()=>{matchTab=t;render()})));
+card.append(sub);
+const title=document.createElement("h3");title.textContent=matchTab;card.append(title);
+card.append(empty(matchTab==="Odds Price History"?"No reviewed odds observations yet":"No verified data yet"));
+body.append(card);
+}else{const grid=document.createElement("div");grid.className="grid";
+const card=document.createElement("div");card.className="card";card.append(empty(sport==="WORLD"?"World sports content is not connected yet":"No verified data yet"));grid.append(card);body.append(grid)}
+}
+document.querySelectorAll("#sports button").forEach(b=>b.onclick=()=>{sport=b.dataset.sport;page="Matches";render()});render();
+</script></body></html>
