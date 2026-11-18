@@ -1,0 +1,32 @@
+product,level,item,parent,status
+Cricbuzz,feature,Live scores,,PARTIALLY VERIFIED
+Cricbuzz,feature,Commentary,Match,PARTIALLY VERIFIED
+Cricbuzz,feature,Match Centre,,PARTIALLY VERIFIED
+Cricbuzz,feature,Ball Map,Match,PARTIALLY VERIFIED
+Cricbuzz,feature,Win probability,Match,PARTIALLY VERIFIED
+Cricbuzz,feature,Partnership graphics,Match,PARTIALLY VERIFIED
+Cricbuzz,feature,Polls,Match,PARTIALLY VERIFIED
+Cricbuzz,feature,News,,PARTIALLY VERIFIED
+Cricbuzz,feature,Schedule,,PARTIALLY VERIFIED
+Cricbuzz,feature,Rankings and records,,PARTIALLY VERIFIED
+Cricbuzz,feature,Player profile,,PARTIALLY VERIFIED
+Cricbuzz,feature,Auction Tracker,,PARTIALLY VERIFIED
+Cricbuzz,feature,Videos / Buzz Shorts,,PARTIALLY VERIFIED
+Cricbuzz,tab order,Bottom navigation,,NOT ACCESSIBLE
+CREX,tab,Home,,PARTIALLY VERIFIED
+CREX,tab,Matches,,PARTIALLY VERIFIED
+CREX,tab,Series,,PARTIALLY VERIFIED
+CREX,tab,Squads,,PARTIALLY VERIFIED
+CREX,tab,Fixtures,,PARTIALLY VERIFIED
+CREX,tab,News,,PARTIALLY VERIFIED
+CREX,tab,More,,PARTIALLY VERIFIED
+CREX,feature,Rankings,More,PARTIALLY VERIFIED
+CREX,feature,Points tables,,PARTIALLY VERIFIED
+CREX,feature,Scorecard,Match,PARTIALLY VERIFIED
+CREX,feature,Commentary,Match,PARTIALLY VERIFIED
+CREX,feature,Graph insights,Match,PARTIALLY VERIFIED
+CREX,feature,Fantasy tips,,PARTIALLY VERIFIED
+CREX,feature,Follow players/teams,,PARTIALLY VERIFIED
+CREX,feature,Search,,PARTIALLY VERIFIED
+CREX,feature,Quizzes,,PARTIALLY VERIFIED
+CREX,feature,Match tab list,Match,NOT ACCESSIBLE
