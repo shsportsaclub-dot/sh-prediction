@@ -119,4 +119,4 @@ class H(BaseHTTPRequestHandler):
 if __name__=="__main__":
  if not TOKEN:raise SystemExit("SH_PREDICTION_ADMIN_TOKEN is required")
  with db():pass
- ThreadingHTTPServer((os.getenv("HOST","127.0.0.1"),int(os.getenv("PORT","8080"))),H).serve_forever()
+ ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()
