@@ -1,4 +1,4 @@
-import os,json,sqlite3,datetime
+import os,json,sqlite3,datetime,secrets
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlparse,parse_qs
 from pathlib import Path
@@ -18,7 +18,8 @@ def db():
 class H(BaseHTTPRequestHandler):
  def sendj(self,code,obj):
   b=json.dumps(obj,ensure_ascii=False).encode();self.send_response(code);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
- def auth(self): return authorized(self.headers.get("Authorization","").removeprefix("Bearer ").strip()) or (bool(TOKEN) and self.headers.get("X-Admin-Token")==TOKEN)
+ def admin_ok(self): return bool(TOKEN) and secrets.compare_digest(self.headers.get("X-Admin-Token",""),TOKEN)
+ def auth(self): return authorized(self.headers.get("Authorization","").removeprefix("Bearer ").strip()) or self.admin_ok()
  def body(self):
   n=int(self.headers.get("Content-Length","0"))
   if n<1 or n>1000000:raise ValueError("invalid payload size")
@@ -32,8 +33,9 @@ class H(BaseHTTPRequestHandler):
   if p=="/icon.svg":
    b=(Path(__file__).parent/"icon.svg").read_bytes();self.send_response(200);self.send_header("Content-Type","image/svg+xml");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION"})
-  if not self.auth():return self.sendj(403,{"error":"login required"})
-  if p.startswith("/admin/") and not self.auth():return self.sendj(403,{"error":"admin token required"})
+  if p.startswith("/admin/"):
+   if not self.admin_ok():return self.sendj(403,{"error":"admin token required"})
+  elif not self.auth():return self.sendj(403,{"error":"login required"})
   with db() as c:
    if p=="/fixtures": rows=c.execute("SELECT * FROM fixtures ORDER BY start_utc DESC LIMIT 200")
    elif p=="/results": rows=c.execute("SELECT f.*,o.toss_winner,o.match_winner FROM fixtures f JOIN outcomes o ON f.id=o.fixture_id ORDER BY f.start_utc DESC LIMIT 200")
@@ -60,7 +62,7 @@ class H(BaseHTTPRequestHandler):
    if p=="/auth/logout":
     logout(self.headers.get("Authorization","").removeprefix("Bearer ").strip())
     return self.sendj(200,{"status":"logged_out"})
-   if not self.auth():return self.sendj(403,{"error":"login required"})
+   if not p.startswith("/admin/") or not self.admin_ok():return self.sendj(403,{"error":"admin token required"})
    with db() as c:
     if p=="/admin/fixtures":
      for k in ("competition","season","home","away","start_utc","source"):
@@ -89,6 +91,7 @@ class H(BaseHTTPRequestHandler):
      for k in ("toss_winner","match_winner"):
       if d.get(k) and d[k] not in (f["home"],f["away"]):raise ValueError("invalid "+k)
      if not d.get("source"):raise ValueError("source required")
+     if c.execute("SELECT 1 FROM outcomes WHERE fixture_id=?",(d["fixture_id"],)).fetchone():raise ValueError("outcome already recorded")
      c.execute("INSERT INTO outcomes(fixture_id,toss_winner,match_winner,source,verified_at) VALUES(?,?,?,?,?)",(d["fixture_id"],d.get("toss_winner"),d.get("match_winner"),d["source"],now()));result={"status":"recorded"}
     elif p=="/admin/import_odds_batch":
      items=d.get("rows")

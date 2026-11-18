@@ -28,9 +28,11 @@ def verify(phone,code):
   token=secrets.token_urlsafe(32)
   with connection() as c:c.execute("INSERT INTO login_sessions(token_hash,phone,created_at) VALUES(?,?,?)",(hashlib.sha256(token.encode()).hexdigest(),phone,time.time()))
   return token
+SESSION_TTL=30*86400
 def authorized(token):
  if not token:return False
  with connection() as c:
+  c.execute("DELETE FROM login_sessions WHERE created_at<?",(time.time()-SESSION_TTL,))
   return c.execute("SELECT 1 FROM login_sessions WHERE token_hash=?",(hashlib.sha256(token.encode()).hexdigest(),)).fetchone() is not None
 def logout(token):
  if token:
