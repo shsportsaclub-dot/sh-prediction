@@ -2,6 +2,7 @@ import os,json,sqlite3,datetime
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlparse,parse_qs
 from pathlib import Path
+from screen_login import generate,verify,authorized,logout
 DB=os.getenv("SH_PREDICTION_DB","data/prediction.sqlite3")
 TOKEN=os.getenv("SH_PREDICTION_ADMIN_TOKEN","")
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -17,7 +18,7 @@ def db():
 class H(BaseHTTPRequestHandler):
  def sendj(self,code,obj):
   b=json.dumps(obj,ensure_ascii=False).encode();self.send_response(code);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
- def auth(self): return bool(TOKEN) and self.headers.get("X-Admin-Token")==TOKEN
+ def auth(self): return authorized(self.headers.get("Authorization","").removeprefix("Bearer ").strip()) or (bool(TOKEN) and self.headers.get("X-Admin-Token")==TOKEN)
  def body(self):
   n=int(self.headers.get("Content-Length","0"))
   if n<1 or n>1000000:raise ValueError("invalid payload size")
@@ -27,6 +28,7 @@ class H(BaseHTTPRequestHandler):
   if p in ("/","/app"):
    b=(Path(__file__).parent/"index.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION"})
+  if not self.auth():return self.sendj(403,{"error":"login required"})
   if p.startswith("/admin/") and not self.auth():return self.sendj(403,{"error":"admin token required"})
   with db() as c:
    if p=="/fixtures": rows=c.execute("SELECT * FROM fixtures ORDER BY start_utc DESC LIMIT 200")
@@ -45,9 +47,16 @@ class H(BaseHTTPRequestHandler):
    else:return self.sendj(404,{"error":"not found"})
    return self.sendj(200,[dict(x) for x in rows])
  def do_POST(self):
-  if not self.auth():return self.sendj(403,{"error":"admin token required"})
   try:
    p=urlparse(self.path).path;d=self.body()
+   if p=="/auth/generate":return self.sendj(200,generate(d.get("phone","")))
+   if p=="/auth/verify":
+    token=verify(d.get("phone",""),d.get("otp",""))
+    return self.sendj(200,{"token":token}) if token else self.sendj(403,{"error":"Incorrect or expired code"})
+   if p=="/auth/logout":
+    logout(self.headers.get("Authorization","").removeprefix("Bearer ").strip())
+    return self.sendj(200,{"status":"logged_out"})
+   if not self.auth():return self.sendj(403,{"error":"login required"})
    with db() as c:
     if p=="/admin/fixtures":
      for k in ("competition","season","home","away","start_utc","source"):
