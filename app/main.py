@@ -28,6 +28,8 @@ class H(BaseHTTPRequestHandler):
   p=urlparse(self.path).path
   if p in ("/","/app"):
    b=(Path(__file__).parent/"index.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p=="/sh-original-blueprint.html":
+   b=(Path(__file__).parent/"sh-original-blueprint.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-prediction-welcome.html":
    b=(Path(__file__).parent/"sh-prediction-welcome.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-prediction-icon.png":
