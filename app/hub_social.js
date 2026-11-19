@@ -85,7 +85,7 @@ async compose(el){if(needLogin())return;
   if(kind==="photo")X.innerHTML='<input id="pf" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin:8px 0;width:100%">';
   else if(kind==="video"||kind==="reel")X.innerHTML='<input id="pf" type="file" accept="video/mp4,video/quicktime,video/webm" style="margin:8px 0;width:100%"><p class="muted">'+(kind==="reel"?"9:16 vertical, up to 90 s":"up to 180 s")+'. Only upload videos you own or have permission to use.</p>';
   else if(kind==="poll")X.innerHTML='<input class="po" placeholder="Option 1" style="width:100%;margin:4px 0"><input class="po" placeholder="Option 2" style="width:100%;margin:4px 0"><input class="po" placeholder="Option 3 (optional)" style="width:100%;margin:4px 0">';
-  else if(kind==="prediction")X.innerHTML='<p class="muted">Tipsters only. The pick is locked when you post and cannot be changed. Pre-match only.</p><select id="pt" style="width:100%;margin:4px 0"><option value="winner">'+esc(t("col.winner"))+'</option><option value="toss">'+esc(t("col.toss"))+'</option></select><select id="pk" style="width:100%;margin:4px 0"><option value="">'+esc(t("so.tag_match"))+'</option></select><input id="pc" type="number" min="0" max="100" placeholder="'+esc(t("ai.confidence"))+' %" style="width:100%;margin:4px 0">';
+  else if(kind==="prediction")X.innerHTML='<p class="muted">'+esc(t("ins.pick_rule"))+'</p><select id="pt" style="width:100%;margin:4px 0"><option value="winner">'+esc(t("col.winner"))+'</option><option value="toss">'+esc(t("col.toss"))+'</option></select><select id="pk" style="width:100%;margin:4px 0"><option value="">'+esc(t("so.tag_match"))+'</option></select><input id="pc" type="number" min="0" max="100" placeholder="'+esc(t("ai.confidence"))+' %" style="width:100%;margin:4px 0">';
   else X.innerHTML="";
   if(kind==="prediction")$("#pm").onchange=()=>{const m=all.find(x=>x.id==$("#pm").value);$("#pk").innerHTML=m?'<option value="'+m.home.id+'">H · '+esc(m.home.name)+'</option><option value="'+m.away.id+'">A · '+esc(m.away.name)+'</option>':''}};
  drawK();extra();
@@ -93,7 +93,9 @@ async compose(el){if(needLogin())return;
   if(kind==="photo"||kind==="video"||kind==="reel"){const fs=[...($("#pf").files||[])];if(!fs.length)throw Error("Choose a file");body.media_ids=[];for(const f of fs)body.media_ids.push(await uploadFile(f,kind==="photo"?"image":"video",kind==="reel"?"reel":"post",p=>msg.textContent=t("so.processing").replace("…","")+" "+p+"%"))}
   if(kind==="poll")body.options=[...document.querySelectorAll(".po")].map(i=>i.value.trim()).filter(Boolean);
   if(kind==="prediction"){body.kind=$("#pt").value==="toss"?"toss_prediction":"prediction";body.prediction_type=$("#pt").value;body.predicted_team_id=+$("#pk").value;if($("#pc").value)body.confidence=+$("#pc").value}
-  const r=await api("/social/posts",{method:"POST",body:JSON.stringify(body)});msg.textContent=r.status==="processing"?t("so.processing"):"✓";location.hash="#/post/"+r.post_id}
+  const r=await api("/social/posts",{method:"POST",body:JSON.stringify(body)});msg.textContent=r.status==="processing"?t("so.processing"):"✓";
+  if(kind==="prediction"){const P=await api("/social/posts/"+r.post_id).catch(()=>null);const m=all.find(x=>x.id==body.match_id);if(P&&P.prediction_id&&m)return changePanel(el,P.prediction_id,m,body.predicted_team_id,r.post_id)}
+  location.hash="#/post/"+r.post_id}
   catch(e){msg.textContent=e.message;$("#go").disabled=false}}},
 async reels(el){
  el.innerHTML='<div id="rl" class="reels" aria-label="'+esc(t("nav.reels"))+'">'+loading()+'</div>';
@@ -184,3 +186,12 @@ let LIVE_ES=null;
 function liveSubscribe(mid,onEvent){if(LIVE_ES){LIVE_ES.close();LIVE_ES=null}if(!window.EventSource)return;LIVE_ES=new EventSource("/api/v1/matches/"+mid+"/stream");
  ["ball","probability","status"].forEach(k=>LIVE_ES.addEventListener(k,e=>{try{onEvent(k,JSON.parse(e.data))}catch(x){}}))}
 window.addEventListener("hashchange",()=>{if(LIVE_ES&&!/\/live$/.test(location.hash)){LIVE_ES.close();LIVE_ES=null}});
+
+/* 5-minute change window for a just-posted pick (owner rule), then it locks for good */
+function changePanel(el,pid,m,cur,postId){const until=Date.now()+5*60*1000;
+ const draw=()=>{const left=Math.max(0,Math.round((until-Date.now())/1000));
+  el.innerHTML='<div class="card"><h2>✓ '+esc(t("ins.posted"))+'</h2><p>'+esc(t("ins.change_until"))+' <b>'+Math.floor(left/60)+':'+String(left%60).padStart(2,"0")+'</b></p>'+
+   (left?'<div class="poll">'+[m.home,m.away].map(x=>'<button data-tm="'+x.id+'" class="'+(x.id===cur?"me":"")+'"><span>'+esc(x.name)+(x.id===cur?" ✓":"")+'</span></button>').join("")+'</div>':'<p class="muted">'+esc(t("ins.locked_now"))+'</p>')+
+   '<p id="cmsg" class="muted" role="status"></p><a class="btn primary" href="#/post/'+postId+'">'+esc(t("ins.view"))+' ›</a></div>';
+  el.querySelectorAll("[data-tm]").forEach(b=>b.onclick=async()=>{try{const r=await api("/predictions/"+pid+"/change",{method:"POST",body:JSON.stringify({predicted_team_id:+b.dataset.tm})});pid=r.prediction_id;cur=+b.dataset.tm;draw()}catch(e){$("#cmsg").textContent=e.message}})};
+ draw();const iv=setInterval(()=>{if(!document.body.contains(el)||location.hash.indexOf("compose")<0){clearInterval(iv);return}if(Date.now()>until+1000){clearInterval(iv)}draw()},1000)}

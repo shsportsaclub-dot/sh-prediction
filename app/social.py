@@ -209,7 +209,7 @@ def counts(c, pid):
             "saves": one("SELECT COUNT(*) FROM bookmarks WHERE post_id=?")}
 
 def post_out(c, p, viewer_id=None):
-    d = {k: p[k] for k in ("id", "author_id", "kind", "body", "match_id", "status", "created_at", "edited_at", "data_origin")}
+    d = {k: p[k] for k in ("id", "author_id", "kind", "body", "match_id", "prediction_id", "status", "created_at", "edited_at", "data_origin")}
     d["author"] = _author(c, p["author_id"])
     d["media"] = [media_out(c, r[0]) for r in c.execute("SELECT media_id FROM post_media WHERE post_id=? ORDER BY position", (p["id"],))]
     d["counts"] = counts(c, p["id"])
@@ -476,8 +476,13 @@ def tipster_stats(c, uid, competition_id=None, days=None):
         sql += " AND m.competition_id=?"; args.append(competition_id)
     if days:
         sql += " AND m.start_utc>=?"; args.append((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)).isoformat())
-    res = [r[0] or "pending" for r in c.execute(sql, args)]
+    rows_ = c.execute(sql.replace("SELECT e.result", "SELECT e.result, p.match_id, p.locked_at"), args).fetchall()
+    res = [r[0] or "pending" for r in rows_]
     t = engine.tally(res)
+    # timing credit (owner rule): picks before the toss count fully; after the toss they count less the later they come
+    import api_v1
+    t["weighted_correct"] = round(sum(api_v1.timing_weight(c, r[1], r[2]) for r in rows_ if r[0] == "correct"), 3)
+    t["after_toss_picks"] = sum(1 for r in rows_ if api_v1.timing_weight(c, r[1], r[2]) < 1)
     recent = [r[0] for r in c.execute(sql.replace("SELECT e.result", "SELECT e.result, m.start_utc") + " AND e.result IN ('correct','incorrect') ORDER BY m.start_utc DESC LIMIT 5", args)]
     t["recent_form"] = "".join("W" if r == "correct" else "L" for r in recent)
     return t
@@ -536,11 +541,12 @@ LEADERBOARDS = ("overall", "accuracy", "volume", "recent", "followers", "engagem
 OVERALL_RULE = ("World ranking score (0-100): 60 x shrunk accuracy x track-record factor + 15 x activity in picks + 10 x posting activity (30 days) "
                 "+ 10 x engagement + 5 x followers. Shrunk accuracy = (correct+1)/(settled+2), so 1 lucky pick is not 100%; "
                 "track-record factor = settled picks / 20 (max 1). Activity parts use log scale so spam does not win. "
-                "Only locked, pre-match, published picks count; nothing is entered by hand.")
+                "Only locked, pre-match, published picks count; nothing is entered by hand. Timing: a correct pick made before the toss counts 1; "
+                "after the toss it counts 0.6 falling by 0.03 a minute (minimum 0.3), so earlier tipsters rank higher.")
 
 def _overall_score(x):
     import math
-    acc = (x["correct"] + 1) / (x["settled"] + 2)
+    acc = (x.get("weighted_correct", x["correct"]) + 1) / (x["settled"] + 2)
     trust = min(1.0, x["settled"] / 20.0)
     lg = lambda v, cap: min(1.0, math.log10(1 + v) / math.log10(1 + cap))
     return round(60 * acc * trust + 15 * lg(x["eligible"], 200) + 10 * lg(x["posts_30d"], 60) + 10 * lg(x["engagement"], 2000) + 5 * lg(x["followers"], 5000), 2)
@@ -561,6 +567,7 @@ def leaderboard(c, kind, competition_id=None, min_settled=5, limit=50, me_user_i
                               (a["user_id"], (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)).isoformat())).fetchone()[0]
         out.append({"user_id": a["user_id"], "username": a["username"], "display_name": a["display_name"], "account_type": a["account_type"], "posts_30d": posts_30d,
                     "accuracy": st["accuracy"], "settled": st["settled"], "correct": st["correct"], "incorrect": st["incorrect"],
+                    "weighted_correct": st["weighted_correct"], "after_toss_picks": st["after_toss_picks"],
                     "eligible": st["settled"] + st["pending"], "recent_form": st["recent_form"], "followers": followers, "engagement": eng})
     for x in out:
         x["score"] = _overall_score(x)
@@ -570,7 +577,7 @@ def leaderboard(c, kind, competition_id=None, min_settled=5, limit=50, me_user_i
     elif kind in ("accuracy", "recent", "competition"):
         excluded = [x for x in out if x["settled"] < min_settled]
         out = [x for x in out if x["settled"] >= min_settled]
-        out.sort(key=lambda x: (-(x["accuracy"] or 0), -x["settled"]))
+        out.sort(key=lambda x: (-(x["weighted_correct"] / x["settled"] if x["settled"] else 0), -(x["accuracy"] or 0), -x["settled"]))
     elif kind == "volume":
         out.sort(key=lambda x: -x["eligible"])
     elif kind == "followers":

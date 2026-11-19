@@ -21,7 +21,7 @@ header.top img{width:34px;height:34px;object-fit:contain}
 header.top h1{font-size:16px;letter-spacing:.12em;margin:0;flex:1;font-weight:800}
 .bar{height:3px;background:linear-gradient(90deg,var(--brand-red),var(--brand-blue))}
 main{max-width:1000px;margin:auto;padding:12px 12px 90px}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 nav.tabs a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;color:var(--muted);text-decoration:none;font-size:10.5px;text-align:center}
 nav.tabs a svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8}
 nav.tabs a[aria-current=page]{color:var(--text)}
@@ -85,6 +85,34 @@ body[data-mcview=classic] .mc-strip4 div{background:var(--surface);color:var(--m
 body[data-mcview=classic] .mc-tabs .btn{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;padding:8px 10px}body[data-mcview=classic] .mc-tabs .btn.on{border-bottom-color:#e0262f;background:none;color:var(--text);font-weight:700}
 body[data-mcview=pro] .mc-head{background:#05070d;border:1px solid #2d7ff9;box-shadow:0 0 0 1px #2d7ff955,0 8px 24px #2d7ff933}body[data-mcview=pro] .mc-score{color:#38e8a0}
 body[data-mcview=pro] .mc-tabs .btn{border-radius:8px;text-transform:uppercase;letter-spacing:.04em;font-size:12px}
+/* insights */
+.ins-sec{margin:14px 0}.ins-sec>h3{display:flex;justify-content:space-between;align-items:baseline;font-size:16px;margin:0 2px 8px}.ins-sec>h3 small{font-weight:400;color:var(--muted);font-size:12px}
+.toss-l{color:#ffb020;font-weight:600;padding:8px 2px}.mcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:8px 0}
+.mcard .mh{font-size:12px;color:var(--muted);margin-bottom:6px}.mcard .mb{display:flex;align-items:center;gap:10px}.mcard .mi{flex:1}.mcard .mi div{display:flex;gap:8px;align-items:baseline;padding:2px 0}
+.mcard .mi b{min-width:54px}.mcard .mr{text-align:right;border-left:1px solid var(--line);padding-left:10px;min-width:96px}.mcard .mr b{display:block;color:#f6d77a}.mcard .mr span{font-size:12px;color:var(--muted)}
+.frow{display:flex;align-items:center;gap:6px;padding:8px 2px;border-bottom:1px solid var(--line)}.frow b{flex:1}.fchip{width:26px;height:26px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;background:#4a5672}.fchip.W{background:#3e8e2e}.fchip.L{background:#b52a2a}
+.h2hbig{display:flex;justify-content:space-around;align-items:center;padding:10px 0}.h2hbig div{text-align:center}.h2hbig strong{font-size:40px;font-weight:800}.h2hbig .hn{color:var(--muted);font-size:13px}
+.cmp{width:100%;border-collapse:collapse}.cmp td{padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px}.cmp td:nth-child(2){text-align:center;color:var(--muted);font-size:13px}.cmp td:last-child{text-align:right}.cmp .gd{color:#58c04a;font-weight:700}.cmp .bd{color:#ef6a6a;font-weight:700}
+.seg{display:flex;gap:8px;margin:6px 0 8px}.seg button{padding:7px 14px;border-radius:10px;background:none;border:1px solid var(--line);color:var(--text)}.seg button.on{background:#0d4a7a;border-color:#0d4a7a;color:#fff}
+.wx{display:flex;gap:14px;align-items:center}.wx .t{font-size:30px;font-weight:700}.donut{display:flex;align-items:center;gap:16px}.donut .lg{flex:1}.donut .lg div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+.psbar{height:10px;border-radius:6px;overflow:hidden;display:flex;margin:6px 0}.psbar i{display:block}
+.fp-cards{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}.fp-card{flex:0 0 150px;border-radius:14px;padding:12px;background:#0b3b44;color:#fff;cursor:pointer;border:0;text-align:left}.fp-card.aw{background:#2f3d1a}.fp-card small{opacity:.8;display:block}.fp-card b{display:block;font-size:15px;margin:2px 0 10px}.fp-card strong{font-size:26px}
+.fp-list .dl{cursor:pointer}.sheet{position:fixed;inset:0;background:#0009;z-index:60;display:flex;align-items:flex-end}.sheet>div{background:var(--surface);width:100%;max-width:640px;margin:0 auto;border-radius:18px 18px 0 0;max-height:88vh;overflow:auto;padding:14px}
+.bk td{padding:9px 4px;border-bottom:1px solid var(--line)}.bk td:nth-child(2),.bk td:nth-child(3){text-align:right}.bk td:nth-child(3){color:#f0b43c;font-weight:700}
+.poll button{display:block;width:100%;margin:6px 0;padding:10px;border-radius:22px;border:1px solid var(--line);background:none;color:#7fb8ff;position:relative;overflow:hidden;text-align:center;font-weight:600}.poll button i{position:absolute;left:0;top:0;bottom:0;background:#1d4ed833}.poll button span{position:relative}.poll button.me{border-color:#7fb8ff}
+.composer{display:flex;gap:8px;margin:10px 0}.composer textarea{flex:1;border-radius:20px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);color:var(--text);resize:none;min-height:42px}
+.ovchips{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:8px 2px}.ovchips .sep{width:1px;height:24px;background:var(--line);margin:0 4px}.ovchips small{color:var(--muted)}
+.inn-sw{display:flex;gap:8px;margin:8px 0}.inn-sw button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--text);font-weight:600}.inn-sw button.on{background:#0d4a7a;border-color:#0d4a7a;color:#fff}
+details.gx{border-top:1px solid var(--line);padding:12px 2px}details.gx summary{color:#7fb8ff;font-weight:600;cursor:pointer}
+.ovh{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}.ovh .bl{width:24px;height:24px;font-size:11px}
+tr.hl td{background:#1d4ed822}
+nav.tabs a.nav-plus span{display:flex;align-items:center;justify-content:center;width:40px;height:40px;margin-top:-18px;border-radius:50%;background:linear-gradient(135deg,#b3122e,#1d4ed8);color:#fff;font-size:28px;line-height:1;box-shadow:0 4px 14px #0007;border:3px solid var(--surface)}
+.tp-wrap{height:340px;overflow:hidden;position:relative;border-radius:14px;border:1px solid var(--line);background:var(--surface)}.tp-wrap.still{height:auto}
+.tp-roll{animation:tproll var(--dur,40s) linear infinite}.tp-wrap:hover .tp-roll,.tp-wrap.paused .tp-roll{animation-play-state:paused}.tp-wrap.still .tp-roll{animation:none}
+@keyframes tproll{from{transform:translateY(0)}to{transform:translateY(-50%)}}@media (prefers-reduced-motion:reduce){.tp-roll{animation:none}.tp-wrap{height:auto}}
+.tp{padding:12px 14px;border-bottom:1px solid var(--line)}.tp .who{display:flex;gap:8px;align-items:center}.tp .av{width:30px;height:30px;border-radius:50%;background:#2a3d66;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.tp .pk{margin:6px 0 0 38px}.tp .pk div{padding:2px 0}.tp .up{margin:8px 0 0 38px;padding:8px 10px;border-left:3px solid #f0b43c;background:#f0b43c14;border-radius:0 8px 8px 0}
+.tp .res-correct{color:#58c04a;font-weight:700}.tp .res-incorrect{color:#ef6a6a;font-weight:700}
 .sec{margin:14px 0}.sec-h{display:flex;align-items:baseline;justify-content:space-between}.sec h2{font-size:18px;margin:6px 0 8px}
 .hscroll{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.hscroll .lcard{flex:0 0 82%;max-width:330px;scroll-snap-align:start}
 .lcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);text-decoration:none}.lcard.is-live{border-color:#e0262f}
@@ -131,6 +159,7 @@ const DEMO=()=>ls.get("shp_demo")==="1";
 const dq=p=>DEMO()?p+(p.includes("?")?"&":"?")+"dataset=demo":p;
 let S={},LANG=ls.get("shp_lang")||"en",PREF=null,CACHE={},CHAT=[];
 const t=k=>S[k]||k;
+window.mcLater=window.mcLater||(fn=>(window._mcq=window._mcq||[]).push(fn));
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const $=s=>document.querySelector(s);
 const when=u=>{const d=new Date(u);return isNaN(d)?"—":d.toLocaleString(LANG,{dateStyle:"medium",timeStyle:"short"})};
@@ -148,7 +177,8 @@ function errorS(el,e,retry){el.innerHTML='<div class="state" role="alert">'+esc(
 const offlineBanner=j=>j&&j.__offline?'<div class="offline" role="status">'+esc(t("state.offline"))+'</div>':"";
 const origin=o=>o==="demo"?' <span class="tag demo">'+esc(t("label.demo"))+'</span>':"";
 const teamTxt=(x,cls)=>'<span class="'+cls+'">'+esc(x.short_code||x.name)+'</span>';
-function navRender(cur){$("#tabs").innerHTML=NAV.map(([id,k])=>'<a href="#/'+id+'" '+(cur===id?'aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+ICONS[id]+'</svg>'+esc(t(k))+'</a>').join("")}
+function navRender(cur){const a=([id,k])=>'<a href="#/'+id+'" '+(cur===id?'aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+ICONS[id]+'</svg>'+esc(t(k))+'</a>';
+ $("#tabs").innerHTML=NAV.slice(0,2).map(a).join("")+'<a href="#/compose" class="nav-plus" aria-label="'+esc(t("so.compose"))+'"><span>+</span>'+esc(t("ins.post"))+'</a>'+NAV.slice(2).map(a).join("")}
 async function loadLang(code){try{const b=await api("/i18n/"+encodeURIComponent(code));S=b.strings;LANG=code;document.documentElement.lang=code;document.documentElement.dir=b.rtl?"rtl":"ltr";ls.set("shp_lang",code)}catch(e){}}
 function setTheme(th){document.documentElement.dataset.theme=th;ls.set("shp_theme",th)}
 function stat(v,l){return '<div class="stat"><b>'+esc(v)+'</b><span class="muted">'+esc(l)+'</span></div>'}
@@ -192,7 +222,7 @@ async match(el,id,tab){
  const VIEWS={pulse:["live","commentary","scorecard","info","fantasy","community","history","seriesstats","graphs"],
   classic:["scorecard","info","live","commentary","seriesstats","xi"],pro:["prediction","graphs","fantasy","h2h","live","scorecard","info"]};
  const DEF={pulse:m=>m.status==="live"?"live":m.status==="completed"?"scorecard":"info",classic:m=>m.status==="scheduled"?"info":"scorecard",pro:()=>"prediction"};
- const LBL={community:"mc.discussions",history:"mc.history",seriesstats:"mc.series_stats"};
+ const LBL={community:"mc.discussions",history:"mc.history",seriesstats:"ins.points_table"};
  const OLD={crex:"pulse",cricbuzz:"classic",sh:"pro"};let view=ls.get("shp_view")||"pulse";view=OLD[view]||view;if(!VIEWS[view])view="pulse";
  const tabs=VIEWS[view];document.body.dataset.mcview=view;
  const ALL=["info","weather","toss","pitch","h2h","prediction","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","history","seriesstats","community","result"];
@@ -203,7 +233,7 @@ async match(el,id,tab){
   '<div class="sub mc-tabs" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t(LBL[k]||"mc."+k))+'</a>').join("")+
   '<select class="btn mc-more'+(tabs.includes(tab)?'':' on')+'" aria-label="'+esc(t("mc.more"))+'" onchange="if(this.value)location.hash=\'#/match/'+id+'/\'+this.value"><option value="">'+esc(t("mc.more"))+' ▾</option>'+more.map(([k,l])=>'<option value="'+k+'"'+(k===tab&&!tabs.includes(tab)?' selected':'')+'>'+esc(t(l))+'</option>').join("")+'</select></div><div id="tb">'+loading()+'</div>';
  const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});
- const tb=$("#tb");const nm=tid=>tid===m.home.id?teamTxt(m.home,"c-home"):(tid===m.away.id?teamTxt(m.away,"c-away"):"—");
+ const tb=el.querySelector("#tb");const nm=tid=>tid===m.home.id?teamTxt(m.home,"c-home"):(tid===m.away.id?teamTxt(m.away,"c-away"):"—");
  const kv=pairs=>'<div class="card"><dl class="kv">'+pairs.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+b+'</dd>').join("")+'</dl></div>';
  const T={
   info:async()=>kv([[t("mc.status"),esc(m.status)],[t("mc.venue"),esc(m.venue||"—")],["Match",esc(m.match_no||"—")],["Format",esc(m.format)],["Source",'<span class="muted">'+esc(m.source)+'</span>']])+(m.attribution?'<p class="muted">'+esc(m.attribution.text)+' · <a href="'+esc(m.attribution.url)+'" rel="noopener" target="_blank">licence</a></p>':''),
@@ -215,7 +245,7 @@ async match(el,id,tab){
    return '<div class="card"><h3>SH AI</h3>'+probBar(pm.home_win_probability,m)+'<p class="muted">'+esc(t("ai.confidence"))+': '+esc(pm.confidence_level)+' · '+esc(t("ai.toss_note"))+'</p>'+factorsHtml(pm.public_factors)+'</div>'+
     (p.items.length?p.items.map(x=>'<div class="card"><h3>'+esc(x.prediction_type.replace(/_/g," "))+' · '+(x.predicted_team_id?nm(x.predicted_team_id):esc(x.predicted_value))+'</h3><div class="muted">'+esc(x.expert_name?x.expert_name+(x.expert_verified?" · "+t("exp.verified"):""):(x.model||"SH"))+' · '+esc(t("ai.confidence"))+': '+(x.confidence==null?"—":x.confidence+"%")+'</div>'+(x.public_note?'<p>'+esc(x.public_note)+'</p>':(x.explanation?'<p>'+esc(x.explanation)+'</p>':''))+'<dl class="kv"><dt>Locked</dt><dd>'+when(x.locked_at)+'</dd><dt>Result</dt><dd class="'+({correct:"o-won",incorrect:"o-lost"}[x.evaluation]||"o-unknown")+'">'+esc(x.evaluation||"pending")+'</dd></dl></div>').join(""):emptyS(t("mc.no_pred")))},
   community:async()=>{const j=await api("/matches/"+id+"/community");
-   setTimeout(()=>bindPosts($("#cp")),0);
+   mcLater(()=>bindPosts($("#cp")));
    return '<div class="card"><h3>'+esc(t("so.sh_ai"))+'</h3>'+probBar(j.sh_ai.home_win_probability,m)+'<p class="muted">'+esc(j.note)+'</p></div>'+
     '<div class="card"><h3>'+esc(t("so.tipster_picks"))+'</h3>'+(j.tipster_picks.length?'<table class="simple"><tbody>'+j.tipster_picks.map(x=>'<tr><td><a href="#/u/'+esc(x.username)+'">'+esc(x.display_name)+'</a>'+(x.verified?' <span class="tag ver">Expert</span>':'')+'</td><td>'+esc(x.prediction_type)+': <b>'+esc(x.pick)+'</b></td><td class="muted">'+when(x.published_at)+'</td><td class="'+({correct:"o-won",incorrect:"o-lost"}[x.result]||"o-unknown")+'">'+esc(x.result||"pending")+'</td></tr>').join("")+'</tbody></table>':'<p class="muted">—</p>')+
     (j.verified_result?'<p>'+esc(t("mc.result"))+': <b>'+esc(j.verified_result.winner||j.verified_result.result_type)+'</b></p>':'')+'</div>'+
@@ -224,9 +254,9 @@ async match(el,id,tab){
   fantasy:async()=>{const f=await api("/matches/"+id+"/fantasy");if(!f.available)return emptyS(f.reason);
    return '<p class="muted">'+esc(t("fan.free"))+' '+esc(f.note)+' Rules: '+esc(f.rule_set)+'.</p>'+f.teams.map(x=>'<div class="card"><h3>'+esc(x.label)+' · '+esc(t("fan.risk"))+': '+esc(x.risk)+'</h3><div class="muted">'+esc(t("fan.captain"))+': <b>'+esc(x.captain.name)+'</b> · '+esc(t("fan.vice"))+': <b>'+esc(x.vice_captain.name)+'</b> · '+x.expected_points+' pts</div><table class="simple"><tbody>'+x.players.map(p=>'<tr><td>'+nm(p.team_id)+' '+esc(p.name)+'</td><td class="muted">'+esc(p.role.replace("_"," "))+'</td><td>'+p.expected_points+'</td><td class="muted">'+esc(p.confidence)+'</td></tr>').join("")+'</tbody></table></div>').join("")},
   live:async()=>{const s=await api("/matches/"+id+"/signals");const L=s.live;
-   setTimeout(()=>liveSubscribe(id,(k,d)=>{if(k==="status"&&d.message&&$("#lvst"))$("#lvst").textContent=d.message;if(k==="ball"){if($("#lvst"))$("#lvst").textContent=d.score+" ("+d.overs+") · "+(d.commentary||"");clearTimeout(window.__lvT);window.__lvT=setTimeout(()=>{if(/\/live$/.test(location.hash))SCREENS.match($("#main"),id,"live")},1500)}}),0);
+   mcLater(()=>liveSubscribe(id,(k,d)=>{if(k==="status"&&d.message&&$("#lvst"))$("#lvst").textContent=d.message;if(k==="ball"){if($("#lvst"))$("#lvst").textContent=d.score+" ("+d.overs+") · "+(d.commentary||"");clearTimeout(window.__lvT);window.__lvT=mcLater(()=>{if(/\/live$/.test(location.hash))SCREENS.match($("#main"),id,"live")},1500)}}));
    if(!L)return '<p class="muted" id="lvst" role="status"></p>'+emptyS("No ball-by-ball data for this match yet. Live data appears only for matches scored in SH PREDICTION or received from an authorized feed.");
-   setTimeout(()=>drawLine($("#lh"),[s.live_history.map(v=>v.predicted_team_id===m.home.id?v.confidence:100-v.confidence)],["--home"]),0);
+   mcLater(()=>drawLine($("#lh"),[s.live_history.map(v=>v.predicted_team_id===m.home.id?v.confidence:100-v.confidence)],["--home"]));
    return '<p class="muted" id="lvst" role="status" aria-live="polite">Live updates: connected</p><div class="card"><h3>Innings '+L.innings_no+' · '+esc(L.score)+' ('+esc(L.overs)+' ov)</h3>'+probBar(L.home_win_probability,m)+'<dl class="kv"><dt>CRR</dt><dd>'+L.current_run_rate+'</dd>'+(L.required_run_rate!=null?'<dt>RRR</dt><dd>'+L.required_run_rate+' · need '+L.runs_needed+'</dd>':'<dt>Projected</dt><dd>'+L.projected_score+'</dd>')+'<dt>'+esc(t("mc.partnerships"))+'</dt><dd>'+L.partnership.runs+' ('+L.partnership.balls+')</dd><dt>Last 12 balls</dt><dd>'+L.momentum_last_12_balls.runs+' runs, '+L.momentum_last_12_balls.wickets+' wkts</dd>'+(s.wicket_impact?'<dt>Next wicket</dt><dd>'+s.wicket_impact.next_wicket_swing+'% for the batting side</dd>':'')+'</dl></div>'+
     (s.over_by_over?'<div class="card"><h3>Phases</h3><table class="simple"><tbody>'+s.over_by_over.phases.map(p=>'<tr><td>'+esc(p.phase)+'</td><td class="muted">overs '+esc(p.overs)+'</td><td>'+p.runs+'</td><td class="muted">'+esc(p.status)+'</td></tr>').join("")+'</tbody></table><p class="muted">Projected total '+s.over_by_over.projected_total+'</p></div>':'')+
     '<div class="card"><h3>Win probability history</h3><canvas id="lh" width="700" height="200" aria-label="Home win probability over time"></canvas><h3 style="margin-top:10px">Turning points</h3>'+(s.turning_points.length?s.turning_points.map(x=>'<div>'+esc(x.at)+': <b class="'+(x.home_swing>=0?"c-home":"c-away")+'">'+(x.home_swing>0?"+":"")+x.home_swing+'%</b></div>').join(""):'<span class="muted">—</span>')+'</div>'},
@@ -235,11 +265,16 @@ async match(el,id,tab){
   partnerships:async()=>{const j=await api("/matches/"+id+"/partnerships");return j.innings.length?j.innings.map(i=>'<div class="card"><h3>Innings '+i.innings_no+'</h3><table class="simple"><tbody>'+i.partnerships.map(p=>'<tr><td>Wicket '+p.wicket+'</td><td>'+p.runs+' ('+p.balls+')</td><td class="muted">'+(p.ended?'ended '+esc(p.ended):'unbroken')+'</td></tr>').join("")+'</tbody></table></div>').join(""):emptyS(t("mc.not_reported"))},
   fow:async()=>{const j=await api("/matches/"+id+"/fall-of-wickets");const any=j.innings.some(i=>i.fall_of_wickets.length);return any?j.innings.map(i=>'<div class="card"><h3>Innings '+i.innings_no+'</h3>'+(i.fall_of_wickets.map(w=>'<div>'+w.wicket+'-'+w.score+' <span class="muted">('+esc(w.over)+' ov'+(w.batter?', '+esc(w.batter):'')+(w.how?', '+esc(w.how):'')+')</span></div>').join("")||'<span class="muted">—</span>')+'</div>').join(""):emptyS(t("mc.not_reported"))},
   graphs:async()=>{const g=await api("/matches/"+id+"/graphs");if(!g.innings.length)return emptyS(t("mc.not_reported"));
-   setTimeout(()=>{drawLine($("#worm"),g.innings.map(i=>i.worm),["--home","--away"]);g.innings.forEach(i=>drawBars($("#man"+i.innings_no),i.manhattan.map(o=>o.runs),i.manhattan.map(o=>o.wickets)))},0);
+   mcLater(()=>{drawLine($("#worm"),g.innings.map(i=>i.worm),["--home","--away"]);g.innings.forEach(i=>drawBars($("#man"+i.innings_no),i.manhattan.map(o=>o.runs),i.manhattan.map(o=>o.wickets)))});
    return '<div class="card"><h3>Worm</h3><canvas id="worm" width="700" height="200" aria-label="Cumulative runs by over"></canvas></div>'+g.innings.map(i=>'<div class="card"><h3>Manhattan · innings '+i.innings_no+'</h3><canvas id="man'+i.innings_no+'" width="700" height="160" aria-label="Runs per over, red bars had a wicket"></canvas></div>').join("")},
   result:async()=>{const r=await api("/matches/"+id+"/result");return r.available?'<div class="card"><h3>'+esc(r.summary)+'</h3>'+(r.margin?'<div>'+esc(r.margin)+(r.method?' ('+esc(r.method)+')':'')+'</div>':'')+'</div>':emptyS(t("mc.not_reported"))}
  };
- try{const ext=window.mcTab&&mcTab[tab]?await mcTab[tab](m,nm):null;tb.innerHTML=(ext==null?await (T[tab]||T.info)():ext)+(window.mcTabAfter&&mcTabAfter[tab]?mcTabAfter[tab](m):"")}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
+ try{const q=window._mcq=[];const ext=window.mcTab&&mcTab[tab]?await mcTab[tab](m,nm):null;const pre=window.mcTabBefore&&mcTabBefore[tab]?await mcTabBefore[tab](m):"";
+   const main=ext==null?await (T[tab]||T.info)():ext,end=window.mcTabEnd&&mcTabEnd[tab]?await mcTabEnd[tab](m):"";
+   if(!tb.isConnected)return;
+   tb.innerHTML=pre+main+(window.mcTabAfter&&mcTabAfter[tab]?mcTabAfter[tab](m):"")+end;
+   // DOM binders queued by the tab code run only now, after the whole tab is on screen
+   q.splice(0).forEach(f=>{try{f()}catch(e){console.error(e)}})}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
 },
 async experts(el,id){
  if(id){el.innerHTML=loading();try{const j=await api("/experts/"+id+"/history");const x=j.expert,s=j.summary;
@@ -291,7 +326,8 @@ async settings(el){
 }};
 
 async function route(){
- const h=(location.hash||"#/home").slice(2).split("/");const el=$("#main");
+ // each navigation renders into a fresh box, so a slower earlier screen can never write over the new one
+ const h=(location.hash||"#/home").slice(2).split("/");const el=document.createElement("div");el.className="screen";$("#main").replaceChildren(el);
  const page=h[0]||"home";navRender(NAV_OF[page]||page);window.scrollTo(0,0);
  if(page==="replay"){el.innerHTML=loading();try{const r=await api("/matches/"+h[1]+"/replay");el.innerHTML='<p><a href="#/match/'+h[1]+'/commentary">←</a></p><h2>'+esc(t("game.replay"))+'</h2>'+fieldHtml()+'<div class="card" id="gl" style="max-height:260px;overflow:auto"></div>';playField(r.events,true)}catch(e){errorS(el,e,route)}return}
  const fn=SCREENS[page]||SCREENS.home;try{await fn(el,h[1],h[2])}catch(e){errorS(el,e,route)}
@@ -315,6 +351,7 @@ window.addEventListener("online",route);window.addEventListener("offline",()=>{$
 </script>
 <script src="/hub_social.js?v=__SH_BUILD__"></script>
 <script src="/match_center.js?v=__SH_BUILD__"></script>
+<script src="/match_insights.js?v=__SH_BUILD__"></script>
 <script src="/shell.js?v=__SH_BUILD__"></script>
 </body>
 </html>

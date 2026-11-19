@@ -31,7 +31,10 @@ def settle(c, p):
     if not p["locked_at"]:
         return "ineligible", None, None, "not locked"
     if p["prediction_type"] in PRE_MATCH_TYPES and pdt(p["locked_at"]) >= pdt(m["start_utc"]):
-        return "ineligible", None, None, "locked at or after match start"
+        t = c.execute("SELECT verified_at FROM toss_results WHERE match_id=?", (m["id"],)).fetchone()
+        # post-toss window: winner/score picks made within 10 minutes of the toss stay eligible even if the start was delayed
+        if not (t and p["prediction_type"] != "toss" and (pdt(p["locked_at"]) - pdt(t[0])).total_seconds() <= 600 and pdt(p["locked_at"]) >= pdt(t[0])):
+            return "ineligible", None, None, "locked at or after match start"
     kind = p["prediction_type"]
     if kind == "toss":
         t = c.execute("SELECT * FROM toss_results WHERE match_id=?", (m["id"],)).fetchone()

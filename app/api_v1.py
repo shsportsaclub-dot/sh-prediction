@@ -646,8 +646,17 @@ def create_prediction(c, who, d, model=False, allow_unverified_expert=False):
     expl = (d.get("explanation") or "").strip()[:2000] or None
     origin = "demo" if m["data_origin"] == "demo" else "verified"
     started = engine.pdt(m["start_utc"]) <= engine.pdt(now())
-    if kind != "live_winner" and started:
-        raise ApiError(409, "MATCH_STARTED", "pre-match predictions close at the scheduled start time")
+    win = prediction_window(c, m)
+    if kind != "live_winner":
+        ok = win["pre_match"] == "open" or (win["pre_match"] == "post_toss" and kind != "toss")
+        if not ok:
+            raise ApiError(409, "MATCH_STARTED", "toss picks close at the toss; winner and score picks close 10 minutes after the toss or at the first ball")
+    if kind == "live_winner" and expert_id:
+        # tipster rule (owner, 19 Nov 2026): the pre-match report never changes; one extra update, only in the innings break
+        if win["update"] != "open":
+            raise ApiError(409, "UPDATE_CLOSED", "a tipster update is allowed only in the innings break, before the next innings' first ball")
+        if c.execute("SELECT 1 FROM predictions WHERE match_id=? AND prediction_type='live_winner' AND expert_id=?", (mid, expert_id)).fetchone():
+            raise ApiError(409, "UPDATE_USED", "this tipster has already posted the one update allowed for this match")
     source_type = "expert" if expert_id else "model"
     model_id = None if expert_id else engine.model_params(c)[0]["id"]
     if kind == "live_winner":
@@ -674,6 +683,107 @@ def create_prediction(c, who, d, model=False, allow_unverified_expert=False):
     engine.reevaluate_match(c, mid)
     audit(c, who["actor"], "prediction.create", "prediction", pid, d)
     return {"prediction_id": pid, "status": "locked" if lock else "draft", "locked_at": ts if lock else None}
+
+POST_TOSS_MIN = 10      # owner rule: after the toss tipsters get 10 minutes (until the first ball) for winner/score picks
+CHANGE_MIN = 5          # owner rule: a submitted pick can be changed for 5 minutes, then it locks for good
+
+def ball_bowled(c, m):
+    if c.execute("SELECT 1 FROM innings WHERE match_id=? AND legal_balls>0", (m["id"],)).fetchone() or \
+       c.execute("SELECT 1 FROM ball_events WHERE match_id=? LIMIT 1", (m["id"],)).fetchone():
+        return True
+    if c.execute("SELECT 1 FROM sqlite_master WHERE name='live_scores'").fetchone():
+        ls = c.execute("SELECT innings_json FROM live_scores WHERE match_id=?", (m["id"],)).fetchone()
+        try:
+            return any(str(i.get("o") or "0") not in ("0", "0.0") for i in json.loads(ls[0] or "[]")) if ls else False
+        except Exception:
+            return False
+    return False
+
+def timing_weight(c, match_id, locked_at):
+    """Ranking credit for a pick by when it was made: before the toss 1.0; after the toss it falls with each minute (0.6 -> 0.3)."""
+    t = c.execute("SELECT verified_at FROM toss_results WHERE match_id=?", (match_id,)).fetchone()
+    if not t or not locked_at or engine.pdt(locked_at) <= engine.pdt(t[0]):
+        return 1.0
+    mins = (engine.pdt(locked_at) - engine.pdt(t[0])).total_seconds() / 60
+    return round(max(0.3, 0.6 - 0.03 * mins), 3)
+
+def change_prediction(c, who, pid, d):
+    p = c.execute("SELECT p.*, x.user_id AS owner FROM predictions p LEFT JOIN expert_profiles x ON x.id=p.expert_id WHERE p.id=?", (pid,)).fetchone()
+    if not p:
+        raise ApiError(404, "NOT_FOUND", "prediction not found")
+    if not is_admin(who) and p["owner"] != (who or {}).get("user_id"):
+        raise ApiError(403, "FORBIDDEN", "not your prediction")
+    if (engine.pdt(now()) - engine.pdt(p["created_at"])).total_seconds() > CHANGE_MIN * 60:
+        raise ApiError(409, "LOCKED", "picks can be changed only within %d minutes of submitting; this one is locked" % CHANGE_MIN)
+    m = get_match(c, p["match_id"])
+    win = prediction_window(c, m)
+    open_ = win["update"] == "open" if p["prediction_type"] == "live_winner" else \
+        (win["pre_match"] == "open" or (win["pre_match"] == "post_toss" and p["prediction_type"] != "toss"))
+    if not open_:
+        raise ApiError(409, "MATCH_STARTED", "the prediction window for this pick has closed")
+    team, value = p["predicted_team_id"], p["predicted_value"]
+    if p["prediction_type"] in ("toss", "winner", "live_winner"):
+        team = int_id(d.get("predicted_team_id"), "predicted_team_id")
+        if team not in (m["home_team_id"], m["away_team_id"]):
+            raise bad("predicted_team_id must be the home or away team of this match")
+    else:
+        try:
+            value = float(d.get("predicted_value"))
+        except (TypeError, ValueError):
+            raise bad("predicted_value (runs) is required")
+    if p["status"] != "locked":
+        raise ApiError(409, "LOCKED", "only the current locked pick can be changed")
+    # locked rows are immutable: the old row is canceled (kept for the record) and a new locked row carries the new pick.
+    # created_at is copied so the 5-minute window always counts from the first submission.
+    ts = now()
+    c.execute("UPDATE predictions SET status='canceled' WHERE id=?", (pid,))
+    c.execute("""INSERT INTO predictions(prediction_uid,match_id,source_type,expert_id,model_version_id,prediction_type,predicted_team_id,predicted_value,
+                 confidence,explanation,factors_json,score_snapshot,created_at,locked_at,status,data_origin) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'locked',?)""",
+              (str(uuid.uuid4()), p["match_id"], p["source_type"], p["expert_id"], p["model_version_id"], p["prediction_type"], team, value,
+               p["confidence"], p["explanation"], p["factors_json"], p["score_snapshot"], p["created_at"], ts, p["data_origin"]))
+    new = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    if c.execute("SELECT 1 FROM prediction_publications WHERE prediction_id=?", (pid,)).fetchone():
+        c.execute("INSERT INTO prediction_publications(prediction_id,published_at,published_by,public_note) SELECT ?,?,published_by,public_note FROM prediction_publications WHERE prediction_id=?",
+                  (new, ts, pid))
+    c.execute("UPDATE posts SET prediction_id=? WHERE prediction_id=?", (new, pid))
+    engine.reevaluate_match(c, p["match_id"])
+    audit(c, who["actor"], "prediction.change", "prediction", pid, dict(d, replaced_by=new))
+    return {"prediction_id": new, "replaces": pid, "changeable_until": (engine.pdt(p["created_at"]) + timedelta(minutes=CHANGE_MIN)).isoformat(), "locked_at": ts}
+
+def prediction_window(c, m):
+    """When tipsters may post. pre_match: open until the toss is recorded, the match goes live or the scheduled start.
+    update: open only in the innings break (first innings over, second not yet started)."""
+    toss = c.execute("SELECT verified_at FROM toss_results WHERE match_id=?", (m["id"],)).fetchone()
+    if not toss:
+        pre = "open" if m["status"] == "scheduled" and engine.pdt(m["start_utc"]) > engine.pdt(now()) else "closed"
+    else:
+        mins = (engine.pdt(now()) - engine.pdt(toss[0])).total_seconds() / 60
+        pre = "post_toss" if mins < POST_TOSS_MIN and m["status"] in ("scheduled", "live") and not ball_bowled(c, m) else "closed"
+    upd, quota = "closed", {"T10": 60, "T20": 120, "The Hundred": 100, "ODI": 300, "List A": 300}.get(m["format"])
+    if m["status"] == "live":
+        inn = c.execute("SELECT innings_no, wickets, legal_balls, max_balls, completed FROM innings WHERE match_id=? AND is_super_over=0 ORDER BY innings_no", (m["id"],)).fetchall()
+        if inn:
+            done1 = inn[0]["completed"] or inn[0]["wickets"] >= 10 or (quota and inn[0]["legal_balls"] >= (inn[0]["max_balls"] or quota))
+            started2 = len(inn) > 1 and inn[1]["legal_balls"] > 0
+            upd = "open" if done1 and not started2 else "closed"
+        else:
+            ls = c.execute("SELECT * FROM live_scores WHERE match_id=?", (m["id"],)).fetchone() if \
+                c.execute("SELECT 1 FROM sqlite_master WHERE name='live_scores'").fetchone() else None
+            if ls:
+                d = dict(ls)
+                try:
+                    I = json.loads(d.get("innings_json") or d.get("score_json") or "[]")
+                except Exception:
+                    I = []
+                bb = lambda o: (lambda s: int(float(s[0] or 0)) * 6 + (int(s[1]) if len(s) > 1 and s[1] else 0))(str(o or 0).split("."))
+                txt = (d.get("status_text") or "").lower()
+                if "innings break" in txt:
+                    upd = "open"
+                elif len(I) == 1 and (I[0].get("w", 0) >= 10 or (quota and bb(I[0].get("o")) >= quota)):
+                    upd = "open"
+                elif len(I) >= 2 and bb(I[1].get("o")) == 0:
+                    upd = "open"
+    return {"pre_match": pre, "update": upd}
 
 def add_version(c, pid, team, value, conf, snapshot, factors):
     n = c.execute("SELECT COALESCE(MAX(version_no),0)+1 FROM prediction_versions WHERE prediction_id=?", (pid,)).fetchone()[0]
@@ -1758,6 +1868,52 @@ def h_db():
     c.execute("PRAGMA foreign_keys=ON")
     return c
 
+def match_insights(c, who, method, mid, what, q, body_fn):
+    import insights
+    r = get_match(c, mid)
+    R = dict(r)
+    R["home_short"] = r["home_code"] if r["home_code_ok"] else None
+    R["away_short"] = r["away_code"] if r["away_code_ok"] else None
+    uid = who.get("user_id") if who else None
+    if what == "fan-poll":
+        if method == "POST":
+            need_user(who)
+            try:
+                return 200, insights.fan_poll(c, R, uid, (body_fn() or {}).get("team_id"), now())
+            except ValueError as e:
+                raise ApiError(400, "BAD_REQUEST", str(e))
+        return 200, insights.fan_poll(c, R, uid)
+    if method != "GET":
+        raise ApiError(405, "METHOD_NOT_ALLOWED", "GET only")
+    if what == "discussions":
+        import social
+        sort = qv(q, "sort") or "top"
+        if sort == "mine":
+            need_user(who)
+        fd = social.feed(c, "match", uid, limit=100, match_id=mid)
+        items = fd["items"]
+        if sort == "mine":
+            items = [p for p in items if p["author_id"] == uid]
+        elif sort == "top":
+            sc = lambda p: (p.get("counts") or {}).get("likes", 0) * 3 + (p.get("counts") or {}).get("comments", 0) * 4
+            items = sorted(sorted(items, key=lambda p: p["created_at"], reverse=True), key=lambda p: -sc(p))
+        return 200, {"sort": sort, "items": items[:50], "poll": insights.fan_poll(c, R, uid)}
+    part = qv(q, "part") or "info"
+    pd = provider_detail(c, mid)
+    if part == "info":
+        return 200, insights.info(c, R, _team_family)
+    if part == "fantasy":
+        return 200, insights.fantasy(c, R, pd)
+    if part == "graphs":
+        return 200, insights.graphs(c, R, pd)
+    if part == "live":
+        return 200, insights.live(c, R, pd)
+    if part == "points":
+        return 200, insights.points(c, R, series_detail)
+    if part == "tipsters":
+        return 200, insights.tipsters(c, R, prediction_window(c, r))
+    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points or tipsters")
+
 def need_user(who):
     if not who or not who.get("user_id"):
         raise ApiError(401, "UNAUTHENTICATED", "login required")
@@ -1771,6 +1927,8 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
         if r is not None:
             return r
         raise ApiError(404, "NOT_FOUND", "unknown endpoint")
+    if len(P) == 3 and P[0] == "matches" and P[2] in ("insights", "fan-poll", "discussions"):
+        return match_insights(c, who, method, int_id(P[1], "match id"), P[2], q, body_fn)
     if method == "GET" and len(P) == 3 and P[0] == "matches" and P[2] in ("community", "replay"):
         mid = int_id(P[1], "match id")
         get_match(c, mid)
@@ -1920,6 +2078,9 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
             if not adm and who["role"] != "expert":
                 raise ApiError(403, "FORBIDDEN", "only verified experts or admins can submit predictions")
             return 201, create_prediction(c, who, d)
+        if len(P) == 3 and P[0] == "predictions" and P[2] == "change":
+            need_user(who) if not adm else None
+            return 200, change_prediction(c, who, int_id(P[1], "prediction id"), d)
         if len(P) == 3 and P[0] == "predictions" and P[2] == "lock":
             if not who:
                 raise ApiError(401, "UNAUTHENTICATED", "login required")

@@ -1,3 +1,19 @@
+# QA addendum — Match Center data depth (owner's 18 reference screenshots) and tipster timing rules (19 Nov 2026)
+
+`pytest`: **101 passed** (7 new in tests/test_insights.py). Chrome: 20 route loads at 390 px and 1366 px plus 10 tab checks: no JavaScript errors, no overflow.
+New `GET /matches/{id}/insights?part=info|fantasy|graphs|live|points|tipsters`, `GET /matches/{id}/discussions?sort=top|latest|mine`, `GET/POST /matches/{id}/fan-poll`, `POST /predictions/{id}/change`.
+- Info: toss line, series card, Playing XI links, team form chips (last 5) with match cards, head-to-head count + last 10 cards, the two teams' points-table rows, team comparison Overall / At this venue (last 10), venue stats (weather from Open-Meteo, CC BY 4.0, cached 30 min; won batting/bowling first donut; averages; highest/lowest with links; pace vs spin when bowler types are recorded; average score at 6/10/15/20 overs from ball-by-ball; recent matches).
+- Fantasy: live SH Points per player with event breakdown sheet and Prev/Next; leaderboard of SH fantasy teams. Values follow published T20 fantasy scoring (dream11.com/games/point-system, checked 19 Nov 2026). Free to play, no money. Reference check: 62 (34), 8x4, 3x6 = 130 + 2 dot balls = 132 as in the owner's screenshot.
+- Discussions: Top / Latest / My posts, fan "Who will win" vote (one per user, changeable while open), inline post box.
+- Live/Commentary: last two overs as ball chips, partnership and last wicket from ball rows.
+- Scorecard: innings switcher, "yet to bat" when the source sends an XI. Points Table: full table, both teams highlighted, team-form toggle, other seasons, leaders.
+- Graphs: SH AI win probability per over (our model, not betting odds), Manhattan, Worm, over-by-over history with ball chips. Betting odds and session markets from the reference app were deliberately not built.
+- Tipster rules: toss picks close at the toss; winner/score picks get 10 minutes after the toss (until the first ball); any pick can be changed for 5 minutes (old row kept, canceled, new locked row); one innings-break update per tipster; ranking credit 1.0 before the toss, 0.6 falling 0.03/min after (min 0.3). Tipster reports scroll upward under Live (and under Info before the match).
+- Bottom bar: centre "+ Post" button opens the composer with match selection; a just-posted pick shows a 5-minute change panel.
+- Rendering: each navigation renders into a fresh box and tab binders run after the whole tab is drawn (fixes lost filter buttons when a tab loads extra data).
+
+---
+
 # QA addendum — owner mockups (10 concept boards, 19 Nov 2026) applied to the real app
 
 `pytest`: **93 passed**. Chrome: 48 page loads (12 routes × 2 loads × phone 390 px and desktop 1366 px): no JavaScript errors, no "could not load". Startup now draws once, after all screen scripts load, which fixes an intermittent "Cannot set properties of null" on deep links.
