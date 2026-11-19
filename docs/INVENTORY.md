@@ -21,6 +21,7 @@ Legend: ✅ done and tested · 🟡 works, limited by data or not fully tested �
 | Accuracy & audit engine | ✅ | ICC settlement, superseded evaluations, full audit log |
 | Admin management system | ✅ | 12 admin screens (`/admin-panel`) |
 | Notification engine | ⬜ | Table exists; no sending yet (needs a free channel decision) |
+| Cricsheet historical import | ✅ | Free (ODC-By 1.0), allow-listed downloads, own parser, results/toss/innings/ball-by-ball/scorecards/XI, dedupe by Cricsheet id, attribution shown; limited-overs only; not live; tested with synthetic files (this workspace cannot reach cricsheet.org) |
 | Data ingestion gateway | 🟡 | Contract, cache, validation, dedupe, retry, adapters (manual, demo, licensed placeholder); no licensed feed connected |
 | Multilingual system | ✅ | 9 languages complete; 15 more with honest partial coverage |
 | Master List (results, admin only) | ✅ | Matches the approved sample exactly |

@@ -200,7 +200,20 @@ def _seed2(c):
     for k, v in (("public_site_enabled", "1"), ("default_language", "en"), ("viewer_sees_demo_option", "1")):
         c.execute("INSERT OR IGNORE INTO system_settings(key,value,updated_at,updated_by) VALUES(?,?,?,'migration')", (k, v, now()))
 
-MIGRATIONS = [("001_normalized_core", M001, _seed), ("002_publishing_admin_gateway", M002, _seed2)]
+M003 = """
+CREATE INDEX IF NOT EXISTS ball_events_match ON ball_events(match_id, innings_no, seq);
+CREATE INDEX IF NOT EXISTS scorecards_player ON scorecards(player_id);
+CREATE INDEX IF NOT EXISTS syncs_local ON data_provider_syncs(provider, provider_entity, local_id);
+"""
+
+def _seed3(c):
+    # Cricsheet: free historical ball-by-ball data under the Open Data Commons Attribution License 1.0
+    c.execute("INSERT OR IGNORE INTO data_providers(name,kind,enabled,config_json) VALUES('cricsheet','licensed',1,?)",
+              (json.dumps({"licence": "Open Data Commons Attribution License 1.0", "licence_url": "https://cricsheet.org/licensing/",
+                           "attribution": "Cricsheet (cricsheet.org)", "historical_only": True}),))
+
+MIGRATIONS = [("001_normalized_core", M001, _seed), ("002_publishing_admin_gateway", M002, _seed2),
+              ("003_cricsheet_history", M003, _seed3)]
 
 def pending(c):
     if not c.execute("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone():

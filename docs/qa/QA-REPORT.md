@@ -1,7 +1,7 @@
 # QA report — Batch 03 (own platform: admin/viewer split, engines, fantasy, assistant, data gateway)
 
 Run date: 2026-11-19 (IST). Python 3.13, SQLite, Google Chrome headless (Playwright).
-Every PASS below comes from an actual run of `python -m unittest discover -s tests -v` → **Ran 55 tests, OK**
+Every PASS below comes from an actual run of `python -m unittest discover -s tests -v` → **Ran 57 tests, OK**
 (the 33 tests from commit 8cf4369 were re-run first and passed; some were updated where the new instructions changed the rules, see below).
 
 ## Master Script §12 checklist
@@ -32,6 +32,8 @@ Tests changed on purpose (new instructions): viewer reads are public (401 now on
 ## All automated tests
 | Test | Result |
 |---|---|
+| `test_v1.CricsheetImport.test_import_results_scorecards_dedupe_and_attribution` | PASS |
+| `test_v1.CricsheetImport.test_download_retries_then_fails_cleanly` | PASS |
 | `test_api.Acc.test_approved_prediction_immutable` | PASS |
 | `test_api.Acc.test_csv_export_neutralises_formulas` | PASS |
 | `test_api.Acc.test_late_prediction_excluded` | PASS |
@@ -137,6 +139,10 @@ Tests changed on purpose (new instructions): viewer reads are public (401 now on
 * admin-light-master.png
 * admin-light-predictions.png
 
+## Cricsheet importer
+Tested with synthetic files in the exact Cricsheet JSON layout: win by runs, tie decided by Super Over, no result, D/L win, Test match skipped; re-import adds nothing; one player row per Cricsheet person id; bowler not charged leg-byes; wides not counted as balls faced; attribution visible on viewer scorecard and Data sources. Screenshots: viewer-dark-cricsheet-scorecard.png, viewer-dark-data-sources.png, admin-dark-cricsheet.png.
+
 ## Not verified
+* A real download from cricsheet.org: this workspace's network blocks it, so the first real import must run on the server.
 * Staging deployment (needs your approval), physical Android device, Firefox/Safari.
 * Real league data: the six league Google Sheets returned "permission denied" to this session.

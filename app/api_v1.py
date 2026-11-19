@@ -15,6 +15,7 @@ import uuid
 import sqlite3
 
 import assistant
+import cricsheet
 import engine
 import fantasy
 import gateway
@@ -186,9 +187,13 @@ def form_of(c, team_id, before, n=5):
                       ORDER BY m.start_utc DESC LIMIT ?""", (team_id, team_id, before, n)).fetchall()
     return "".join("W" if r[0] == team_id else ("L" if r[0] else "N") for r in rs)
 
+def attribution_for(source):
+    return {"text": "Data: " + cricsheet.ATTRIBUTION, "url": cricsheet.LICENSE_URL} if (source or "").startswith("Cricsheet") else None
+
 def match_detail(c, mid):
     r = get_match(c, mid)
     d = match_out(r)
+    d["attribution"] = attribution_for(r["source"])
     h, a = r["home_team_id"], r["away_team_id"]
     h2h = c.execute("""SELECT r.winner_team_id FROM matches m JOIN match_results r ON r.match_id=m.id
                        WHERE ((m.home_team_id=? AND m.away_team_id=?) OR (m.home_team_id=? AND m.away_team_id=?)) AND m.id<>?
@@ -1272,6 +1277,13 @@ def dispatch(c, who, method, parts, q, body_fn):
             if len(P) == 3 and P[2] in sub:
                 get_match(c, mid)
                 return 200, sub[P[2]]()
+        if P == ["sources"]:
+            return 200, {"items": [
+                {"name": "Cricsheet", "url": "https://cricsheet.org", "licence": "Open Data Commons Attribution License 1.0",
+                 "licence_url": cricsheet.LICENSE_URL, "covers": "historical ball-by-ball data (after matches finish; not live)",
+                 "matches_imported": c.execute("SELECT COUNT(*) FROM data_provider_syncs WHERE provider='cricsheet' AND provider_entity='match'").fetchone()[0]},
+                {"name": "SH PREDICTION verified entry", "covers": "fixtures, tosses, results and live scoring entered by SH admins"},
+                {"name": "SH demo generator", "covers": "clearly labelled demo data, never mixed with real data"}]}
         if P == ["competitions"]:
             return 200, {"items": rows(c.execute("SELECT id,name,category,division,format,featured,data_origin FROM competitions ORDER BY featured DESC, category, name"))}
         if P == ["teams"]:
@@ -1333,6 +1345,11 @@ def dispatch(c, who, method, parts, q, body_fn):
                                                      if c.execute("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone() else []}}
             if A in simple:
                 return 200, simple[A]()
+            if A == ("cricsheet",):
+                return 200, {"files": [{"key": k, "file": v[0], "label": v[1]} for k, v in cricsheet.ZIPS.items()],
+                             "attribution": cricsheet.ATTRIBUTION, "licence_url": cricsheet.LICENSE_URL,
+                             "imported_matches": c.execute("SELECT COUNT(*) FROM data_provider_syncs WHERE provider='cricsheet' AND provider_entity='match'").fetchone()[0],
+                             "runs": rows(c.execute("SELECT * FROM data_sync_runs WHERE provider='cricsheet' ORDER BY id DESC LIMIT 10"))}
             if A == ("model-versions",):
                 items = rows(c.execute("SELECT * FROM model_versions ORDER BY id DESC"))
                 for i in items:
@@ -1379,6 +1396,27 @@ def dispatch(c, who, method, parts, q, body_fn):
                 return (201 if A == ("model-versions",) else 200), flat[A](c, who, d)
             if A == ("settings",):
                 return 200, admin_settings(c, who, d)
+            if A == ("cricsheet", "import") or A == ("providers", "cricsheet", "sync"):
+                key = d.get("file") or "recent_7"
+                if key not in cricsheet.ZIPS:
+                    raise bad("file must be one of: " + ", ".join(cricsheet.ZIPS))
+                if not c.execute("SELECT enabled FROM data_providers WHERE name='cricsheet'").fetchone()[0]:
+                    raise ApiError(409, "DISABLED", "Cricsheet provider is disabled")
+                limit = d.get("limit")
+                if limit is not None and (not isinstance(limit, int) or not 1 <= limit <= 50000):
+                    raise bad("limit must be 1..50000")
+                audit(c, who["actor"], "cricsheet.import", "provider", "cricsheet", {"file": key, "limit": limit})
+                c.commit()
+                try:
+                    job, _ = cricsheet.start_job(DB_FN, key, lambda conn: (lambda row: admin_match(conn, {"actor": "cricsheet-import", "role": "admin", "user_id": None}, row)),
+                                                 limit=limit, opener=CRICSHEET_OPENER)
+                except RuntimeError as e:
+                    raise ApiError(409, "BUSY", str(e))
+                return 202, job
+            if A == ("player-stats", "rebuild"):
+                r = cricsheet.rebuild_player_statistics(c)
+                audit(c, who["actor"], "player_stats.rebuild", "player_statistics", r["player_format_rows"], {})
+                return 200, r
             if A == ("demo-seed",):
                 return 200, demo_seed(c, who)
             if A == ("system", "migrate"):
@@ -1423,6 +1461,7 @@ def dispatch(c, who, method, parts, q, body_fn):
     raise ApiError(405, "METHOD_NOT_ALLOWED", "method not allowed")
 
 DB_PATH = None  # set by main.py
+CRICSHEET_OPENER = None  # tests inject a fake downloader; production uses urllib
 
 def _db_path():
     return DB_PATH

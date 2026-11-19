@@ -24,6 +24,7 @@ Before the database migration has been run, every endpoint except `/i18n/*` and 
 | GET | `/experts`, `/experts/{id}/history` | ranked on published tips |
 | GET | `/analytics/accuracy` · `/toss` · `/home-away` · `/venue` | published predictions only |
 | GET | `/competitions`, `/teams`, `/languages`, `/i18n/{code}` | `coverage_percent` is honest |
+| GET | `/sources` | data sources, licences and Cricsheet attribution |
 | POST | `/assistant` | `{"question","language"}` → grounded answer + sources |
 | GET | `/data/fixtures` · `/data/results` · `/data/live` · `/data/history` | Cricket Data Gateway (cached) |
 | GET | `/data/scorecards/{id}` · `/data/commentary/{id}` · `/data/squads/{id}` · `/data/playing-xi/{id}` | |
@@ -52,6 +53,8 @@ Before the database migration has been run, every endpoint except `/i18n/*` and 
 | GET / POST | `/admin/settings`, `/admin/fantasy/rules`, `/admin/model-versions` | |
 | GET / POST | `/admin/providers`, `/admin/providers/{name}`, `/admin/providers/{name}/sync` | keys never stored here |
 | POST | `/admin/import` | CSV, dry run unless `commit: true` |
+| GET / POST | `/admin/cricsheet`, `/admin/cricsheet/import` | `{"file": "ipl"|"bbl"|"wbb"|"wpl"|"npl"|"ilt"|"t20s"|"recent_2"|"recent_7"|"recent_30"|"all", "limit"}` → 202, runs in the background on our server |
+| POST | `/admin/player-stats/rebuild` | career figures per format from stored scorecards |
 | GET | `/admin/accuracy`, `/admin/calibration` | all locked predictions; walk-forward backtest |
 | GET / POST | `/admin/system/status`, `/admin/system/migrate` | `{"confirm": true}` → verified backup, then migrate |
 

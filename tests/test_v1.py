@@ -705,3 +705,134 @@ class Languages(unittest.TestCase):
             if not b["ui_complete"]:
                 self.assertIsNotNone(b["fallback_note"])
         self.assertGreaterEqual(sum(1 for l in langs.values() if l["coverage_percent"] == 100), 6)
+
+# ---------------------------------------------------------------- Cricsheet importer
+def _cs_doc(teams, winner=None, by=None, result=None, eliminator=None, method=None, toss=("A", "field"), event="SH Test League", season="2025",
+            overs=20, deliveries=None, second=None, mtype="T20", date="2025-04-01"):
+    """A small synthetic document in the Cricsheet JSON layout (test data, not real matches)."""
+    a, b = teams
+    people = {n: "%08x" % (abs(hash(n)) % 0xFFFFFFFF) for n in ("%s1" % a, "%s2" % a, "%s3" % a, "%s1" % b, "%s2" % b)}
+    outcome = {}
+    if winner: outcome.update(winner=winner, by=by or {"runs": 10})
+    if result: outcome["result"] = result
+    if eliminator: outcome["eliminator"] = eliminator
+    if method: outcome["method"] = method
+    def inn(team, bat1, bat2, bowler, balls, target=None):
+        overs_l, cur = [], []
+        for i, x in enumerate(balls):
+            d = {"batter": bat1, "bowler": bowler, "non_striker": bat2, "runs": {"batter": 0, "extras": 0, "total": 0}}
+            if x == "W":
+                d["wickets"] = [{"player_out": bat1, "kind": "bowled"}]
+            elif x == "wd":
+                d["runs"] = {"batter": 0, "extras": 1, "total": 1}; d["extras"] = {"wides": 1}
+            elif x == "lb":
+                d["runs"] = {"batter": 0, "extras": 1, "total": 1}; d["extras"] = {"legbyes": 1}
+            else:
+                d["runs"] = {"batter": x, "extras": 0, "total": x}
+            cur.append(d)
+            if sum(1 for y in cur if "extras" not in y or "wides" not in y["extras"]) == 6:
+                overs_l.append({"over": len(overs_l), "deliveries": cur}); cur = []
+        if cur:
+            overs_l.append({"over": len(overs_l), "deliveries": cur})
+        r = {"team": team, "overs": overs_l}
+        if target: r["target"] = {"runs": target, "overs": overs}
+        return r
+    innings = [inn(a, "%s1" % a, "%s2" % a, "%s1" % b, deliveries or [4, 6, "wd", 1, "W", 0, 2, "lb"])]
+    if second is not None:
+        innings.append(inn(b, "%s1" % b, "%s2" % b, "%s1" % a, second, target=sum(x for x in (deliveries or [4, 6, 1, 0, 2]) if isinstance(x, int)) + 3))
+    return {"meta": {"data_version": "1.1.0"}, "info": {"balls_per_over": 6, "city": "Testville", "dates": [date], "event": {"name": event, "match_number": 1},
+            "gender": "male", "match_type": mtype, "outcome": outcome, "overs": overs, "players": {a: ["%s1" % a, "%s2" % a, "%s3" % a], b: ["%s1" % b, "%s2" % b]},
+            "registry": {"people": people}, "season": season, "teams": [a, b], "toss": {"winner": toss[0] if toss[0] in teams else a, "decision": toss[1]},
+            "venue": "Synthetic Oval"}, "innings": innings}
+
+def _cs_zip(docs):
+    import zipfile, io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for k, d in docs.items():
+            z.writestr(k + ".json", json.dumps(d))
+        z.writestr("README.txt", "synthetic")
+    return buf.getvalue()
+
+class CricsheetImport(unittest.TestCase):
+    def setUp(self):
+        import cricsheet
+        self.cs = cricsheet
+        self.docs = {
+            "900001": _cs_doc(("CsLions", "CsTigers"), winner="CsLions", by={"runs": 7}, toss=("CsLions", "bat"), second=[1, 0, "W", 2]),
+            "900002": _cs_doc(("CsTigers", "CsLions"), result="tie", eliminator="CsLions", toss=("CsTigers", "field"), date="2025-04-03"),
+            "900003": _cs_doc(("CsLions", "CsTigers"), result="no result", toss=("CsTigers", "field"), date="2025-04-05"),
+            "900004": _cs_doc(("CsLions", "CsTigers"), winner="CsTigers", by={"wickets": 4}, method="D/L", date="2025-04-07"),
+            "900005": _cs_doc(("CsLions", "CsTigers"), winner="CsLions", mtype="Test", date="2025-04-09"),
+        }
+        data = _cs_zip(self.docs)
+        import io as _io
+        api_v1.CRICSHEET_OPENER = lambda req, timeout=None: _io.BytesIO(data)
+
+    def tearDown(self):
+        api_v1.CRICSHEET_OPENER = None
+
+    def _run(self, body):
+        s, r = call("/api/v1/admin/cricsheet/import", body, A)
+        self.assertEqual(s, 202, r)
+        for _ in range(100):
+            runs = call("/api/v1/admin/cricsheet", h=A)[1]["runs"]
+            run = [x for x in runs if x["id"] == r["run_id"]][0]
+            if run["status"] != "running":
+                return run
+            time.sleep(0.05)
+        self.fail("import did not finish")
+
+    def test_import_results_scorecards_dedupe_and_attribution(self):
+        self.assertEqual(call("/api/v1/admin/cricsheet/import", {"file": "https://evil.example/x.zip"}, A)[0], 400)  # fixed allow-list only
+        self.assertEqual(call("/api/v1/admin/cricsheet/import", {"file": "ipl"})[0], 403)
+        run = self._run({"file": "ipl"})
+        self.assertEqual((run["status"], run["created"], run["rejected"]), ("ok", 4, 1), run)   # the Test match is skipped
+        again = self._run({"file": "ipl"})
+        self.assertEqual((again["created"], again["duplicates"]), (0, 4))
+        c = db()
+        mid = lambda k: c.execute("SELECT local_id FROM data_provider_syncs WHERE provider='cricsheet' AND provider_entity='match' AND provider_id=?", (k,)).fetchone()[0]
+        res = lambda k: tuple(c.execute("SELECT r.result_type, t.name, r.margin, r.method FROM match_results r LEFT JOIN teams t ON t.id=r.winner_team_id WHERE r.match_id=?", (mid(k),)).fetchone())
+        self.assertEqual(res("900001"), ("win", "CsLions", "7 runs", None))
+        self.assertEqual(res("900002"), ("tie_super_over", "CsLions", None, "Super Over"))
+        self.assertEqual(res("900003"), ("no_result", None, None, None))
+        self.assertEqual(res("900004"), ("win", "CsTigers", "4 wickets", "D/L"))
+        toss = c.execute("SELECT t.name, tr.decision FROM toss_results tr JOIN teams t ON t.id=tr.winner_team_id WHERE tr.match_id=?", (mid("900002"),)).fetchone()
+        self.assertEqual(tuple(toss), ("CsTigers", "bowl"))   # Cricsheet "field" is stored as bowl
+        # innings 1 of 900001: 4,6,wd,1,W,0,2,lb -> 15 runs, 1 wicket, 7 legal balls
+        sc = call("/api/v1/matches/%d/scorecard" % mid("900001"))[1]["innings"][0]
+        self.assertEqual((sc["runs"], sc["wickets"], sc["overs"]), (15, 1, "1.1"))
+        bat = {p["name"]: p for p in sc["players"]}
+        self.assertEqual((bat["CsLions1"]["runs"], bat["CsLions1"]["balls"], bat["CsLions1"]["fours"], bat["CsLions1"]["sixes"]), (13, 7, 1, 1))  # synthetic data keeps the same striker; wide not a ball faced
+        self.assertTrue(bat["CsLions1"]["dismissal"].startswith("bowled"))
+        self.assertEqual((bat["CsTigers1"]["runs_conceded"], bat["CsTigers1"]["wickets"]), (14, 1))  # leg-bye not charged to the bowler
+        m = call("/api/v1/matches/%d" % mid("900001"))[1]
+        self.assertIn("Open Data Commons Attribution License", m["attribution"]["text"])
+        self.assertEqual(m["data_origin"], "imported")
+        self.assertEqual(len(m["playing_xi"]), 5)
+        src = call("/api/v1/sources")[1]["items"][0]
+        self.assertEqual((src["name"], src["matches_imported"] >= 4), ("Cricsheet", True))
+        # results master and statistics use the imported data; it is never treated as demo
+        cid = c.execute("SELECT competition_id FROM matches WHERE id=?", (mid("900001"),)).fetchone()[0]
+        ml = call("/api/v1/admin/master-list?competition_id=%d" % cid, h=A)[1]["items"]
+        self.assertEqual([(r["toss"]["outcome"] if r["toss"] else None) for r in ml], ["won", "lost", "unknown", "lost"])  # 900004: CsLions won the toss, CsTigers won (D/L)
+        st = c.execute("SELECT matches, runs FROM player_statistics ps JOIN players p ON p.id=ps.player_id WHERE p.name='CsLions1' AND format='T20'").fetchone()
+        self.assertEqual(st[0], 4)
+        # same Cricsheet person id -> one player row across matches
+        self.assertEqual(c.execute("SELECT COUNT(*) FROM players WHERE name='CsLions1'").fetchone()[0], 1)
+        c.close()
+
+    def test_download_retries_then_fails_cleanly(self):
+        calls = []
+        def boom(req, timeout=None):
+            calls.append(req.full_url); raise OSError("network down")
+        old = time.sleep
+        try:
+            import cricsheet as cs
+            cs.time.sleep = lambda s: None
+            with self.assertRaises(RuntimeError):
+                cs.download("recent_2", opener=boom)
+        finally:
+            cs.time.sleep = old
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(u == "https://cricsheet.org/downloads/recently_added_2_json.zip" for u in calls))
