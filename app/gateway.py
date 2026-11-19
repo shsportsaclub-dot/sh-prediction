@@ -63,7 +63,49 @@ class LicensedFeedProvider(ProviderAdapter):
     def __init__(self, config=None):
         self.config = config or {}
     def fetch_fixtures(self):
-        raise RuntimeError("licensed feed not configured (no contract/key)")
+        if self.config.get("provider") != "cricketdata":
+            raise RuntimeError("licensed feed provider not configured")
+        import os
+        import urllib.parse
+        import urllib.request
+        from datetime import datetime, timezone
+        key = os.getenv("CRICKETDATA_API_KEY", "").strip()
+        if not key:
+            raise RuntimeError("CRICKETDATA_API_KEY missing in server environment")
+        if not self.config.get("contract_reference"):
+            raise RuntimeError("CricketData subscription reference required")
+        # Provider documents 25 rows per page. Limit pagination to protect daily API quota.
+        pages = max(1, min(int(self.config.get("pages", 1)), 4))
+        endpoint = "https://api.cricapi.com/v1/currentMatches"
+        out = []
+        for page in range(pages):
+            url = endpoint + "?" + urllib.parse.urlencode({"apikey": key, "offset": page * 25})
+            request = urllib.request.Request(url, headers={"User-Agent": "SH-PREDICTION/1.0"})
+            with urllib.request.urlopen(request, timeout=20) as response:
+                payload = json.load(response)
+            if payload.get("status") != "success":
+                raise RuntimeError("CricketData returned an unsuccessful response")
+            items = payload.get("data") or []
+            if not isinstance(items, list):
+                raise RuntimeError("CricketData returned invalid match data")
+            for match in items:
+                teams = match.get("teams") or []
+                if len(teams) != 2 or not match.get("id") or not match.get("dateTimeGMT"):
+                    continue
+                try:
+                    dt = datetime.fromisoformat(match["dateTimeGMT"].replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)  # CricketData dateTimeGMT is UTC
+                except (ValueError, TypeError):
+                    continue
+                fmt = {"t20": "T20", "odi": "ODI", "test": "Test"}.get(str(match.get("matchType", "")).lower(), "Other")
+                out.append({"provider_id": str(match["id"]), "competition": str(match.get("series_id") or "CricketData current matches"),
+                            "season": str(dt.year), "home": str(teams[0]), "away": str(teams[1]),
+                            "start_utc": dt.astimezone(timezone.utc).isoformat(), "venue": match.get("venue"),
+                            "format": fmt, "source": "CricketData.org / CricAPI (subscribed feed)"})
+            if len(items) < 25:
+                break
+        return out
 
 ADAPTERS = {"demo": DemoProvider, "manual": ManualProvider, "licensed_feed": LicensedFeedProvider}
 
