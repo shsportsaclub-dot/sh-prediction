@@ -548,3 +548,46 @@ class AutoPrepare(unittest.TestCase):
             c = main.db(); self.assertTrue(schema.pending(c)); c.close()
         finally:
             main.DB = old
+
+
+class SeriesHomeFilters(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+        docs = {}
+        for i, (a, b, w, d) in enumerate([("India Women", "Australia Women", "India Women", "2025-03-01"), ("Australia Women", "India Women", "Australia Women", "2025-03-03"),
+                                          ("India Women", "Australia Women", "India Women", "2025-03-05")]):
+            docs["97100%d" % i] = T._cs_doc((a, b), winner=w, date=d, event="QS Women's Series", second=[1, 0, "W", 2])
+        for i, (a, b, w, d) in enumerate([("QS Kings", "QS Queens", "QS Kings", "2025-04-01"), ("QS Queens", "QS Rooks", "QS Rooks", "2025-04-02"),
+                                          ("QS Kings", "QS Rooks", None, "2025-04-03")]):
+            doc = T._cs_doc((a, b), winner=w, result=None if w else "no result", date=d, event="QS League", second=[1, 0, "W", 2])
+            docs["97200%d" % i] = doc
+        r = run("cricsheet_recent", Fake({"recently_added_7_json.zip": T._cs_zip(docs)}))
+        assert r["status"] == "ok", r
+
+    def test_filters_use_real_metadata(self):
+        women = T.call("/api/v1/matches?status=results&gender=women&limit=100")[1]["items"]
+        self.assertTrue(women and all("Women" in (m["home"]["name"] + m["away"]["name"] + m["competition"]) for m in women))
+        intl = {m["id"] for m in T.call("/api/v1/matches?status=results&scope=international&limit=100")[1]["items"]}
+        dom = {m["id"] for m in T.call("/api/v1/matches?status=results&scope=domestic&limit=100")[1]["items"]}
+        self.assertFalse(intl & dom)
+        qs = [m for m in T.call("/api/v1/matches?status=results&q=QS&limit=100")[1]["items"]]
+        self.assertTrue(all(m["id"] in intl for m in qs if "India Women" in m["home"]["name"]))   # India Women v Australia Women = international
+        self.assertTrue(all(m["id"] in dom for m in qs if "Kings" in m["home"]["name"] or "Queens" in m["home"]["name"]))
+        self.assertTrue(all(m["format"] == "Test" for m in T.call("/api/v1/matches?status=results&format=Test&limit=100")[1]["items"]))
+        self.assertEqual(T.call("/api/v1/matches?format=Gully")[0], 400)
+
+    def test_series_page_points_table_and_dashboard(self):
+        s = [x for x in T.call("/api/v1/series?q=QS%20League")[1]["items"] if x["name"].startswith("QS League")][0]
+        self.assertEqual((s["matches"], s["completed"]), (3, 3))
+        d = T.call("/api/v1/series/%d" % s["id"])[1]
+        pt = {x["team"]: x for x in d["points_table"]}
+        self.assertEqual((pt["QS Kings"]["played"], pt["QS Kings"]["won"], pt["QS Kings"]["no_result"], pt["QS Kings"]["points"]), (2, 1, 1, 3))
+        self.assertEqual((pt["QS Queens"]["lost"], pt["QS Queens"]["points"]), (2, 0))
+        self.assertEqual(d["points_table"][0]["team"], "QS Kings")                                    # 3 pts first; Rooks also 3 -> NRR decides
+        self.assertIsNotNone(pt["QS Kings"]["nrr"])
+        self.assertTrue(d["top_batters"] and d["results"] and not d["fixtures"])
+        self.assertEqual(T.call("/api/v1/series/999999")[0], 404)
+        h = T.call("/api/v1/home/dashboard")[1]
+        self.assertIn("Data not available from the current source", h["news_note"])
+        self.assertIsNone(h["news"])

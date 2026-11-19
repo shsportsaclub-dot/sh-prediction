@@ -1,3 +1,11 @@
+# QA addendum — Blueprint v2.0, Phase 2 (core application)
+
+`pytest`: **93 passed**. Chrome at 360/390/430 px (phone), 768 px (tablet), 1366 px (desktop): Home, Matches, Series list, Series page (points table), Predictions, Match Center (default tab by status), More, Search, Social, Leaderboard: **no JavaScript errors, no horizontal overflow** (only the intended scrolling rows). The new Home is drawn on every load (3 loads per width). Screenshots: `docs/qa/v2/`.
+Built: 5-item bottom bar (Home · Matches · Series · Predictions · More), global header (live indicator, search, language, notifications, theme, profile), Cricbuzz-style Home (featured match cards with innings scores, RRR when chasing, status/result/start time; filters All/Live/Upcoming/Results/International/Domestic/Women/T20/ODI/Test/T10 against real match fields; featured predictions labelled Estimate; SH feature shortcuts; dashboard), Series pages (fixtures, results, points table with ICC-style NRR, teams, top run-scorers and wicket-takers), Match Center tab order Weather → Graphs plus "More match details", one missing-data sentence in 9 languages.
+Not available from current sources (shown as such): news, rankings. Not built yet: player/team/venue profile pages, weather feed, 3D Virtual Live, Broadcast Studio (Phases 3–5).
+
+---
+
 # QA addendum — Batch 05b (AllCric-style Match Center on the free plan, tipster world ranking)
 
 `pytest`: **85 passed** (2 runs). SH SOCIAL E2E: **21/21**. Chrome 390×844: Live (score header with last-ball flash, over strip, batters, bowler, opening-stand partnership), Scorecard (batting, extras breakdown, total, bowling), Playing XI (squads with roles, initials instead of photos), Graphs (Manhattan from provider ball rows), Head-to-head (last-5 form, H2H list), Info (venue stats), Tipster leaderboard (pinned "#1 You" row + world rank): `docs/qa/match-center/*.png`. No JavaScript errors.

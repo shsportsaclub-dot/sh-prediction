@@ -21,7 +21,7 @@ header.top img{width:34px;height:34px;object-fit:contain}
 header.top h1{font-size:16px;letter-spacing:.12em;margin:0;flex:1;font-weight:800}
 .bar{height:3px;background:linear-gradient(90deg,var(--brand-red),var(--brand-blue))}
 main{max-width:1000px;margin:auto;padding:12px 12px 90px}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 nav.tabs a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;color:var(--muted);text-decoration:none;font-size:10.5px;text-align:center}
 nav.tabs a svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8}
 nav.tabs a[aria-current=page]{color:var(--text)}
@@ -71,6 +71,20 @@ canvas{width:100%;height:190px;display:block}
 .av{width:34px;height:34px;border-radius:50%;background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
 .fm{display:inline-flex;width:24px;height:24px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-left:4px;background:var(--surface2)}.fm.fW{background:#13a058;color:#fff}.fm.fL{background:#5b1420;color:#fff}
 .h2h-row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+header.top{display:flex;align-items:center;gap:10px}.hdr{display:flex;gap:2px;align-items:center}.hb{background:none;border:0;padding:6px;color:var(--text);display:inline-flex;align-items:center;cursor:pointer}
+.hb svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}.live-dot{background:#e0262f;color:#fff;font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.5px;animation:lp 1.6s infinite}
+@keyframes lp{50%{opacity:.6}}.sec{margin:14px 0}.sec-h{display:flex;align-items:baseline;justify-content:space-between}.sec h2{font-size:18px;margin:6px 0 8px}
+.hscroll{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.hscroll .lcard{flex:0 0 82%;max-width:330px;scroll-snap-align:start}
+.lcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);text-decoration:none}.lcard.is-live{border-color:#e0262f}
+.lc-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.lc-comp{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lc-meta{font-size:12px;margin:2px 0 6px}
+.lc-team{display:flex;justify-content:space-between;font-size:16px;padding:3px 0}.lc-sc{font-weight:800}.lc-sc small{font-weight:400;color:var(--muted)}.lc-rrr{font-size:12px;color:#ffb020;margin-top:4px}.lc-status{font-size:13px;color:var(--muted);margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.fbar{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.shf{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.shf-i{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 4px;font-size:12px;text-align:center;color:var(--text);text-decoration:none}.shf-i span{font-size:22px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.dl{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);color:var(--text);text-decoration:none;font-size:14px}
+.mc-tabs{align-items:center}.mc-more{background:var(--surface2);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 12px}.mc-more.on{border-color:var(--brand-blue)}
+.pt td,.pt th{text-align:center}.pt td:nth-child(2),.pt th:nth-child(2){text-align:left}
+@media(max-width:520px){header.top{gap:6px}header.top h1{font-size:14px;letter-spacing:1px;line-height:1.1;max-width:84px}header.top img{width:34px;height:34px}.hb{padding:3px}.hb svg{width:20px;height:20px}.live-dot{font-size:10px;padding:2px 5px}}
+@media(min-width:900px){.hscroll .lcard{flex:0 0 300px}.shf{grid-template-columns:repeat(8,1fr)}}
 .me-row td{background:rgba(255,200,0,.12)}.me-card{border-color:#e0b000}
 .ds-live_ball_by_ball,.ds-live_scorecard,.ds-live_score_only{background:#0b5d2a;color:#fff}.ds-delayed{background:#7a5400;color:#fff}.ds-unavailable{background:#5b1420;color:#fff}.ds-historical_ball_by_ball{background:#13325c;color:#fff}
 .gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin:8px 0}.gal img,.gal video{width:100%;border-radius:10px;display:block;max-height:520px;object-fit:cover;background:#000;cursor:zoom-in}
@@ -83,7 +97,7 @@ canvas{width:100%;height:190px;display:block}
 </style>
 </head>
 <body>
-<header class="top"><img src="/sh-prediction-icon.png" alt="SH PREDICTION logo"><h1>SH PREDICTION</h1></header>
+<header class="top"><img src="/sh-prediction-icon.png" alt="SH PREDICTION logo"><h1>SH PREDICTION</h1><span class="grow"></span><div class="hdr" id="hdr"></div></header>
 <div class="bar" aria-hidden="true"></div>
 <nav class="tabs" id="tabs" aria-label="Main navigation"></nav>
 <main id="main" tabindex="-1" aria-live="polite"></main>
@@ -96,8 +110,9 @@ const ICONS={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1
  ai:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><rect x="7" y="7" width="10" height="10" rx="2"/>',assistant:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/>',
  accuracy:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'};
 ICONS.social='<path d="M4 5h16v11H9l-5 4z"/><circle cx="9" cy="10.5" r="1"/><circle cx="15" cy="10.5" r="1"/>';ICONS.reels='<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M11 9l4 3-4 3z"/>';ICONS.more='<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>';
-const NAV=[["home","nav.home"],["matches","nav.matches"],["social","nav.social"],["reels","nav.reels"],["experts","nav.experts"],["more","nav.more"]];
-const NAV_OF={match:"matches",post:"social",u:"social",tag:"social",compose:"social",ai:"more",assistant:"more",accuracy:"more",settings:"more",leaderboard:"more",game:"more",notifications:"more",dashboard:"more",account:"more"};
+ICONS.series='<path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h10v4H4z"/>';ICONS.predictions='<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>';
+const NAV=[["home","nav.home"],["matches","nav.matches"],["series","nav.series"],["predictions","nav.predictions"],["more","nav.more"]];
+const NAV_OF={match:"matches",post:"more",u:"more",tag:"more",compose:"more",social:"more",reels:"more",experts:"predictions",ai:"predictions",assistant:"more",accuracy:"more",settings:"more",leaderboard:"more",game:"more",notifications:"more",dashboard:"more",account:"more"};
 const DEMO=()=>ls.get("shp_demo")==="1";
 const dq=p=>DEMO()?p+(p.includes("?")?"&":"?")+"dataset=demo":p;
 let S={},LANG=ls.get("shp_lang")||"en",PREF=null,CACHE={},CHAT=[];
@@ -157,11 +172,14 @@ async matches(el){
   catch(e){errorS($("#list"),e,go)}};go();
 },
 async match(el,id,tab){
- tab=tab||"info";el.innerHTML=loading();
+ el.innerHTML=loading();
  let m;try{m=await api("/matches/"+id)}catch(e){return errorS(el,e,()=>SCREENS.match(el,id,tab))}
- const tabs=["info","weather","toss","pitch","h2h","prediction","community","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","result"];
+ const tabs=["weather","toss","pitch","h2h","prediction","xi","fantasy","live","scorecard","graphs"];
+ const more=[["commentary","mc.commentary"],["xi","mc.squads"],["partnerships","mc.partnerships"],["fow","mc.fow"],["info","mc.info"],["h2h","mc.venue_records"],["community","mc.community"],["result","mc.result"]];
+ tab=tab||(m.status==="live"?"live":m.status==="scheduled"?"prediction":"scorecard");
  el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p>'+(window.mcHeader?mcHeader(m):'')+'<div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
-  '<div class="sub" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t("mc."+k))+'</a>').join("")+'</div><div id="tb">'+loading()+'</div>';
+  '<div class="sub mc-tabs" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t("mc."+k))+'</a>').join("")+
+  '<select class="btn mc-more'+(tabs.includes(tab)?'':' on')+'" aria-label="'+esc(t("mc.more"))+'" onchange="if(this.value)location.hash=\'#/match/'+id+'/\'+this.value"><option value="">'+esc(t("mc.more"))+' ▾</option>'+more.map(([k,l])=>'<option value="'+k+'"'+(k===tab&&!tabs.includes(tab)?' selected':'')+'>'+esc(t(l))+'</option>').join("")+'</select></div><div id="tb">'+loading()+'</div>';
  const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});
  const tb=$("#tb");const nm=tid=>tid===m.home.id?teamTxt(m.home,"c-home"):(tid===m.away.id?teamTxt(m.away,"c-away"):"—");
  const kv=pairs=>'<div class="card"><dl class="kv">'+pairs.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+b+'</dd>').join("")+'</dl></div>';
@@ -264,5 +282,6 @@ window.addEventListener("online",route);window.addEventListener("offline",()=>{$
 </script>
 <script src="/hub_social.js"></script>
 <script src="/match_center.js"></script>
+<script src="/shell.js"></script>
 </body>
 </html>

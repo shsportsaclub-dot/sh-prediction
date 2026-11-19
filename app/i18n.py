@@ -813,3 +813,44 @@ def coverage(code):
         return 100
     have = STRINGS.get(code, {})
     return int(100 * sum(1 for k in EN if k in have) / len(EN))
+
+# Blueprint v2.0 shell: navigation, home sections, series pages, missing-data message
+KEYS3 = ["nav.series", "nav.predictions", "mc.more", "mc.squads", "mc.venue_records", "home.featured", "home.all", "home.results", "home.international",
+         "home.domestic", "home.women", "home.featured_predictions", "home.news", "home.dashboard", "home.upcoming_tournaments", "home.recent_series",
+         "home.top_performers", "home.rankings", "home.sh_features", "home.estimate", "series.fixtures", "series.results", "series.points", "series.teams",
+         "series.stats", "data.na"]
+_SHELL = {
+ "en": ["Series", "Predictions", "More match details", "Squads", "Venue records", "Featured matches", "All", "Results", "International", "Domestic", "Women",
+        "Featured predictions", "Cricket news", "Global cricket dashboard", "Upcoming tournaments", "Recently completed series", "Top performers (30 days)",
+        "Rankings", "SH exclusive features", "Estimate", "Fixtures", "Results", "Points table", "Teams", "Statistics", "Data not available from the current source"],
+ "hi": ["सीरीज़", "भविष्यवाणियाँ", "मैच की और जानकारी", "स्क्वॉड", "मैदान के रिकॉर्ड", "फ़ीचर्ड मैच", "सभी", "नतीजे", "अंतरराष्ट्रीय", "घरेलू", "महिला",
+        "फ़ीचर्ड भविष्यवाणियाँ", "क्रिकेट समाचार", "वैश्विक क्रिकेट डैशबोर्ड", "आगामी टूर्नामेंट", "हाल में पूरी हुई सीरीज़", "शीर्ष प्रदर्शन (30 दिन)",
+        "रैंकिंग", "SH विशेष सुविधाएँ", "अनुमान", "फ़िक्स्चर", "नतीजे", "अंक तालिका", "टीमें", "आँकड़े", "मौजूदा स्रोत से डेटा उपलब्ध नहीं है"],
+ "te": ["సిరీస్", "అంచనాలు", "మరిన్ని మ్యాచ్ వివరాలు", "స్క్వాడ్‌లు", "మైదానం రికార్డులు", "ప్రత్యేక మ్యాచ్‌లు", "అన్నీ", "ఫలితాలు", "అంతర్జాతీయ", "దేశీయ", "మహిళలు",
+        "ప్రత్యేక అంచనాలు", "క్రికెట్ వార్తలు", "ప్రపంచ క్రికెట్ డాష్‌బోర్డ్", "రాబోయే టోర్నమెంట్లు", "ఇటీవల ముగిసిన సిరీస్‌లు", "అగ్ర ప్రదర్శనలు (30 రోజులు)",
+        "ర్యాంకింగ్‌లు", "SH ప్రత్యేక ఫీచర్లు", "అంచనా", "ఫిక్చర్లు", "ఫలితాలు", "పాయింట్ల పట్టిక", "జట్లు", "గణాంకాలు", "ప్రస్తుత మూలం నుండి డేటా అందుబాటులో లేదు"],
+ "ta": ["தொடர்கள்", "கணிப்புகள்", "மேலும் போட்டி விவரங்கள்", "அணி வீரர்கள்", "மைதான சாதனைகள்", "சிறப்பு போட்டிகள்", "அனைத்தும்", "முடிவுகள்", "சர்வதேச", "உள்நாட்டு", "பெண்கள்",
+        "சிறப்பு கணிப்புகள்", "கிரிக்கெட் செய்திகள்", "உலக கிரிக்கெட் டாஷ்போர்டு", "வரவிருக்கும் தொடர்கள்", "சமீபத்தில் முடிந்த தொடர்கள்", "சிறந்த செயல்பாடு (30 நாட்கள்)",
+        "தரவரிசை", "SH சிறப்பு அம்சங்கள்", "மதிப்பீடு", "அட்டவணை", "முடிவுகள்", "புள்ளிப் பட்டியல்", "அணிகள்", "புள்ளிவிவரங்கள்", "தற்போதைய மூலத்தில் தரவு கிடைக்கவில்லை"],
+ "kn": ["ಸರಣಿ", "ಮುನ್ಸೂಚನೆಗಳು", "ಹೆಚ್ಚಿನ ಪಂದ್ಯ ವಿವರಗಳು", "ತಂಡದ ಆಟಗಾರರು", "ಮೈದಾನ ದಾಖಲೆಗಳು", "ವಿಶೇಷ ಪಂದ್ಯಗಳು", "ಎಲ್ಲಾ", "ಫಲಿತಾಂಶಗಳು", "ಅಂತರರಾಷ್ಟ್ರೀಯ", "ದೇಶೀಯ", "ಮಹಿಳೆಯರು",
+        "ವಿಶೇಷ ಮುನ್ಸೂಚನೆಗಳು", "ಕ್ರಿಕೆಟ್ ಸುದ್ದಿ", "ಜಾಗತಿಕ ಕ್ರಿಕೆಟ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", "ಮುಂಬರುವ ಟೂರ್ನಿಗಳು", "ಇತ್ತೀಚೆಗೆ ಮುಗಿದ ಸರಣಿಗಳು", "ಉನ್ನತ ಪ್ರದರ್ಶನ (30 ದಿನ)",
+        "ಶ್ರೇಯಾಂಕ", "SH ವಿಶೇಷ ವೈಶಿಷ್ಟ್ಯಗಳು", "ಅಂದಾಜು", "ವೇಳಾಪಟ್ಟಿ", "ಫಲಿತಾಂಶಗಳು", "ಅಂಕಪಟ್ಟಿ", "ತಂಡಗಳು", "ಅಂಕಿಅಂಶಗಳು", "ಪ್ರಸ್ತುತ ಮೂಲದಿಂದ ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ"],
+ "bn": ["সিরিজ", "পূর্বাভাস", "আরও ম্যাচের তথ্য", "স্কোয়াড", "মাঠের রেকর্ড", "বিশেষ ম্যাচ", "সব", "ফলাফল", "আন্তর্জাতিক", "ঘরোয়া", "মহিলা",
+        "বিশেষ পূর্বাভাস", "ক্রিকেট খবর", "বিশ্ব ক্রিকেট ড্যাশবোর্ড", "আসন্ন টুর্নামেন্ট", "সম্প্রতি শেষ হওয়া সিরিজ", "সেরা পারফরম্যান্স (৩০ দিন)",
+        "র‍্যাঙ্কিং", "SH বিশেষ ফিচার", "অনুমান", "সূচি", "ফলাফল", "পয়েন্ট টেবিল", "দল", "পরিসংখ্যান", "বর্তমান উৎস থেকে তথ্য পাওয়া যাচ্ছে না"],
+ "mr": ["मालिका", "अंदाज", "अधिक सामना तपशील", "संघ खेळाडू", "मैदानाचे विक्रम", "निवडक सामने", "सर्व", "निकाल", "आंतरराष्ट्रीय", "देशांतर्गत", "महिला",
+        "निवडक अंदाज", "क्रिकेट बातम्या", "जागतिक क्रिकेट डॅशबोर्ड", "आगामी स्पर्धा", "नुकत्याच संपलेल्या मालिका", "सर्वोत्तम कामगिरी (30 दिवस)",
+        "क्रमवारी", "SH विशेष सुविधा", "अंदाज", "वेळापत्रक", "निकाल", "गुणतालिका", "संघ", "आकडेवारी", "सध्याच्या स्रोताकडून डेटा उपलब्ध नाही"],
+ "ur": ["سیریز", "پیش گوئیاں", "میچ کی مزید تفصیلات", "اسکواڈ", "میدان کے ریکارڈ", "نمایاں میچ", "سب", "نتائج", "بین الاقوامی", "ڈومیسٹک", "خواتین",
+        "نمایاں پیش گوئیاں", "کرکٹ خبریں", "عالمی کرکٹ ڈیش بورڈ", "آنے والے ٹورنامنٹ", "حال ہی میں ختم ہونے والی سیریز", "بہترین کارکردگی (30 دن)",
+        "درجہ بندی", "SH خصوصی فیچرز", "اندازہ", "شیڈول", "نتائج", "پوائنٹس ٹیبل", "ٹیمیں", "اعداد و شمار", "موجودہ ذریعہ سے ڈیٹا دستیاب نہیں"],
+ "es": ["Series", "Predicciones", "Más detalles del partido", "Plantillas", "Récords del estadio", "Partidos destacados", "Todos", "Resultados", "Internacional", "Nacional", "Femenino",
+        "Predicciones destacadas", "Noticias de críquet", "Panel mundial de críquet", "Próximos torneos", "Series terminadas recientemente", "Mejores actuaciones (30 días)",
+        "Clasificaciones", "Funciones exclusivas de SH", "Estimación", "Calendario", "Resultados", "Tabla de puntos", "Equipos", "Estadísticas", "Datos no disponibles en la fuente actual"],
+}
+for _code, _vals in _SHELL.items():
+    _d = dict(zip(KEYS3, _vals))
+    _d["mc.not_reported"] = _d["data.na"]          # one clear missing-data sentence everywhere
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)

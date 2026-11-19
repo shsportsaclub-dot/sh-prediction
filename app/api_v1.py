@@ -219,18 +219,36 @@ def identity(h, c):
     return {"user_id": u["id"], "role": u["role"], "actor": "user:%d" % u["id"]}
 
 # ------------------------------------------------------------------ reads
+# A match is "women" when a team is marked women or a name says so; "international" when both teams are national
+# sides listed in our country registry (ICC members), with or without "Women"/"A"/"U19" after the name.
+WOMEN_SQL = "(h.gender='women' OR a.gender='women' OR h.name LIKE '% Women%' OR a.name LIKE '% Women%' OR c.name LIKE '%Women%')"
+_NAT = "(SELECT name FROM countries WHERE icc_status IS NOT NULL)"
+_BASE = lambda col: "TRIM(REPLACE(REPLACE(REPLACE(REPLACE(%s,' Women',''),' Under-19s',''),' U19',''),' A',''))" % col
+INTL_SQL = "(%s IN %s AND %s IN %s)" % (_BASE("h.name"), _NAT, _BASE("a.name"), _NAT)
+
 def list_matches(c, q):
     limit, offset = page(q)
     where, args = [], []
     st = qv(q, "status")
     if st:
-        groups = {"live": ("live",), "upcoming": ("scheduled",), "completed": ("completed", "abandoned", "no_result", "canceled")}
+        groups = {"live": ("live",), "upcoming": ("scheduled",), "completed": ("completed", "abandoned", "no_result", "canceled"),
+                  "results": ("completed", "abandoned", "no_result", "canceled")}
         if st not in groups:
-            raise bad("status must be live, upcoming or completed")
+            raise bad("status must be live, upcoming, completed or results")
         where.append("m.status IN (%s)" % ",".join("?" * len(groups[st])))
         args += groups[st]
     if qv(q, "competition_id"):
         where.append("m.competition_id=?"); args.append(int_id(qv(q, "competition_id"), "competition_id"))
+    if qv(q, "format"):
+        f = qv(q, "format")
+        if f not in ("T10", "T20", "The Hundred", "ODI", "List A", "Test", "First-class", "Other"):
+            raise bad("format must be T10, T20, The Hundred, ODI, List A, Test, First-class or Other")
+        where.append("m.format=?"); args.append(f)
+    if qv(q, "gender") in ("women", "men"):
+        w = WOMEN_SQL
+        where.append(w if qv(q, "gender") == "women" else "NOT (" + w + ")")
+    if qv(q, "scope") in ("international", "domestic"):
+        where.append(INTL_SQL if qv(q, "scope") == "international" else "NOT (" + INTL_SQL + ")")
     if qv(q, "team_id"):
         t = int_id(qv(q, "team_id"), "team_id"); where.append("(m.home_team_id=? OR m.away_team_id=?)"); args += [t, t]
     if qv(q, "date"):
@@ -243,7 +261,7 @@ def list_matches(c, q):
     where.append(origin_sql(dataset(q)))
     sql = MATCH_SQL + (" WHERE " + " AND ".join(where) if where else "")
     total = c.execute("SELECT COUNT(*) FROM (" + sql + ")", args).fetchone()[0]
-    order = " ORDER BY m.start_utc DESC" if st == "completed" else " ORDER BY m.start_utc ASC"
+    order = " ORDER BY m.start_utc DESC" if st in ("completed", "results") else " ORDER BY m.start_utc ASC"
     items = annotate(c, [match_out(r) for r in c.execute(sql + order + " LIMIT ? OFFSET ?", args + [limit, offset])])
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -505,6 +523,16 @@ def master_list(c, q):
     where, args = [origin_sql(d)], []
     if qv(q, "competition_id"):
         where.append("m.competition_id=?"); args.append(int_id(qv(q, "competition_id"), "competition_id"))
+    if qv(q, "format"):
+        f = qv(q, "format")
+        if f not in ("T10", "T20", "The Hundred", "ODI", "List A", "Test", "First-class", "Other"):
+            raise bad("format must be T10, T20, The Hundred, ODI, List A, Test, First-class or Other")
+        where.append("m.format=?"); args.append(f)
+    if qv(q, "gender") in ("women", "men"):
+        w = WOMEN_SQL
+        where.append(w if qv(q, "gender") == "women" else "NOT (" + w + ")")
+    if qv(q, "scope") in ("international", "domestic"):
+        where.append(INTL_SQL if qv(q, "scope") == "international" else "NOT (" + INTL_SQL + ")")
     out = []
     for serial, r in enumerate(c.execute(MATCH_SQL + " WHERE " + " AND ".join(where) + " ORDER BY m.start_utc, m.id", args).fetchall(), 1):
         teams = {r["home_team_id"]: ("H", r["home_code"] if r["home_code_ok"] else None, r["home_name"]),
@@ -787,6 +815,85 @@ def admin_match(c, who, d):
         c.execute("INSERT OR IGNORE INTO data_provider_syncs(provider,provider_entity,provider_id,local_table,local_id,synced_at) VALUES(?,?,?,?,?,?)",
                   (d["provider"], "match", str(d["provider_id"]), "matches", mid, now()))
     return {"match_id": mid, "status": status}
+
+# ------------------------------------------------------------------ Series (competition pages) and Home dashboard
+def series_list(c, q):
+    limit, offset = page(q)
+    like = "%" + (qv(q, "q") or "")[:60] + "%"
+    items = rows(c.execute("""SELECT cp.id, cp.name, cp.category, cp.division, cp.format,
+        SUM(m.status='live') AS live, SUM(m.status='scheduled') AS upcoming, SUM(m.status IN ('completed','no_result','abandoned','canceled')) AS completed,
+        MIN(CASE WHEN m.status='scheduled' THEN m.start_utc END) AS next_start, MAX(m.start_utc) AS last_start, MIN(m.start_utc) AS first_start, COUNT(m.id) AS matches
+        FROM competitions cp JOIN matches m ON m.competition_id=cp.id AND m.data_origin<>'demo'
+        WHERE cp.name LIKE ? GROUP BY cp.id ORDER BY live DESC, (next_start IS NULL), next_start, last_start DESC LIMIT ? OFFSET ?""", (like, limit, offset)))
+    return {"items": items}
+
+def series_detail(c, cid):
+    cp = c.execute("SELECT id, name, category, division, format, source FROM competitions WHERE id=?", (cid,)).fetchone()
+    if not cp:
+        raise ApiError(404, "NOT_FOUND", "series not found")
+    ms = [match_out(r) for r in c.execute(MATCH_SQL + " WHERE m.competition_id=? AND m.data_origin<>'demo' ORDER BY m.start_utc", (cid,))]
+    annotate(c, ms)
+    table = {}
+    for m in ms:
+        for side in ("home", "away"):
+            t = m[side]
+            table.setdefault(t["id"], {"team_id": t["id"], "team": t["name"], "short_code": t["short_code"], "played": 0, "won": 0, "lost": 0,
+                                       "tied": 0, "no_result": 0, "points": 0, "runs_for": 0, "balls_for": 0, "runs_against": 0, "balls_against": 0, "nrr_matches": 0})
+        if m["status"] not in ("completed", "no_result", "abandoned") or not m.get("result_type"):
+            continue
+        H, A = table[m["home"]["id"]], table[m["away"]["id"]]
+        for T_ in (H, A):
+            T_["played"] += 1
+        rt, w = m["result_type"], m.get("winner_team_id")
+        if rt in ("win", "awarded", "tie_super_over") and w:
+            W, L = (H, A) if w == m["home"]["id"] else (A, H)
+            W["won"] += 1; W["points"] += 2; L["lost"] += 1
+        elif rt in ("tie", "draw"):
+            H["tied"] += 1; A["tied"] += 1; H["points"] += 1; A["points"] += 1
+        else:
+            H["no_result"] += 1; A["no_result"] += 1; H["points"] += 1; A["points"] += 1
+        inn = c.execute("SELECT batting_team_id, runs, wickets, legal_balls, max_balls FROM innings WHERE match_id=? AND is_super_over=0 ORDER BY innings_no", (m["id"],)).fetchall()
+        if len(inn) == 2 and rt not in ("no_result", "abandoned", "canceled"):
+            for i, x in enumerate(inn):
+                bat = table.get(x["batting_team_id"]); bowl = table.get(inn[1 - i]["batting_team_id"])
+                if not bat or not bowl:
+                    continue
+                balls = x["max_balls"] if x["wickets"] == 10 and x["max_balls"] else x["legal_balls"]   # all out: full quota counts (ICC NRR rule)
+                bat["runs_for"] += x["runs"]; bat["balls_for"] += balls; bowl["runs_against"] += x["runs"]; bowl["balls_against"] += balls
+                bat["nrr_matches"] += 1
+    pts = []
+    for T_ in table.values():
+        T_["nrr"] = round(T_["runs_for"] * 6 / T_["balls_for"] - T_["runs_against"] * 6 / T_["balls_against"], 3) if T_["balls_for"] and T_["balls_against"] else None
+        pts.append(T_)
+    pts.sort(key=lambda x: (-x["points"], -(x["nrr"] if x["nrr"] is not None else -99), -x["won"], x["team"]))
+    top_bat = rows(c.execute("""SELECT p.id AS player_id, p.name, SUM(s.runs) AS runs, SUM(s.balls) AS balls, COUNT(DISTINCT s.match_id) AS innings
+        FROM scorecards s JOIN players p ON p.id=s.player_id JOIN matches m ON m.id=s.match_id WHERE m.competition_id=? AND s.runs IS NOT NULL
+        GROUP BY p.id ORDER BY runs DESC LIMIT 5""", (cid,)))
+    top_bowl = rows(c.execute("""SELECT p.id AS player_id, p.name, SUM(s.wickets) AS wickets, SUM(s.runs_conceded) AS runs_conceded
+        FROM scorecards s JOIN players p ON p.id=s.player_id JOIN matches m ON m.id=s.match_id WHERE m.competition_id=? AND s.wickets IS NOT NULL
+        GROUP BY p.id HAVING wickets>0 ORDER BY wickets DESC, runs_conceded LIMIT 5""", (cid,)))
+    return {"series": dict(cp), "fixtures": [m for m in ms if m["status"] in ("scheduled", "live")], "results": [m for m in reversed(ms) if m["status"] not in ("scheduled", "live")],
+            "teams": sorted({(t["team_id"], t["team"]) for t in pts}, key=lambda x: x[1]) and [{"id": t["team_id"], "name": t["team"]} for t in sorted(pts, key=lambda x: x["team"])],
+            "points_table": pts, "points_rule": "Win 2, tie/no result 1. NRR from recorded innings (all-out sides charged the full quota); blank when innings are not recorded.",
+            "top_batters": top_bat, "top_bowlers": top_bowl}
+
+def home_dashboard(c):
+    upcoming = rows(c.execute("""SELECT cp.id, cp.name, MIN(m.start_utc) AS starts, COUNT(*) AS matches FROM matches m JOIN competitions cp ON cp.id=m.competition_id
+        WHERE m.status='scheduled' AND m.data_origin<>'demo' GROUP BY cp.id ORDER BY starts LIMIT 8"""))
+    recent = rows(c.execute("""SELECT cp.id, cp.name, MAX(m.start_utc) AS ended, COUNT(*) AS matches FROM matches m JOIN competitions cp ON cp.id=m.competition_id
+        WHERE m.status IN ('completed','no_result') AND m.data_origin<>'demo' AND cp.id NOT IN (SELECT competition_id FROM matches WHERE status IN ('scheduled','live'))
+        GROUP BY cp.id ORDER BY ended DESC LIMIT 8"""))
+    since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)).isoformat()
+    top_bat = rows(c.execute("""SELECT p.name, SUM(s.runs) AS runs, COUNT(DISTINCT s.match_id) AS matches FROM scorecards s JOIN players p ON p.id=s.player_id
+        JOIN matches m ON m.id=s.match_id WHERE m.start_utc>=? AND m.data_origin<>'demo' AND s.runs IS NOT NULL GROUP BY p.id ORDER BY runs DESC LIMIT 5""", (since,)))
+    top_bowl = rows(c.execute("""SELECT p.name, SUM(s.wickets) AS wickets, COUNT(DISTINCT s.match_id) AS matches FROM scorecards s JOIN players p ON p.id=s.player_id
+        JOIN matches m ON m.id=s.match_id WHERE m.start_utc>=? AND m.data_origin<>'demo' AND s.wickets>0 GROUP BY p.id ORDER BY wickets DESC LIMIT 5""", (since,)))
+    trending = rows(c.execute("""SELECT m.id, th.name AS home, ta.name AS away, COUNT(p.id) AS posts FROM posts p JOIN matches m ON m.id=p.match_id
+        JOIN teams th ON th.id=m.home_team_id JOIN teams ta ON ta.id=m.away_team_id WHERE p.status='published' AND p.created_at>=?
+        GROUP BY m.id ORDER BY posts DESC LIMIT 5""", (since,))) if c.execute("SELECT 1 FROM sqlite_master WHERE name='posts'").fetchone() else []
+    return {"upcoming_tournaments": upcoming, "recently_completed": recent, "top_batters_30d": top_bat, "top_bowlers_30d": top_bowl, "trending_matches": trending,
+            "rankings": None, "rankings_note": "Data not available from the current source (no licensed rankings feed connected).",
+            "news": None, "news_note": "Data not available from the current source (no licensed news feed connected)."}
 
 # ------------------------------------------------------------------ SH Universal Cricket Data Bridge
 def bridge_status(c):
@@ -1693,6 +1800,12 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
                 return 200, cricket_extra(c, mid, P[2], q)
         if P == ["matches"]:
             return 200, list_matches(c, q)
+        if P == ["series"]:
+            return 200, series_list(c, q)
+        if len(P) == 2 and P[0] == "series":
+            return 200, series_detail(c, int_id(P[1], "series id"))
+        if P == ["home", "dashboard"]:
+            return 200, home_dashboard(c)
         if len(P) >= 2 and P[0] == "matches":
             mid = int_id(P[1], "match id")
             if len(P) == 2:
