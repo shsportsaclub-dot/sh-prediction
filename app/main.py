@@ -363,5 +363,10 @@ if __name__=="__main__":
  with db():pass
  start_worker()
  auto_prepare_empty_db()
+ try:
+  import t10_seed
+  print("SH T10 fixture seed:",t10_seed.seed(db),flush=True)
+ except Exception as exc:
+  print("SH T10 fixture seed failed:",repr(exc),flush=True)
  import scheduler;scheduler.start(db)  # 24/7 data collectors (SH_COLLECTORS=0 disables)
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()
