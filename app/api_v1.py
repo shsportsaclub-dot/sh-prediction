@@ -388,8 +388,40 @@ def scorecard(c, mid):
                                                   WHERE match_id=? AND innings_no=? AND is_wicket=1 ORDER BY seq""", (mid, i["innings_no"])))
     return {"match_id": mid, "innings": inns}
 
+def provider_commentary(c, mid, q):
+    """Commentary written by our own engine from the provider's ball rows (never the provider's text)."""
+    r = c.execute("SELECT balls_json, balls_at FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone() if \
+        c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() else None
+    balls = json.loads(r[0]) if r and r[0] else []
+    if not balls:
+        return None
+    lang = qv(q, "lang") or "en"
+    ext = {"wd": "wide", "wides": "wide", "wide": "wide", "nb": "no_ball", "noballs": "no_ball", "noball": "no_ball",
+           "b": "bye", "byes": "bye", "lb": "leg_bye", "legbyes": "leg_bye"}
+    inn_ids, ev = {}, []
+    for i, b in enumerate(balls):
+        ino = inn_ids.setdefault(str(b.get("inning")), len(inn_ids) + 1)
+        et = ext.get(str(b.get("extra") or "").lower()) if not isinstance(b.get("extra"), dict) else None
+        runs = b.get("runs") or 0
+        ev.append({"innings_no": ino, "seq": b.get("n") or i + 1, "over_no": b.get("over") or 0, "ball_in_over": b.get("ball") or 0,
+                   "runs_bat": 0 if et in ("wide", "bye", "leg_bye") else runs, "extras": runs if et in ("wide", "bye", "leg_bye") else 0,
+                   "extra_type": et, "is_wicket": 1 if b.get("wicket") else 0, "wicket_kind": None,
+                   "batter": b.get("batter"), "bowler": b.get("bowler"), "batting_team_id": None})
+    gen = {(g["innings_no"], g["seq"]): g["text"] for g in commentary_engine.generate(ev, lang, {})}
+    items = [dict(e, generated_commentary=gen.get((e["innings_no"], e["seq"])), source="cricketdata") for e in reversed(ev)]
+    limit, offset = page(q)
+    return {"items": items[offset:offset + limit], "total": len(items), "limit": limit, "offset": offset,
+            "language": lang if lang in commentary_engine.languages() else "en",
+            "language_note": None if lang in commentary_engine.languages() else "Commentary is generated in English for this language for now.",
+            "note": "Written by SH PREDICTION from CricketData ball rows (runs, extras, wickets). Updated %s." % ((r[1] or "")[11:16] + " UTC"),
+            "source": "CricketData.org"}
+
 def commentary(c, mid, q):
     get_match(c, mid)
+    if not c.execute("SELECT 1 FROM ball_events WHERE match_id=? LIMIT 1", (mid,)).fetchone():
+        pc = provider_commentary(c, mid, q)
+        if pc:
+            return pc
     limit, offset = page(q)
     items = rows(c.execute("""SELECT b.*, bt.name AS batter, bw.name AS bowler FROM ball_events b LEFT JOIN players bt ON bt.id=b.batter_id
                               LEFT JOIN players bw ON bw.id=b.bowler_id WHERE b.match_id=? ORDER BY b.innings_no DESC,b.seq DESC LIMIT ? OFFSET ?""",

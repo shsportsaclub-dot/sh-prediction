@@ -30,8 +30,12 @@ function bowlTable(inn){return '<table class="simple sc"><thead><tr><th>Bowler</
 const extrasTxt=e=>{if(!e)return "—";const k=["b","lb","w","nb","p"].filter(x=>e[x]!=null);const tot=e.total!=null?e.total:k.reduce((a,x)=>a+(+e[x]||0),0);return tot+(k.length?' ('+k.map(x=>x+" "+e[x]).join(", ")+')':'')};
 const srcNote=pd=>'<p class="muted">Source: '+esc(pd.source)+' · '+esc(pd.rule)+'</p>'+(pd.notes&&pd.notes.length?'<p class="muted">Not available: '+pd.notes.map(esc).join(" · ")+'</p>':'');
 
+const localTime=u=>{try{return new Date(u).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return u}};
+function scoreOnly(m){const L=m.live_score;if(!L||!L.innings||!L.innings.length)return null;
+ return '<div class="card"><h3>Score</h3>'+L.innings.map(i=>'<div class="row"><b class="grow">'+esc(String(i.inning||"").replace(/ Inning \d+$/,""))+'</b><span class="mc-score">'+i.r+'-'+i.w+'</span> <span class="muted">('+esc(String(i.o))+' ov)</span></div>').join("")+
+  (L.status_text?'<p><b>'+esc(L.status_text)+'</b></p>':'')+'<p class="muted">Score line from '+esc(L.source)+', updated '+ago(L.fetched_at)+'. Batter-by-batter detail appears when the full scorecard for this match is received.</p></div>'}
 window.mcTab={
- live:async m=>{const pd=PD(m);if(!pd||m.status!=="live"&&!pd.featured)return null;   // our own ball-by-ball keeps the original Live tab
+ live:async m=>{const pd=PD(m);if(!pd||m.status!=="live"&&!pd.featured){if((m.data_status||"").indexOf("ball_by_ball")<0&&m.live_score)return scoreOnly(m);return null}   // our own ball-by-ball keeps the original Live tab
   const li=lastInn(pd.scorecard),notOut=li.batting.filter(b=>/not out/i.test(b.dismissal||"")),cur=li.bowling.slice(-1);
   const pship=notOut.length===2&&li.total&&li.total.w===0?li.total.r:null;   // only certain when no wicket has fallen
   const balls=pd.balls||[],lastOv=balls.length?balls[balls.length-1].over:null,thisOv=balls.filter(b=>b.over===lastOv);
@@ -55,10 +59,19 @@ window.mcTab={
    '<div class="card"><h3>Head to head</h3><div class="row"><b class="grow c-home">'+esc(m.home.name)+' won '+hw+'</b><span class="muted">'+H.head_to_head.length+' matches</span><b class="grow c-away" style="text-align:right">'+esc(m.away.name)+' won '+aw+'</b></div>'+
    (H.head_to_head.length?H.head_to_head.map(x=>'<div class="h2h-row"><div><b>'+esc(x.winner?x.winner+' won'+(x.margin?' by '+x.margin:''):x.result_type)+'</b><div class="muted">'+(x.innings.map(i=>esc(i.team)+' '+i.runs+'/'+i.wickets).join(" · ")||"scores not recorded")+'</div></div><div style="text-align:right"><div class="muted">'+esc(x.day)+'</div><a href="#/match/'+x.id+'/scorecard">View</a></div></div>').join(""):'<p class="muted">No earlier meetings in our database.</p>')+'</div><p class="muted">'+esc(H.note)+'</p>'}
 };
+function matchDetails(m){const info=(m.provider_detail&&m.provider_detail.info)||{};
+ const toss=m.toss_winner_id?((m.toss_winner_id===m.home.id?m.home.name:m.away.name)+' won the toss'+(m.toss_decision?' and chose to '+(m.toss_decision==="bat"?"bat":"bowl"):'')):'Not yet';
+ const res=m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+' won'+(m.margin?' by '+m.margin:'')):m.result_type.replace("_"," ")):null;
+ const rows=[["Series",esc(m.competition)],["Match",esc(m.match_no||"—")],["Format",esc(m.format)],["Date & time",esc(localTime(m.start_utc))+' <span class="muted">(your time)</span>'],
+  ["Venue",esc(m.venue||info.venue||"—")],["Toss",esc(toss)],["Status",esc((m.live_score&&m.live_score.status_text)||m.status)]];
+ if(res)rows.push(["Result",'<b>'+esc(res)+'</b>']);
+ rows.push(["Data",'<span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span>']);
+ return '<div class="card"><h3>Match details</h3><dl class="kv">'+rows.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+b+'</dd>').join("")+'</dl></div>'}
+window.mcTab.info=async m=>matchDetails(m)+'<p class="muted">Source: '+esc(m.source)+'</p>'+(m.attribution?'<p class="muted">'+esc(m.attribution.text)+' · <a href="'+esc(m.attribution.url)+'" rel="noopener" target="_blank">licence</a></p>':'');
 window.mcTabAfter={
- info:m=>{const v=m.history&&m.history.venue;if(!v)return "";
+ info:m=>(function(){const v=m.history&&m.history.venue;if(!v)return "";
   return '<div class="card"><h3>Venue stats · '+esc(v.name)+'</h3>'+(v.matches?'<dl class="kv"><dt>Matches</dt><dd>'+v.matches+'</dd><dt>Avg 1st innings</dt><dd>'+v.avg_first_innings+'</dd><dt>Avg 2nd innings</dt><dd>'+v.avg_second_innings+'</dd>'+
    '<dt>Won batting first</dt><dd>'+v.bat_first_win_pct+'%</dd><dt>Won chasing</dt><dd>'+v.chase_win_pct+'%</dd>'+(v.highest?'<dt>Highest total</dt><dd>'+v.highest.runs+'-'+v.highest.wickets+' ('+v.highest.overs+' ov) by '+esc(v.highest.team)+'</dd>':'')+
-   (v.lowest_all_out?'<dt>Lowest all out</dt><dd>'+v.lowest_all_out.runs+' ('+v.lowest_all_out.overs+' ov) by '+esc(v.lowest_all_out.team)+'</dd>':'')+'</dl>':'<p class="muted">No completed '+esc(m.format)+' matches at this venue in our database yet.</p>')+'<p class="muted">'+esc(m.history.note)+'</p></div>'}
+   (v.lowest_all_out?'<dt>Lowest all out</dt><dd>'+v.lowest_all_out.runs+' ('+v.lowest_all_out.overs+' ov) by '+esc(v.lowest_all_out.team)+'</dd>':'')+'</dl>':'<p class="muted">No completed '+esc(m.format)+' matches at this venue in our database yet.</p>')+'<p class="muted">'+esc(m.history.note)+'</p></div>'})()
 };
 })();

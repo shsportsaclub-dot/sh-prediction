@@ -396,6 +396,11 @@ class FeaturedDetail(unittest.TestCase):
         self.assertEqual(pd["runs_per_over"], [{"inning": "0", "over": 1, "runs": 4}, {"inning": "0", "over": 2, "runs": 6}])
         self.assertNotIn("secret", pd["info"])
         self.assertEqual(T.call("/api/v1/matches/%d" % live)[1]["data_status"], "live_scorecard")
+        cm = T.call("/api/v1/matches/%d/commentary?lang=en" % live)[1]                              # our own words from provider ball rows
+        self.assertEqual((cm["source"], cm["total"]), ("CricketData.org", 3))
+        self.assertTrue(all(x["generated_commentary"] for x in cm["items"]))
+        self.assertIn("C Knott", cm["items"][0]["generated_commentary"])                         # newest first: the six by C Knott
+        self.assertEqual(T.call("/api/v1/matches/%d/commentary?lang=te" % live)[1]["language"], "te")
         hits = sum(1 for u in fake.urls if "match_" in u)
         self.assertEqual(hits, 4)
         # free plan: an immediate re-run spends nothing; 6 min later 1 hit (scorecard); squad/info every 2 h, balls every 12 min
