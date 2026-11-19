@@ -4,7 +4,7 @@
 This document governs changes to the EXISTING Python app, not a separate mockup. Repository: shsportsaclub-dot/sh-prediction. Running server: python app/main.py. README confirms / and /admin-panel, app/api_v1.py, app/gateway.py, backed-up migration flow and tests. SH PREDICTION is independent of Scoring Heroes. Existing features and user data must be preserved.
 
 ## Non-negotiable visual/product contract
-1. Global app: information-rich Cricbuzz-inspired *functional hierarchy*, not its copied appearance. Preserve two top-level sections CRICKET and WORLD, with For You / Live / Upcoming / Finished and access to series, teams, players, rankings, news, and search.
+1. Global app: information-rich Cricbuzz-inspired *functional hierarchy*, not its copied appearance. Preserve two top-level sections CRICKET and PREDICTORS (never WORLD). CRICKET contains worldwide cricket coverage, with For You / Live / Upcoming / Finished and access to series, teams, players, rankings, news, and search. PREDICTORS contains SH AI predictions, expert predictors, community predictions, prediction history, prediction accuracy, and predictor rankings. These are two primary sections, not a single flat list of tabs.
 2. Match center: CREX-inspired *functional depth*, original SH styling, never copied assets or exact visual composition. A compact persistent match header shows competition, teams, score, overs, state, target/lead/trail/session when applicable, and data freshness.
 3. Navigation is NOT one long row of unlimited tabs and NOT a long page of all tables. Use hierarchical route-driven MAIN TAB -> SUBMENU -> SUBTAB -> ONE functional view. Main tabs: Overview, Live, Scorecard, Prediction, More. Each submenu exposes relevant subtabs only. Back navigation returns to prior level; URLs are deep-linkable; active tab survives refresh.
 4. Overview groups: Match Summary (summary, match info, key moments); Pre-Match (weather, toss, pitch, venue); Insights (H2H, form, team strength). Live groups: Live Center (score, batters, bowlers, over); Commentary (all balls, boundaries, wickets, over summary); Analysis (win probability, momentum, run rate). Scorecard groups: Innings (format-appropriate innings); Batting (dismissals, extras); Bowling (spells, economy); Partnerships (partnerships, fall of wickets). Prediction groups: Match Prediction (winner, projected score, chase/defend); Toss & Pitch (toss, pitch impact, venue); Advanced (matchups, confidence, prediction history). More groups: Teams (XI, squads, comparisons); Statistics (graphs, records, venue); Extras (fantasy, highlights, SH Social, virtual live, broadcast). Menus may expand through data-driven configuration without adding an unbounded top row.
@@ -15,7 +15,7 @@ This document governs changes to the EXISTING Python app, not a separate mockup.
 ## Ordered implementation (do not skip)
 P0: inspect current routes, CSS/HTML, provider mapping, DB, migrations, test suite and deployment; capture baseline. Confirm durable verified backup before any production migration. Verify service storage persistence. Never expose tokens.
 P1: implement hierarchical navigation and routing against existing match pages; create actual browser screens backed by real components and real API data states. No AI-generated concept screens. Keep old routes functional.
-P2: implement cricket/world home, match lists and filtering, compact match header, scorecard and commentary with verified provider data; show unavailable states for unsupported fields.
+P2: implement cricket/predictors home, match lists and filtering, compact match header, scorecard and commentary with verified provider data; show unavailable states for unsupported fields.
 P3: pitch/toss/weather/H2H/graphs/prediction/fantasy and cross-linked team, player, series, venue pages, sourced statistics and explanation.
 P4: SH Social, Virtual Live, broadcast integrations and universal localization; do not imply replay accuracy without event tracking data.
 
@@ -25,7 +25,7 @@ For EACH phase: implement actual code; run unit tests and browser navigation che
 ## Acceptance checklist
 [ ] Baseline routes and production migration verified
 [ ] Nested main/submenu/subtab navigation and browser back work
-[ ] Cricket/World main sections and real match list work
+[ ] Cricket/Predictors main sections and real match list work
 [ ] Live and scorecard show verified data or explicit unavailable states
 [ ] Commentary and charts correctly handle absent source data
 [ ] Existing admin, predictions, social, and other features preserved
