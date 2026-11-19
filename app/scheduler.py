@@ -83,11 +83,17 @@ def job_cricketdata_live(conn, cfg, opener):
     recent = _ts(_now_dt() - datetime.timedelta(hours=10))
     n = conn.execute("""SELECT COUNT(*) FROM matches m JOIN data_provider_syncs s ON s.local_id=m.id AND s.provider='cricketdata' AND s.provider_entity='match'
                         WHERE m.status='live' OR (m.status='scheduled' AND m.start_utc BETWEEN ? AND ?)""", (recent, soon)).fetchone()[0]
-    if not n:
-        return {"skipped": "no CricketData match is live or starting within the hour; no hit spent"}
+    last = cfg.get("last_call_at")
+    stale = not last or last < _ts(_now_dt() - datetime.timedelta(minutes=60))
+    if not n and not stale and not cricketdata.auto(conn, cfg)["paid"]:
+        return {"skipped": "no CricketData match is live or starting within the hour; checked within the last hour; no hit spent"}
     create_match, record_result = _helpers(conn)
     k = cricketdata.sync(conn, "currentMatches", cfg.get("daily_budget", "auto"), create_match, record_result, now, opener)
     conn.commit()
+    cfg["last_call_at"] = now()
+    k["_cfg"] = cfg
+    k["live_now"] = conn.execute("""SELECT COUNT(*) FROM matches m JOIN data_provider_syncs s ON s.local_id=m.id AND s.provider='cricketdata'
+                                    AND s.provider_entity='match' WHERE m.status='live'""").fetchone()[0]
     return k
 
 

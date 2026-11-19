@@ -488,3 +488,31 @@ class PlanModes(unittest.TestCase):
         self.assertEqual(ev[-1]["score"], "45-1")                                                   # the app gets the new score pushed
         hdr = T.call("/api/v1/matches/%d" % live)[1]["provider_detail"]["scorecard"][0]["total"]
         self.assertEqual((hdr["r"], hdr["w"]), (45, 1))
+
+
+class LiveDiscovery(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def setUp(self):
+        os.environ["CRICKETDATA_API_KEY"] = "test-key-123"
+        free_plan()
+
+    def tearDown(self):
+        os.environ.pop("CRICKETDATA_API_KEY", None)
+
+    def test_live_job_finds_live_matches_it_did_not_know(self):
+        cur = {"status": "success", "info": {"hitsToday": 3, "hitsLimit": 100}, "data": [
+            {"id": "cd-new-live", "name": "QV Hawks vs QV Owls, 9th Match, QV Cup, 2026", "matchType": "t20", "status": "QV Owls opt to bowl",
+             "venue": "QV Park", "dateTimeGMT": (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=40)).strftime("%Y-%m-%dT%H:%M:%S"),
+             "teams": ["QV Hawks", "QV Owls"], "score": [{"r": 52, "w": 2, "o": 6.1, "inning": "QV Hawks Inning 1"}], "matchStarted": True, "matchEnded": False}]}
+        c = T.db(); c.execute("UPDATE collector_jobs SET config_json='{\"daily_budget\": \"auto\"}' WHERE name='cricketdata_live'"); c.commit(); c.close()
+        r = run("cricketdata_live", Fake({"currentMatches": json.dumps(cur).encode()}))
+        self.assertEqual(r["status"], "ok", r)
+        self.assertGreaterEqual(r["summary"]["live_now"], 1)
+        m = T.call("/api/v1/matches/%d" % match_by("cricketdata", "cd-new-live"))[1]
+        self.assertEqual((m["status"], m["live_score"]["innings"][0]["r"]), ("live", 52))
+        self.assertIn(m["id"], [x["id"] for x in T.call("/api/v1/matches?status=live&limit=100")[1]["items"]])   # shows on Home -> Live
+        again = run("cricketdata_live", Fake({"currentMatches": json.dumps(cur).encode()}))
+        self.assertEqual(again["status"], "ok")   # a live match is now known, so it keeps refreshing it
