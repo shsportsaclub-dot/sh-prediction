@@ -1,0 +1,38 @@
+{
+  "schema": "sh-prediction-prematch-v1",
+  "competition": "Abu Dhabi T10 2026",
+  "date": "2026-11-19",
+  "source": "SH SPORTS CLUB prediction Google Sheet; fixture schedule cross-checked against public listings",
+  "verification": "Predictions are user picks; scores and results unverified",
+  "matches": [
+    {
+      "match_no": 28,
+      "home": "UAE Bulls",
+      "away": "Arabian Aces",
+      "start_ist": "17:00",
+      "toss_prediction": "Arabian Aces",
+      "winner_prediction": "UAE Bulls",
+      "toss_report": "UAE Bulls opted to field (user reported, unverified)",
+      "status": "awaiting verified score/result"
+    },
+    {
+      "match_no": 29,
+      "home": "Yas Lions",
+      "away": "Royal Desert Champions",
+      "start_ist": "19:15",
+      "toss_prediction": "Yas Lions",
+      "winner_prediction": "Royal Desert Champions",
+      "toss_report": "Yas Lions opted to bowl (user reported, unverified)",
+      "status": "awaiting verified score/result"
+    },
+    {
+      "match_no": 30,
+      "home": "Emirates Eagles",
+      "away": "United Tigers",
+      "start_ist": "21:30",
+      "toss_prediction": "United Tigers",
+      "winner_prediction": "Emirates Eagles",
+      "status": "scheduled; awaiting verified toss/score"
+    }
+  ]
+}
