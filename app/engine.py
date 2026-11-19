@@ -97,10 +97,12 @@ EVAL_SQL = """SELECT p.*, e.result, e.actual_team_id, e.rule, m.competition_id, 
  LEFT JOIN prediction_evaluations e ON e.prediction_id=p.id AND e.superseded_at IS NULL
  LEFT JOIN expert_profiles x ON x.id=p.expert_id WHERE p.status<>'draft'"""
 
-def accuracy(c, include_demo=False, prediction_type=None):
-    rows = c.execute(EVAL_SQL).fetchall()
-    if not include_demo:
-        rows = [r for r in rows if r["data_origin"] != "demo" and r["match_origin"] != "demo"]
+def accuracy(c, include_demo=False, prediction_type=None, published_only=False, dataset=None):
+    """dataset='demo' -> demo rows only; otherwise verified/imported rows only. Never both."""
+    sql = EVAL_SQL + (" AND p.id IN (SELECT prediction_id FROM prediction_publications)" if published_only else "")
+    rows = c.execute(sql).fetchall()
+    demo = dataset == "demo" or (dataset is None and include_demo)
+    rows = [r for r in rows if (r["match_origin"] == "demo") == demo]
     if prediction_type:
         rows = [r for r in rows if r["prediction_type"] == prediction_type]
     res = lambda rs: tally([r["result"] or "pending" for r in rs])
@@ -115,13 +117,13 @@ def accuracy(c, include_demo=False, prediction_type=None):
             "by_expert": by(lambda r: r["expert_name"] if r["source_type"] == "expert" else None),
             "by_model": by(lambda r: "model #%d" % r["model_version_id"] if r["model_version_id"] else None),
             "by_team": {t: res(v) for t, v in sorted(team_rows.items(), key=lambda kv: str(kv[0]))},
-            "includes_demo": include_demo}
+            "dataset": "demo" if demo else "verified", "published_only": published_only}
 
-def completed_matches(c, include_demo=False):
+def completed_matches(c, include_demo=False, dataset=None):
     sql = """SELECT m.*, r.result_type, r.winner_team_id, t.winner_team_id AS toss_winner, t.decision FROM matches m
              JOIN match_results r ON r.match_id=m.id LEFT JOIN toss_results t ON t.match_id=m.id"""
-    rows = c.execute(sql + ("" if include_demo else " WHERE m.data_origin<>'demo'") + " ORDER BY m.start_utc").fetchall()
-    return rows
+    demo = dataset == "demo" or (dataset is None and include_demo)
+    return c.execute(sql + (" WHERE m.data_origin='demo'" if demo else " WHERE m.data_origin<>'demo'") + " ORDER BY m.start_utc").fetchall()
 
 def batting_first(m):
     if not m["toss_winner"] or not m["decision"]:
@@ -129,8 +131,8 @@ def batting_first(m):
     other = m["away_team_id"] if m["toss_winner"] == m["home_team_id"] else m["home_team_id"]
     return m["toss_winner"] if m["decision"] == "bat" else other
 
-def analytics(c, include_demo=False):
-    rows = [r for r in completed_matches(c, include_demo) if r["result_type"] in ("win", "tie_super_over", "awarded")]
+def analytics(c, include_demo=False, dataset=None):
+    rows = [r for r in completed_matches(c, include_demo, dataset) if r["result_type"] in ("win", "tie_super_over", "awarded")]
     pct = lambda a, b: round(100.0 * a / b, 1) if b else None
     toss_known = [r for r in rows if r["toss_winner"]]
     tw = sum(1 for r in toss_known if r["toss_winner"] == r["winner_team_id"])
@@ -150,7 +152,7 @@ def analytics(c, include_demo=False):
         v[1] += batting_first(r) == r["winner_team_id"]
         v[2] += batting_first(r) != r["winner_team_id"]
     return {
-        "sample_matches": len(rows), "includes_demo": include_demo,
+        "sample_matches": len(rows), "dataset": "demo" if (dataset == "demo" or include_demo) else "verified",
         "toss": {"matches_with_toss": len(toss_known), "toss_winner_won": tw, "toss_winner_lost": len(toss_known) - tw,
                  "toss_winner_win_pct": pct(tw, len(toss_known))},
         "batting_first_vs_chasing": {"matches": len(bf), "batting_first_won": bfw, "chasing_won": len(bf) - bfw,
@@ -171,17 +173,21 @@ def _sig(x):
     return 1 / (1 + math.exp(-x))
 
 def model_params(c):
-    mv = c.execute("SELECT * FROM model_versions WHERE name='sh-baseline' ORDER BY id DESC LIMIT 1").fetchone()
+    mv = c.execute("SELECT * FROM model_versions WHERE name='sh-baseline' ORDER BY id DESC LIMIT 1").fetchone()  # newest = active
     return mv, json.loads(mv["params_json"])
 
-def predict_match(c, match_id):
-    """Explainable pre-match winner probability for the HOME team plus factor breakdown."""
+def predict_match(c, match_id, use_toss=True, params=None, history=None):
+    """Explainable pre-match winner probability for the HOME team plus factor breakdown.
+    Demo matches learn only from demo history and real matches only from verified history."""
     mv, P = model_params(c)
+    if params:
+        P = params
     m = c.execute("SELECT * FROM matches WHERE id=?", (match_id,)).fetchone()
     if not m:
         raise LookupError("match not found")
     h, a = m["home_team_id"], m["away_team_id"]
-    hist = [r for r in completed_matches(c) if pdt(r["start_utc"]) < pdt(m["start_utc"]) and r["id"] != m["id"]
+    base = history if history is not None else completed_matches(c, dataset="demo" if m["data_origin"] == "demo" else "verified")
+    hist = [r for r in base if pdt(r["start_utc"]) < pdt(m["start_utc"]) and r["id"] != m["id"]
             and r["result_type"] in ("win", "tie_super_over", "awarded")]
     L, W = P["laplace"], P["form_window"]
 
@@ -198,7 +204,7 @@ def predict_match(c, match_id):
     venue_bias = 0.0
     venue_note = "no venue history"
     vh = [r for r in hist if r["venue_id"] and r["venue_id"] == m["venue_id"] and batting_first(r)]
-    toss = c.execute("SELECT * FROM toss_results WHERE match_id=?", (match_id,)).fetchone()
+    toss = c.execute("SELECT * FROM toss_results WHERE match_id=?", (match_id,)).fetchone() if use_toss else None
     if vh and toss and toss["decision"]:
         bfw = (sum(1 for r in vh if batting_first(r) == r["winner_team_id"]) + L) / (len(vh) + 2 * L)
         home_bats_first = (toss["winner_team_id"] == h) == (toss["decision"] == "bat")
@@ -244,7 +250,7 @@ def resources(balls_left, wickets_lost, max_balls):
         return 0.0
     b = balls_left / max_balls
     w = (10 - wickets_lost) / 10
-    return (1 - math.exp(-3.2 * b)) / (1 - math.exp(-3.2)) * (w ** 0.9 if b > 0.3 else w ** 0.6)
+    return (1 - math.exp(-0.6 * b)) / (1 - math.exp(-0.6)) * (w ** 0.9 if b > 0.3 else w ** 0.6)
 
 def live_probability(fmt, innings_no, runs, wickets, legal_balls, target=None, max_balls=None, prematch_home=None, batting_is_home=True):
     max_balls = max_balls or FORMAT_BALLS.get(fmt, 120)
@@ -273,3 +279,122 @@ def live_probability(fmt, innings_no, runs, wickets, legal_balls, target=None, m
                    batting_team_win_probability=round(100 * bat_p, 1))
     out["bowling_team_win_probability"] = round(100 - out["batting_team_win_probability"], 1)
     return out
+
+
+# ------------------------------------------------------------------ public explanation (no weights)
+FACTOR_LABEL = {"recent_form": "Recent form", "head_to_head": "Head-to-head", "home_advantage": "Home advantage",
+                "venue_toss_bias": "Venue and toss"}
+
+def public_factors(res, home_name, away_name):
+    out = []
+    for f in res["factors"]:
+        v = f["contribution"]
+        fav = "neutral" if abs(v) < 0.05 else ("home" if v > 0 else "away")
+        if f["factor"] == "recent_form":
+            detail = "%s won %s, %s won %s of recent verified matches" % (home_name, f["home"], away_name, f["away"])
+        elif f["factor"] == "head_to_head":
+            detail = f["detail"].replace("home", home_name, 1)
+        elif f["factor"] == "home_advantage":
+            detail = "%s is the listed home team" % home_name
+        else:
+            detail = f["detail"]
+        out.append({"factor": FACTOR_LABEL[f["factor"]], "favours": fav,
+                    "favours_team": home_name if fav == "home" else (away_name if fav == "away" else None), "detail": detail})
+    return out
+
+# ------------------------------------------------------------------ innings projections
+PHASES = {"T10": [("Powerplay", 1, 2), ("Middle", 3, 7), ("Death", 8, 10)],
+          "T20": [("Powerplay", 1, 6), ("Middle", 7, 15), ("Death", 16, 20)],
+          "The Hundred": [("Powerplay (25 balls)", 1, 5), ("Middle", 6, 15), ("Death", 16, 20)],
+          "ODI": [("Powerplay 1", 1, 10), ("Middle", 11, 40), ("Death", 41, 50)],
+          "List A": [("Powerplay 1", 1, 10), ("Middle", 11, 40), ("Death", 41, 50)]}
+
+def over_projection(fmt, runs, wickets, legal_balls, max_balls=None, actual_overs=None):
+    """Expected runs for every remaining over (own resource curve), cumulative projection and phase totals.
+    actual_overs: {over_no(1-based): runs} for overs already bowled."""
+    max_balls = max_balls or FORMAT_BALLS.get(fmt, 120)
+    balls_per_over = 5 if fmt == "The Hundred" else 6
+    par = PAR_RPO.get(fmt, 8.0) * max_balls / 6
+    overs = []
+    cum = runs
+    left = max_balls - legal_balls
+    done_overs = legal_balls // balls_per_over
+    for o in range(1, max_balls // balls_per_over + 1):
+        if o <= done_overs:
+            overs.append({"over": o, "runs": (actual_overs or {}).get(o), "kind": "actual"})
+            continue
+        b_start = max_balls - (o - 1) * balls_per_over
+        b_end = max(b_start - balls_per_over, 0)
+        b_start = min(b_start, left)
+        exp = max(0.0, (resources(b_start, wickets, max_balls) - resources(b_end, wickets, max_balls)) * par) if b_start > b_end else 0.0
+        cum += exp
+        overs.append({"over": o, "expected_runs": round(exp, 1), "projected_total": round(cum), "kind": "projected"})
+    phases = []
+    for name, a, b in PHASES.get(fmt, []):
+        tot, kinds = 0.0, set()
+        for x in overs[a - 1:b]:
+            if x["kind"] == "actual":
+                tot += x["runs"] or 0
+            else:
+                tot += x["expected_runs"]
+            kinds.add(x["kind"])
+        phases.append({"phase": name, "overs": "%d-%d" % (a, b), "runs": round(tot),
+                       "status": "completed" if kinds == {"actual"} else ("projected" if kinds == {"projected"} else "in progress")})
+    return {"overs": overs, "projected_total": round(cum), "phases": phases}
+
+def projected_second_innings(c, match_id):
+    m = c.execute("SELECT * FROM matches WHERE id=?", (match_id,)).fetchone()
+    rows = c.execute("""SELECT i.runs FROM innings i JOIN matches m ON m.id=i.match_id WHERE i.innings_no=2 AND i.completed=1
+                        AND i.is_super_over=0 AND m.format=? AND m.venue_id IS ? AND m.id<>? AND m.data_origin<>'demo'""",
+                     (m["format"], m["venue_id"], match_id)).fetchall()
+    if len(rows) < 3:
+        return {"available": False, "reason": "needs at least 3 completed second innings at this venue in this format", "samples": len(rows)}
+    vals = sorted(r[0] for r in rows)
+    return {"available": True, "projected": round(sum(vals) / len(vals)), "low": vals[len(vals) // 4], "high": vals[(3 * len(vals)) // 4], "samples": len(vals)}
+
+def wicket_impact(fmt, innings_no, runs, wickets, legal_balls, target=None, max_balls=None):
+    """How far the batting side's win chance moves if the next ball is a wicket (no run)."""
+    if wickets >= 9:
+        now_p = live_probability(fmt, innings_no, runs, wickets, legal_balls, target, max_balls)["batting_team_win_probability"]
+        return {"next_wicket_swing": round(-now_p, 1)}
+    a = live_probability(fmt, innings_no, runs, wickets, legal_balls, target, max_balls)["batting_team_win_probability"]
+    b = live_probability(fmt, innings_no, runs, wickets + 1, legal_balls + 1, target, max_balls)["batting_team_win_probability"]
+    return {"next_wicket_swing": round(b - a, 1)}
+
+def player_projection(c, player_id, fmt):
+    s = c.execute("SELECT * FROM player_statistics WHERE player_id=? AND format=?", (player_id, fmt)).fetchone()
+    if not s or not s["matches"]:
+        return {"available": False, "reason": "no verified %s statistics for this player" % fmt}
+    rpm = (s["runs"] or 0) / s["matches"]
+    wpm = (s["wickets"] or 0) / s["matches"]
+    return {"available": True, "matches": s["matches"], "expected_runs": round(rpm, 1), "strike_rate": s["strike_rate"],
+            "expected_wickets": round(wpm, 2), "economy": s["economy"]}
+
+# ------------------------------------------------------------------ calibration / walk-forward backtest
+def backtest(c, params=None, dataset="verified"):
+    """Walk-forward: each completed match is predicted only from matches before it, without its toss.
+    Reports Brier score, log loss, hit rate and reliability bins. No claim beyond what this sample shows."""
+    hist = [r for r in completed_matches(c, dataset=dataset) if r["result_type"] in ("win", "tie_super_over", "awarded")]
+    preds = []
+    for i, r in enumerate(hist):
+        if i == 0:
+            continue
+        res = predict_match(c, r["id"], use_toss=False, params=params, history=hist[:i])
+        p = res["home_win_probability"] / 100
+        y = 1 if r["winner_team_id"] == r["home_team_id"] else 0
+        preds.append((p, y))
+    n = len(preds)
+    if not n:
+        return {"matches_evaluated": 0, "note": "needs at least 2 completed matches with a winner"}
+    brier = sum((p - y) ** 2 for p, y in preds) / n
+    ll = -sum(y * math.log(max(p, 1e-9)) + (1 - y) * math.log(max(1 - p, 1e-9)) for p, y in preds) / n
+    hit = sum(1 for p, y in preds if (p >= 0.5) == (y == 1)) / n
+    bins = []
+    for lo in (0.0, 0.2, 0.4, 0.6, 0.8):
+        b = [(p, y) for p, y in preds if lo <= p < lo + 0.2 or (lo == 0.8 and p == 1.0)]
+        if b:
+            bins.append({"range": "%d-%d%%" % (lo * 100, lo * 100 + 20), "matches": len(b),
+                         "mean_predicted": round(100 * sum(p for p, _ in b) / len(b), 1), "observed_home_win": round(100 * sum(y for _, y in b) / len(b), 1)})
+    return {"matches_evaluated": n, "dataset": dataset, "brier_score": round(brier, 4), "log_loss": round(ll, 4),
+            "hit_rate": round(100 * hit, 1), "baseline_brier_coin_flip": 0.25, "reliability": bins,
+            "note": "Walk-forward backtest on stored matches only; small samples are not evidence of skill."}

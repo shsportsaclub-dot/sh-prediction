@@ -1,7 +1,9 @@
 """/api/v1 — versioned SH PREDICTION API.
 
-Auth: Bearer session token (on-screen OTP login) for reads; X-Admin-Token for /api/v1/admin/*;
-verified experts (or admin) may POST predictions. Every write is audited.
+Viewer endpoints are public and return only published predictions and public explanations.
+/api/v1/admin/* needs the admin token (checked here, in the backend, for every call).
+Logged-in users (Bearer session) manage their preferences and follows; verified experts may submit
+predictions, which stay private until an admin publishes them. Every write is audited.
 Errors: {"error": {"code", "message"}} with HTTP 400/401/403/404/409/429.
 """
 import hashlib
@@ -12,9 +14,13 @@ import time
 import uuid
 import sqlite3
 
+import assistant
 import engine
+import fantasy
+import gateway
 import i18n
-from schema import now, migrate, bridge_legacy
+import system
+from schema import now, pending, bridge_legacy
 
 class ApiError(Exception):
     def __init__(self, status, code, message):
@@ -57,6 +63,16 @@ def qv(q, k):
     v = q.get(k, [None])[0]
     return v.strip() if isinstance(v, str) and v.strip() else None
 
+def dataset(q):
+    """'verified' (default) or 'demo'. The two are never mixed in one response."""
+    d = qv(q, "dataset") or ("demo" if qv(q, "include_demo") == "1" else "verified")
+    if d not in ("verified", "demo"):
+        raise bad("dataset must be verified or demo")
+    return d
+
+def origin_sql(d, alias="m"):
+    return "%s.data_origin='demo'" % alias if d == "demo" else "%s.data_origin<>'demo'" % alias
+
 def int_id(v, name="id"):
     try:
         return int(v)
@@ -93,20 +109,46 @@ def get_match(c, mid):
         raise ApiError(404, "NOT_FOUND", "match not found")
     return r
 
+# ------------------------------------------------------------------ privacy of SH logic
+# Model internals (factor weights, factor breakdown, model name/version, training sample) are visible
+# to admins only. Users see outcomes: probabilities, picks, confidence and the public settlement rule.
+PUBLIC_MODEL_NAME = "SH AI"
+
+def is_admin(who):
+    return bool(who) and who["role"] == "admin"
+
+def redact_prediction(d):
+    d.pop("factors", None)
+    d.pop("model_version_id", None)
+    if d.get("source_type") == "model":
+        d["model"] = PUBLIC_MODEL_NAME
+        d["explanation"] = "SH AI prediction"
+    for v in d.get("versions", []):
+        v.pop("factors_json", None)
+    return d
+
+def redact_signals(s):
+    pm = s["pre_match"]
+    s["pre_match"] = {k: pm[k] for k in ("match_id", "home_win_probability", "away_win_probability", "toss_probability",
+                                         "confidence_level", "predicted_team_id", "confidence", "public_factors")}
+    s["pre_match"]["model"] = PUBLIC_MODEL_NAME
+    return s
+
 # ------------------------------------------------------------------ identity
 def identity(h, c):
-    """Return dict(user_id, role, actor) or None. Admin token wins."""
-    if h.admin_ok():
-        return {"user_id": None, "role": "admin", "actor": "admin-token"}
+    """Return dict(user_id, role, actor) or None. A valid admin token gives the admin role (and keeps the user's own id)."""
+    adm = h.admin_ok()
     tok = h.headers.get("Authorization", "").removeprefix("Bearer ").strip()
     if not tok:
-        return None
+        return {"user_id": None, "role": "admin", "actor": "admin-token"} if adm else None
     s = c.execute("SELECT phone FROM login_sessions WHERE token_hash=? AND created_at>=?",
                   (hashlib.sha256(tok.encode()).hexdigest(), time.time() - 30 * 86400)).fetchone()
     if not s:
-        return None
+        return {"user_id": None, "role": "admin", "actor": "admin-token"} if adm else None
     c.execute("INSERT OR IGNORE INTO users(phone,created_at) VALUES(?,?)", (s[0], now()))
     u = c.execute("SELECT * FROM users WHERE phone=?", (s[0],)).fetchone()
+    if adm:
+        return {"user_id": u["id"], "role": "admin", "actor": "admin-token:user:%d" % u["id"]}
     return {"user_id": u["id"], "role": u["role"], "actor": "user:%d" % u["id"]}
 
 # ------------------------------------------------------------------ reads
@@ -131,8 +173,7 @@ def list_matches(c, q):
     if qv(q, "q"):
         like = "%" + qv(q, "q")[:60] + "%"
         where.append("(h.name LIKE ? OR a.name LIKE ? OR c.name LIKE ? OR h.short_code LIKE ? OR a.short_code LIKE ?)"); args += [like] * 5
-    if qv(q, "include_demo") != "1":
-        where.append("m.data_origin<>'demo'")
+    where.append(origin_sql(dataset(q)))
     sql = MATCH_SQL + (" WHERE " + " AND ".join(where) if where else "")
     total = c.execute("SELECT COUNT(*) FROM (" + sql + ")", args).fetchone()[0]
     order = " ORDER BY m.start_utc DESC" if st == "completed" else " ORDER BY m.start_utc ASC"
@@ -159,19 +200,23 @@ def match_detail(c, mid):
     d["squads"] = rows(c.execute("SELECT s.team_id,p.id AS player_id,p.name,p.role FROM match_squads s JOIN players p ON p.id=s.player_id WHERE s.match_id=?", (mid,)))
     return d
 
-def match_predictions(c, mid):
+def match_predictions(c, mid, who=None):
     get_match(c, mid)
     out = []
     for p in c.execute("""SELECT p.*, e.result AS evaluation, e.actual_team_id, e.actual_value, e.rule, e.evaluated_at,
                           x.display_name AS expert_name, x.verified AS expert_verified, mv.name||' '||mv.version AS model
                           FROM predictions p LEFT JOIN prediction_evaluations e ON e.prediction_id=p.id AND e.superseded_at IS NULL
                           LEFT JOIN expert_profiles x ON x.id=p.expert_id LEFT JOIN model_versions mv ON mv.id=p.model_version_id
-                          WHERE p.match_id=? AND p.status<>'draft' ORDER BY p.created_at""", (mid,)):
+                          WHERE p.match_id=? AND p.status<>'draft' %s ORDER BY p.created_at""" % (
+                              "" if is_admin(who) else "AND p.id IN (SELECT prediction_id FROM prediction_publications)"), (mid,)):
         d = dict(p)
         d["factors"] = json.loads(d.pop("factors_json") or "null")
+        pub = c.execute("SELECT published_at, public_note FROM prediction_publications WHERE prediction_id=?", (p["id"],)).fetchone()
+        d["published_at"] = pub[0] if pub else None
+        d["public_note"] = pub[1] if pub else None
         d["versions"] = rows(c.execute("SELECT * FROM prediction_versions WHERE prediction_id=? ORDER BY version_no", (p["id"],)))
-        out.append(d)
-    return {"items": out}
+        out.append(d if is_admin(who) else redact_prediction(d))
+    return {"items": out, "published_only": not is_admin(who)}
 
 def scorecard(c, mid):
     get_match(c, mid)
@@ -223,8 +268,17 @@ def current_live(c, r):
 
 def signals(c, mid):
     r = get_match(c, mid)
-    out = {"match_id": mid, "data_origin": r["data_origin"], "pre_match": engine.predict_match(c, mid),
-           "projected_first_innings": engine.projected_first_innings(c, mid), "live": current_live(c, r)}
+    pm = engine.predict_match(c, mid)
+    pm["public_factors"] = engine.public_factors(pm, r["home_name"], r["away_name"])
+    out = {"match_id": mid, "data_origin": r["data_origin"], "pre_match": pm,
+           "projected_first_innings": engine.projected_first_innings(c, mid),
+           "projected_second_innings": engine.projected_second_innings(c, mid), "live": current_live(c, r)}
+    inn = c.execute("SELECT * FROM innings WHERE match_id=? AND is_super_over=0 ORDER BY innings_no DESC LIMIT 1", (mid,)).fetchone()
+    if inn:
+        per_over = {o + 1: runs for o, runs in c.execute("""SELECT over_no, SUM(runs_bat+extras) FROM ball_events WHERE match_id=? AND innings_no=?
+                                                             GROUP BY over_no""", (mid, inn["innings_no"]))}
+        out["over_by_over"] = engine.over_projection(r["format"], inn["runs"], inn["wickets"], inn["legal_balls"], inn["max_balls"], per_over)
+        out["wicket_impact"] = engine.wicket_impact(r["format"], inn["innings_no"], inn["runs"], inn["wickets"], inn["legal_balls"], inn["target"], inn["max_balls"])
     lw = c.execute("SELECT id FROM predictions WHERE match_id=? AND prediction_type='live_winner' ORDER BY id LIMIT 1", (mid,)).fetchone()
     out["live_history"] = rows(c.execute("SELECT version_no,predicted_team_id,confidence,score_snapshot,created_at FROM prediction_versions WHERE prediction_id=? ORDER BY version_no", (lw[0],))) if lw else []
     # turning points: biggest swings between consecutive live versions
@@ -238,43 +292,54 @@ def signals(c, mid):
     return out
 
 def master_list(c, q):
-    where, args = ["m.data_origin<>'demo'"] if qv(q, "include_demo") != "1" else [], []
+    """ADMIN ONLY. Actual results master (not predictions): Match | Home | Away | Toss | Winner.
+    Toss cell = toss winner; its code is 'won' (green) if that team went on to win the match, 'lost' (red)
+    if it lost, 'unknown' (grey) while there is no winner. Winner cell = match winner (green) or None (grey dash)."""
+    d = dataset(q)
+    where, args = [origin_sql(d)], []
     if qv(q, "competition_id"):
         where.append("m.competition_id=?"); args.append(int_id(qv(q, "competition_id"), "competition_id"))
-    source = qv(q, "source") or "primary"
     out = []
-    for r in c.execute(MATCH_SQL + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY m.start_utc, m.id", args):
+    for serial, r in enumerate(c.execute(MATCH_SQL + " WHERE " + " AND ".join(where) + " ORDER BY m.start_utc, m.id", args).fetchall(), 1):
         teams = {r["home_team_id"]: ("H", r["home_code"] if r["home_code_ok"] else None, r["home_name"]),
                  r["away_team_id"]: ("A", r["away_code"] if r["away_code_ok"] else None, r["away_name"])}
 
         def cell(team_id, outcome):
-            if not team_id:
-                return None
             side, code, name = teams[team_id]
             return {"side": side, "code": code, "name": name, "outcome": outcome}
-
-        def pred(kind):
-            p = c.execute("""SELECT p.predicted_team_id, e.result FROM predictions p LEFT JOIN prediction_evaluations e
-                             ON e.prediction_id=p.id AND e.superseded_at IS NULL WHERE p.match_id=? AND p.prediction_type=?
-                             AND p.locked_at IS NOT NULL AND p.status='locked' ORDER BY CASE p.source_type WHEN 'legacy' THEN 0 WHEN 'expert' THEN 1 ELSE 2 END, p.id LIMIT 1""",
-                          (r["id"], kind)).fetchone()
-            if not p:
-                return None
-            return cell(p[0], {"correct": "won", "incorrect": "lost"}.get(p[1] or "pending", "unknown"))
-
-        toss_actual = cell(r["toss_winner_id"], "won") if r["toss_winner_id"] else None
-        win_actual = cell(r["winner_team_id"], "won") if r["winner_team_id"] else None
-        out.append({"match_id": r["id"], "match": r["match_no"] or "M%d" % r["id"], "start_utc": r["start_utc"],
-                    "competition": r["competition"], "data_origin": r["data_origin"], "status": r["status"],
+        winner = r["winner_team_id"] if r["result_type"] in ("win", "tie_super_over", "awarded") else None
+        toss = None
+        if r["toss_winner_id"]:
+            toss = cell(r["toss_winner_id"], "unknown" if not winner else ("won" if winner == r["toss_winner_id"] else "lost"))
+        num = (r["match_no"] or "").strip()
+        out.append({"match_id": r["id"], "match": "%02d" % int(num) if num.isdigit() else (num or "%02d" % serial),
+                    "start_utc": r["start_utc"], "competition": r["competition"], "status": r["status"], "result_type": r["result_type"],
                     "home": {"side": "H", "code": r["home_code"] if r["home_code_ok"] else None, "name": r["home_name"]},
                     "away": {"side": "A", "code": r["away_code"] if r["away_code_ok"] else None, "name": r["away_name"]},
-                    "toss_prediction": pred("toss"), "winner_prediction": pred("winner"),
-                    "toss_actual": toss_actual, "winner_actual": win_actual})
-    return {"columns": ["Match", "Home", "Away", "Toss", "Winner"], "items": out, "view": source}
+                    "toss": toss, "winner": cell(winner, "won") if winner else None})
+    return {"columns": ["Match", "Home", "Away", "Toss", "Winner"], "dataset": d, "items": out,
+            "meaning": "actual results; predictions are kept in separate immutable records"}
 
-def experts(c, q):
+def prediction_register(c, q):
+    """ADMIN ONLY. Every non-draft and draft prediction with its evaluation and publication state."""
     limit, offset = page(q)
-    acc = engine.accuracy(c)["by_expert"]
+    where, args = [origin_sql(dataset(q))], []
+    for k, col in (("match_id", "p.match_id"), ("status", "p.status"), ("source_type", "p.source_type")):
+        if qv(q, k):
+            where.append(col + "=?"); args.append(qv(q, k))
+    if qv(q, "published") in ("0", "1"):
+        where.append(("" if qv(q, "published") == "1" else "NOT ") + "EXISTS(SELECT 1 FROM prediction_publications pp WHERE pp.prediction_id=p.id)")
+    sql = """FROM predictions p JOIN matches m ON m.id=p.match_id JOIN teams h ON h.id=m.home_team_id JOIN teams a ON a.id=m.away_team_id
+             LEFT JOIN teams t ON t.id=p.predicted_team_id LEFT JOIN prediction_evaluations e ON e.prediction_id=p.id AND e.superseded_at IS NULL
+             LEFT JOIN prediction_publications pp ON pp.prediction_id=p.id LEFT JOIN expert_profiles x ON x.id=p.expert_id WHERE """ + " AND ".join(where)
+    items = rows(c.execute("""SELECT p.id,p.match_id,h.name AS home,a.name AS away,m.start_utc,p.source_type,x.display_name AS expert,p.prediction_type,
+                              t.name AS predicted_team,p.predicted_value,p.confidence,p.status,p.created_at,p.locked_at,e.result AS evaluation,
+                              pp.published_at """ + sql + " ORDER BY m.start_utc DESC, p.id DESC LIMIT ? OFFSET ?", args + [limit, offset]))
+    return {"items": items, "total": c.execute("SELECT COUNT(*) " + sql, args).fetchone()[0], "limit": limit, "offset": offset}
+
+def experts(c, q, who=None):
+    limit, offset = page(q)
+    acc = engine.accuracy(c, published_only=not is_admin(who))["by_expert"]
     items = rows(c.execute("""SELECT x.id,x.display_name,x.bio,x.contact_url,x.verified,x.verified_at,x.language_code,co.name AS country,
                               (SELECT COUNT(*) FROM expert_follows f WHERE f.expert_id=x.id) AS followers
                               FROM expert_profiles x LEFT JOIN countries co ON co.id=x.country_id ORDER BY x.verified DESC,x.id LIMIT ? OFFSET ?""",
@@ -286,17 +351,18 @@ def experts(c, q):
         e["rank"] = i
     return {"items": items, "total": c.execute("SELECT COUNT(*) FROM expert_profiles").fetchone()[0], "limit": limit, "offset": offset}
 
-def expert_history(c, eid, q):
+def expert_history(c, eid, q, who=None):
     limit, offset = page(q)
     x = c.execute("SELECT * FROM expert_profiles WHERE id=?", (eid,)).fetchone()
     if not x:
         raise ApiError(404, "NOT_FOUND", "expert not found")
+    pubf = "" if is_admin(who) else "AND p.id IN (SELECT prediction_id FROM prediction_publications)"
     items = rows(c.execute("""SELECT p.id,p.match_id,p.prediction_type,p.predicted_team_id,t.name AS predicted_team,p.confidence,p.explanation,
                               p.created_at,p.locked_at,e.result AS evaluation,e.rule FROM predictions p LEFT JOIN teams t ON t.id=p.predicted_team_id
                               LEFT JOIN prediction_evaluations e ON e.prediction_id=p.id AND e.superseded_at IS NULL
-                              WHERE p.expert_id=? AND p.status<>'draft' ORDER BY p.created_at DESC LIMIT ? OFFSET ?""", (eid, limit, offset)))
+                              WHERE p.expert_id=? AND p.status<>'draft' %s ORDER BY p.created_at DESC LIMIT ? OFFSET ?""" % pubf, (eid, limit, offset)))
     res = [r[0] or "pending" for r in c.execute("""SELECT e.result FROM predictions p LEFT JOIN prediction_evaluations e ON e.prediction_id=p.id
-                                                    AND e.superseded_at IS NULL WHERE p.expert_id=? AND p.status<>'draft'""", (eid,))]
+                                                    AND e.superseded_at IS NULL WHERE p.expert_id=? AND p.status<>'draft' %s""" % pubf, (eid,))]
     return {"expert": dict(x), "summary": engine.tally(res), "items": items, "limit": limit, "offset": offset}
 
 # ------------------------------------------------------------------ writes
@@ -417,6 +483,29 @@ def model_prediction(c, who, mid):
         out.append(create_prediction(c, who, {"match_id": mid, "prediction_type": "first_innings_score", "predicted_value": proj["projected"],
                                               "explanation": "Venue average of %d first innings (IQR %d-%d)" % (proj["samples"], proj["low"], proj["high"]), "lock": True}, model=True))
     return {"model": res, "stored": out}
+
+MODEL_PARAM_KEYS = ("form_window", "form_weight", "h2h_weight", "home_weight", "venue_weight", "laplace")
+
+def admin_model_version(c, who, d):
+    ver = str(d.get("version") or "").strip()
+    if not re.fullmatch(r"[0-9A-Za-z.\-]{1,20}", ver):
+        raise bad("version required (letters, digits, dot, dash)")
+    p = d.get("params")
+    if not isinstance(p, dict) or set(p) != set(MODEL_PARAM_KEYS):
+        raise bad("params must contain exactly: " + ", ".join(MODEL_PARAM_KEYS))
+    for k, v in p.items():
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not 0 <= v <= 100:
+            raise bad(k + " must be a number between 0 and 100")
+    if not 1 <= p["form_window"] <= 50 or p["laplace"] <= 0:
+        raise bad("form_window must be 1..50 and laplace > 0")
+    try:
+        c.execute("INSERT INTO model_versions(name,version,description,params_json,created_at) VALUES('sh-baseline',?,?,?,?)",
+                  (ver, (d.get("description") or "admin tuned").strip()[:500], json.dumps(p), now()))
+    except sqlite3.IntegrityError:
+        raise ApiError(409, "DUPLICATE", "model version already exists")
+    mid = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    audit(c, who["actor"], "model.version", "model_version", mid, {"version": ver})  # weights deliberately not copied to the audit text
+    return {"model_version_id": mid, "version": ver, "active": True}
 
 def get_or_create(c, table, key_cols, values, extra=None):
     cols = list(key_cols) + list((extra or {}).keys())
@@ -706,48 +795,444 @@ def monitor(c):
             "counts": {t: c.execute('SELECT COUNT(*) FROM "%s"' % t).fetchone()[0] for t in tables if t != "login_sessions"},
             "time_utc": now()}
 
+# ------------------------------------------------------------------ publishing
+def publish(c, who, pid, d):
+    p = c.execute("SELECT * FROM predictions WHERE id=?", (pid,)).fetchone()
+    if not p:
+        raise ApiError(404, "NOT_FOUND", "prediction not found")
+    if not p["locked_at"]:
+        raise ApiError(409, "NOT_LOCKED", "lock the prediction before publishing")
+    if c.execute("SELECT 1 FROM prediction_publications WHERE prediction_id=?", (pid,)).fetchone():
+        raise ApiError(409, "ALREADY_PUBLISHED", "already published")
+    note = (d.get("public_note") or "").strip()[:1000] or None
+    c.execute("INSERT INTO prediction_publications(prediction_id,published_at,published_by,public_note) VALUES(?,?,?,?)", (pid, now(), who["actor"], note))
+    audit(c, who["actor"], "prediction.publish", "prediction", pid, d)
+    return {"prediction_id": pid, "published": True}
+
+def unpublish(c, who, pid, d):
+    if not (d.get("reason") or "").strip():
+        raise bad("reason required to unpublish")
+    old = c.execute("SELECT * FROM prediction_publications WHERE prediction_id=?", (pid,)).fetchone()
+    if not old:
+        raise ApiError(404, "NOT_FOUND", "prediction is not published")
+    c.execute("DELETE FROM prediction_publications WHERE prediction_id=?", (pid,))
+    audit(c, who["actor"], "prediction.unpublish", "prediction", pid, d, dict(old))
+    return {"prediction_id": pid, "published": False}
+
+# ------------------------------------------------------------------ match centre extras
+def graphs(c, mid):
+    get_match(c, mid)
+    out = []
+    for inn in c.execute("SELECT * FROM innings WHERE match_id=? ORDER BY innings_no", (mid,)).fetchall():
+        per = c.execute("""SELECT over_no, SUM(runs_bat+extras) AS runs, SUM(is_wicket) AS wkts FROM ball_events WHERE match_id=? AND innings_no=?
+                           GROUP BY over_no ORDER BY over_no""", (mid, inn["innings_no"])).fetchall()
+        cum, worm = 0, []
+        for r in per:
+            cum += r["runs"]
+            worm.append(cum)
+        out.append({"innings_no": inn["innings_no"], "batting_team_id": inn["batting_team_id"],
+                    "manhattan": [{"over": r["over_no"] + 1, "runs": r["runs"], "wickets": r["wkts"]} for r in per],
+                    "worm": worm, "run_rate": [round(w * 1.0 / (i + 1), 2) for i, w in enumerate(worm)]})
+    return {"match_id": mid, "innings": out}
+
+def partnerships(c, mid):
+    get_match(c, mid)
+    out = []
+    for inn in c.execute("SELECT innings_no FROM innings WHERE match_id=? ORDER BY innings_no", (mid,)).fetchall():
+        parts, cur, wk = [], {"runs": 0, "balls": 0}, 0
+        for b in c.execute("SELECT * FROM ball_events WHERE match_id=? AND innings_no=? ORDER BY seq", (mid, inn[0])):
+            cur["runs"] += b["runs_bat"] + b["extras"]
+            cur["balls"] += b["extra_type"] not in ("wide", "no_ball")
+            if b["is_wicket"]:
+                wk += 1
+                parts.append(dict(cur, wicket=wk, ended="%d.%d" % (b["over_no"], b["ball_in_over"])))
+                cur = {"runs": 0, "balls": 0}
+        if cur["balls"] or cur["runs"]:
+            parts.append(dict(cur, wicket=wk + 1, ended=None))
+        out.append({"innings_no": inn[0], "partnerships": parts})
+    return {"match_id": mid, "innings": out}
+
+def fall_of_wickets(c, mid):
+    get_match(c, mid)
+    out = []
+    for inn in c.execute("SELECT innings_no FROM innings WHERE match_id=? ORDER BY innings_no", (mid,)).fetchall():
+        tot, wk, fow = 0, 0, []
+        for b in c.execute("""SELECT b.*, p.name AS batter FROM ball_events b LEFT JOIN players p ON p.id=b.batter_id
+                              WHERE b.match_id=? AND b.innings_no=? ORDER BY b.seq""", (mid, inn[0])):
+            tot += b["runs_bat"] + b["extras"]
+            if b["is_wicket"]:
+                wk += 1
+                fow.append({"wicket": wk, "score": tot, "over": "%d.%d" % (b["over_no"], b["ball_in_over"]), "batter": b["batter"], "how": b["wicket_kind"]})
+        out.append({"innings_no": inn[0], "fall_of_wickets": fow})
+    return {"match_id": mid, "innings": out}
+
+def final_result(c, mid):
+    r = get_match(c, mid)
+    names = {r["home_team_id"]: r["home_name"], r["away_team_id"]: r["away_name"]}
+    if not r["result_type"]:
+        return {"match_id": mid, "available": False, "status": r["status"]}
+    text = {"win": "%s won", "awarded": "%s awarded the match", "tie_super_over": "Tie; %s won the Super Over"}.get(r["result_type"])
+    return {"match_id": mid, "available": True, "result_type": r["result_type"], "winner_team_id": r["winner_team_id"],
+            "summary": (text % names[r["winner_team_id"]]) if text else {"tie": "Match tied", "no_result": "No result", "abandoned": "Match abandoned", "canceled": "Match canceled"}[r["result_type"]],
+            "margin": r["margin"], "method": r["method"]}
+
+# ------------------------------------------------------------------ admin: players, squads, XI, stats, edits
+def admin_player(c, who, d):
+    name = (d.get("name") or "").strip()
+    if not name:
+        raise bad("name required")
+    if d.get("role") not in ("batter", "bowler", "all_rounder", "wicket_keeper"):
+        raise bad("role must be batter, bowler, all_rounder or wicket_keeper")
+    pid = d.get("player_id")
+    if pid:
+        c.execute("UPDATE players SET name=?,role=?,batting_style=?,bowling_style=? WHERE id=?", (name, d["role"], d.get("batting_style"), d.get("bowling_style"), int_id(pid)))
+    else:
+        c.execute("INSERT INTO players(name,role,batting_style,bowling_style) VALUES(?,?,?,?)", (name, d["role"], d.get("batting_style"), d.get("bowling_style")))
+        pid = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    audit(c, who["actor"], "player.upsert", "player", pid, d)
+    return {"player_id": pid}
+
+def admin_player_stats(c, who, d):
+    pid = int_id(d.get("player_id"), "player_id")
+    if not c.execute("SELECT 1 FROM players WHERE id=?", (pid,)).fetchone():
+        raise ApiError(404, "NOT_FOUND", "player not found")
+    fmt = d.get("format")
+    if fmt not in ("T10", "T20", "The Hundred", "ODI", "List A", "Test", "First-class", "Other"):
+        raise bad("invalid format")
+    vals = []
+    for k in ("matches", "runs", "batting_avg", "strike_rate", "wickets", "economy"):
+        v = d.get(k)
+        if v is not None and (not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0):
+            raise bad(k + " must be a non-negative number")
+        vals.append(v)
+    if not (d.get("source") or "").strip():
+        raise bad("source required")
+    c.execute("""INSERT INTO player_statistics(player_id,format,matches,runs,batting_avg,strike_rate,wickets,economy,updated_at) VALUES(?,?,?,?,?,?,?,?,?)
+                 ON CONFLICT(player_id,format) DO UPDATE SET matches=excluded.matches,runs=excluded.runs,batting_avg=excluded.batting_avg,
+                 strike_rate=excluded.strike_rate,wickets=excluded.wickets,economy=excluded.economy,updated_at=excluded.updated_at""", [pid, fmt] + vals + [now()])
+    audit(c, who["actor"], "player.stats", "player", pid, d)
+    return {"player_id": pid, "format": fmt}
+
+def admin_lineup(c, who, mid, d, table):
+    m = get_match(c, mid)
+    team = int_id(d.get("team_id"), "team_id")
+    if team not in (m["home_team_id"], m["away_team_id"]):
+        raise bad("team must play in this match")
+    players = d.get("players")
+    if not isinstance(players, list) or not 1 <= len(players) <= 25:
+        raise bad("players must be a list of 1..25 entries")
+    if table == "playing_xi" and len([p for p in players if not p.get("is_impact_sub")]) > 11:
+        raise bad("a Playing XI has at most 11 players (plus impact substitutes)")
+    old = rows(c.execute("SELECT * FROM %s WHERE match_id=? AND team_id=?" % table, (mid, team)))
+    c.execute("DELETE FROM %s WHERE match_id=? AND team_id=?" % table, (mid, team))
+    for i, p in enumerate(players, 1):
+        pid = int_id(p.get("player_id"), "player_id")
+        if not c.execute("SELECT 1 FROM players WHERE id=?", (pid,)).fetchone():
+            raise bad("unknown player_id %d" % pid)
+        if table == "playing_xi":
+            c.execute("INSERT INTO playing_xi(match_id,team_id,player_id,batting_order,is_captain,is_keeper,is_impact_sub) VALUES(?,?,?,?,?,?,?)",
+                      (mid, team, pid, p.get("batting_order", i), 1 if p.get("is_captain") else 0, 1 if p.get("is_keeper") else 0, 1 if p.get("is_impact_sub") else 0))
+        else:
+            c.execute("INSERT INTO match_squads(match_id,team_id,player_id) VALUES(?,?,?)", (mid, team, pid))
+    audit(c, who["actor"], table + ".set", "match", mid, d, {"previous": old})
+    return {"match_id": mid, "team_id": team, "count": len(players)}
+
+def admin_scorecard_row(c, who, mid, d):
+    get_match(c, mid)
+    pid = int_id(d.get("player_id"), "player_id")
+    ino = int_id(d.get("innings_no"), "innings_no")
+    cols = ("runs", "balls", "fours", "sixes", "dismissal", "overs_bowled", "maidens", "runs_conceded", "wickets")
+    c.execute("""INSERT INTO scorecards(match_id,innings_no,player_id,%s) VALUES(?,?,?,%s)
+                 ON CONFLICT(match_id,innings_no,player_id) DO UPDATE SET %s""" % (",".join(cols), ",".join("?" * len(cols)), ",".join("%s=excluded.%s" % (k, k) for k in cols)),
+              [mid, ino, pid] + [d.get(k) for k in cols])
+    audit(c, who["actor"], "scorecard.row", "match", mid, d)
+    return {"match_id": mid, "player_id": pid}
+
+EDITABLE = ("venue", "city", "match_no", "weather", "pitch_report", "format", "start_utc", "status")
+
+def admin_edit_match(c, who, mid, d):
+    m = get_match(c, mid)
+    changes = {k: d[k] for k in EDITABLE if k in d}
+    if not changes:
+        raise bad("nothing to change; editable: " + ", ".join(EDITABLE))
+    if "start_utc" in changes:
+        locked = c.execute("SELECT COUNT(*) FROM predictions WHERE match_id=? AND locked_at IS NOT NULL AND prediction_type<>'live_winner'", (mid,)).fetchone()[0]
+        if locked and not (d.get("reason") or "").strip():
+            raise ApiError(409, "HAS_LOCKED_PREDICTIONS", "locked predictions exist; send a reason to change the start time (eligibility is re-checked)")
+        try:
+            changes["start_utc"] = engine.pdt(changes["start_utc"]).isoformat()
+        except ValueError:
+            raise bad("start_utc must be ISO-8601 with timezone")
+    if "format" in changes and changes["format"] not in ("T10", "T20", "The Hundred", "ODI", "List A", "Test", "First-class", "Other"):
+        raise bad("invalid format")
+    if "status" in changes and changes["status"] not in ("scheduled", "live"):
+        raise bad("status can only be set to scheduled or live here; record results through Result Verification")
+    venue = changes.pop("venue", None)
+    city = changes.pop("city", "")
+    if venue:
+        changes["venue_id"] = get_or_create(c, "venues", ["name", "city"], {"name": venue.strip(), "city": (city or "").strip()})
+    old = dict(c.execute("SELECT * FROM matches WHERE id=?", (mid,)).fetchone())
+    c.execute("UPDATE matches SET %s, updated_at=? WHERE id=?" % ",".join(k + "=?" for k in changes), list(changes.values()) + [now(), mid])
+    engine.reevaluate_match(c, mid)
+    audit(c, who["actor"], "match.edit", "match", mid, d, old)
+    return {"match_id": mid, "changed": sorted(changes)}
+
+# ------------------------------------------------------------------ admin: users, settings, providers, import
+def admin_users(c, q):
+    limit, offset = page(q)
+    return {"items": rows(c.execute("""SELECT u.id, substr(u.phone,1,2)||'******'||substr(u.phone,-2) AS phone_masked, u.role, u.created_at,
+                                       x.id AS expert_id, x.verified FROM users u LEFT JOIN expert_profiles x ON x.user_id=u.id ORDER BY u.id DESC LIMIT ? OFFSET ?""", (limit, offset))),
+            "total": c.execute("SELECT COUNT(*) FROM users").fetchone()[0],
+            "note": "Admin rights come only from the admin key. Roles here: user or expert."}
+
+def admin_set_role(c, who, uid, d):
+    if d.get("role") not in ("user", "expert"):
+        raise bad("role must be user or expert (admin access is only through the admin key)")
+    old = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not old:
+        raise ApiError(404, "NOT_FOUND", "user not found")
+    c.execute("UPDATE users SET role=? WHERE id=?", (d["role"], uid))
+    audit(c, who["actor"], "user.role", "user", uid, d, {"role": old["role"]})
+    return {"user_id": uid, "role": d["role"]}
+
+SETTINGS = {"public_site_enabled": ("0", "1"), "default_language": None, "viewer_sees_demo_option": ("0", "1")}
+
+def admin_settings(c, who, d=None):
+    if d is not None:
+        for k, v in d.items():
+            if k not in SETTINGS:
+                raise bad("unknown setting " + k)
+            v = str(v)
+            if SETTINGS[k] and v not in SETTINGS[k]:
+                raise bad("%s must be one of %s" % (k, ", ".join(SETTINGS[k])))
+            if k == "default_language" and not c.execute("SELECT 1 FROM languages WHERE code=?", (v,)).fetchone():
+                raise bad("unknown language")
+            old = c.execute("SELECT value FROM system_settings WHERE key=?", (k,)).fetchone()
+            c.execute("INSERT INTO system_settings(key,value,updated_at,updated_by) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by",
+                      (k, v, now(), who["actor"]))
+            audit(c, who["actor"], "setting.update", "setting", k, {k: v}, {"value": old[0]} if old else None)
+    return {"items": rows(c.execute("SELECT * FROM system_settings ORDER BY key"))}
+
+def admin_provider(c, who, name, d):
+    p = c.execute("SELECT * FROM data_providers WHERE name=?", (name,)).fetchone()
+    if not p:
+        raise ApiError(404, "NOT_FOUND", "unknown provider")
+    if "enabled" in d:
+        if name == "licensed_feed" and d["enabled"]:
+            cfg = json.loads(p["config_json"] or "{}")
+            if not cfg.get("contract_reference"):
+                raise ApiError(409, "NOT_CONFIGURED", "record the licence/contract reference before enabling a licensed feed")
+        c.execute("UPDATE data_providers SET enabled=? WHERE name=?", (1 if d["enabled"] else 0, name))
+    if "config" in d:
+        cfg = d["config"]
+        if not isinstance(cfg, dict) or any(k.lower() in ("api_key", "key", "token", "secret", "password") for k in cfg):
+            raise bad("config must be an object without secrets; keep API keys in server environment variables")
+        c.execute("UPDATE data_providers SET config_json=? WHERE name=?", (json.dumps(cfg), name))
+    audit(c, who["actor"], "provider.update", "provider", name, d, dict(p))
+    return dict(c.execute("SELECT * FROM data_providers WHERE name=?", (name,)).fetchone())
+
+IMPORT_COLS = ("competition", "season", "match_no", "home", "away", "start_utc", "venue", "format", "source",
+               "toss_winner", "toss_decision", "result_type", "winner", "margin", "method")
+
+def admin_import(c, who, d):
+    """Verified manual entry: CSV text with header row. Fixtures are created (deduplicated); toss/result
+    columns, when filled, are recorded through the same verified endpoints. Dry run by default."""
+    import csv, io
+    text = d.get("csv") or ""
+    if not 1 <= len(text) <= 500000:
+        raise bad("csv text required (max 500 kB)")
+    rd = csv.DictReader(io.StringIO(text))
+    if not rd.fieldnames or not {"competition", "home", "away", "start_utc", "source"} <= {f.strip() for f in rd.fieldnames}:
+        raise bad("header must include competition, home, away, start_utc, source")
+    commit = bool(d.get("commit"))
+    report = {"rows": 0, "created": 0, "duplicates": 0, "results": 0, "errors": []}
+    c.execute("SAVEPOINT import_all")  # outer savepoint: a dry run rolls everything back
+    for n, row in enumerate(rd, 2):
+        row = {k.strip(): (v or "").strip() for k, v in row.items() if k}
+        report["rows"] += 1
+        sp = "imp_%d" % n
+        c.execute("SAVEPOINT " + sp)
+        try:
+            r = admin_match(c, who, {k: row.get(k) or None for k in ("competition", "season", "match_no", "home", "away", "start_utc", "venue", "source")}
+                            | {"format": row.get("format") or "T20", "data_origin": "verified"})
+            report["created" if r["status"] == "created" else "duplicates"] += 1
+            mid = r["match_id"]
+            m = get_match(c, mid)
+            names = {m["home_name"]: m["home_team_id"], m["away_name"]: m["away_team_id"]}
+            if row.get("toss_winner"):
+                if row["toss_winner"] not in names:
+                    raise ValueError("toss_winner must be the home or away name")
+                if not c.execute("SELECT 1 FROM toss_results WHERE match_id=?", (mid,)).fetchone():
+                    admin_toss(c, who, {"match_id": mid, "winner_team_id": names[row["toss_winner"]], "decision": (row.get("toss_decision") or "").lower(), "source": row["source"]})
+            if row.get("result_type"):
+                if not c.execute("SELECT 1 FROM match_results WHERE match_id=?", (mid,)).fetchone():
+                    w = names.get(row.get("winner")) if row.get("winner") else None
+                    if row.get("winner") and w is None:
+                        raise ValueError("winner must be the home or away name")
+                    admin_result(c, who, {"match_id": mid, "result_type": row["result_type"], "winner_team_id": w, "margin": row.get("margin") or None,
+                                          "method": row.get("method") or None, "source": row["source"]})
+                    report["results"] += 1
+            c.execute("RELEASE " + sp)
+        except (ApiError, ValueError, KeyError, sqlite3.DatabaseError) as e:
+            c.execute("ROLLBACK TO " + sp); c.execute("RELEASE " + sp)
+            report["errors"].append({"line": n, "error": getattr(e, "message", str(e))})
+    report["committed"] = commit
+    if not commit:
+        c.execute("ROLLBACK TO import_all")
+        c.execute("RELEASE import_all")
+        return report
+    c.execute("RELEASE import_all")
+    audit(c, who["actor"], "data.import", "import", report["rows"], {k: v for k, v in report.items() if k != "errors"})
+    gateway.clear_cache()
+    return report
+
+class _DryRun(Exception):
+    def __init__(self, report):
+        self.report = report
+
+# ------------------------------------------------------------------ data gateway (public read contract)
+def gw_fixtures(c, q):
+    d = dataset(q)
+    return gateway.cached(("fx", d, qv(q, "competition_id")), gateway.TTL["default"], lambda: {
+        "items": [match_out(r) for r in c.execute(MATCH_SQL + " WHERE " + origin_sql(d) + " AND m.status IN ('scheduled','live')"
+                                                  + (" AND m.competition_id=%d" % int_id(qv(q, "competition_id")) if qv(q, "competition_id") else "")
+                                                  + " ORDER BY m.start_utc LIMIT 200")], "dataset": d})
+
+def gw_results(c, q):
+    d = dataset(q)
+    return gateway.cached(("res", d), gateway.TTL["default"], lambda: {
+        "items": [match_out(r) for r in c.execute(MATCH_SQL + " WHERE " + origin_sql(d) + " AND r.result_type IS NOT NULL ORDER BY m.start_utc DESC LIMIT 200")], "dataset": d})
+
+def gw_live(c, q):
+    d = dataset(q)
+    def build():
+        out = []
+        for r in c.execute(MATCH_SQL + " WHERE " + origin_sql(d) + " AND m.status='live' ORDER BY m.start_utc").fetchall():
+            x = match_out(r)
+            x["live"] = current_live(c, r)
+            out.append(x)
+        return {"items": out, "dataset": d, "note": "Live data exists only for matches scored in SH PREDICTION or received from a licensed feed."}
+    return gateway.cached(("live", d), gateway.TTL["live"], build)
+
+def gw_team_stats(c, tid):
+    t = c.execute("SELECT * FROM teams WHERE id=?", (tid,)).fetchone()
+    if not t:
+        raise ApiError(404, "NOT_FOUND", "team not found")
+    rs = c.execute("""SELECT r.winner_team_id, r.result_type FROM matches m JOIN match_results r ON r.match_id=m.id
+                      WHERE (m.home_team_id=? OR m.away_team_id=?) AND m.data_origin<>'demo' ORDER BY m.start_utc""", (tid, tid)).fetchall()
+    won = sum(1 for r in rs if r[0] == tid)
+    nr = sum(1 for r in rs if r[1] in ("no_result", "abandoned", "canceled", "tie"))
+    return {"team_id": tid, "name": t["name"], "played": len(rs), "won": won, "lost": len(rs) - won - nr, "no_result_or_tie": nr,
+            "last5": "".join("W" if r[0] == tid else ("L" if r[0] else "N") for r in rs[-5:]), "dataset": "verified"}
+
+def gw_venue_stats(c, vid):
+    v = c.execute("SELECT * FROM venues WHERE id=?", (vid,)).fetchone()
+    if not v:
+        raise ApiError(404, "NOT_FOUND", "venue not found")
+    st = engine.analytics(c)["venue"].get(v["name"], {"matches": 0})
+    avg = c.execute("""SELECT i.innings_no, AVG(i.runs), COUNT(*) FROM innings i JOIN matches m ON m.id=i.match_id WHERE m.venue_id=? AND i.completed=1
+                       AND i.is_super_over=0 AND m.data_origin<>'demo' GROUP BY i.innings_no""", (vid,)).fetchall()
+    return {"venue_id": vid, "name": v["name"], "results": st, "average_totals": {"innings_%d" % a[0]: {"average": round(a[1]), "innings": a[2]} for a in avg}}
+
+def gw_player_stats(c, pid):
+    p = c.execute("SELECT * FROM players WHERE id=?", (pid,)).fetchone()
+    if not p:
+        raise ApiError(404, "NOT_FOUND", "player not found")
+    return {"player": dict(p), "statistics": rows(c.execute("SELECT * FROM player_statistics WHERE player_id=?", (pid,)))}
+
+def gw_history(c, q):
+    limit, offset = page(q)
+    where, args = [origin_sql(dataset(q)), "r.result_type IS NOT NULL"], []
+    if qv(q, "team_id"):
+        t = int_id(qv(q, "team_id"), "team_id"); where.append("(m.home_team_id=? OR m.away_team_id=?)"); args += [t, t]
+    if qv(q, "from"):
+        where.append("m.start_utc>=?"); args.append(qv(q, "from"))
+    if qv(q, "to"):
+        where.append("m.start_utc<=?"); args.append(qv(q, "to"))
+    sql = MATCH_SQL + " WHERE " + " AND ".join(where)
+    return {"items": [match_out(r) for r in c.execute(sql + " ORDER BY m.start_utc DESC LIMIT ? OFFSET ?", args + [limit, offset])],
+            "total": c.execute("SELECT COUNT(*) FROM (" + sql + ")", args).fetchone()[0], "limit": limit, "offset": offset}
+
+def admin_dashboard(c):
+    one = lambda sql, *a: c.execute(sql, a).fetchone()[0]
+    acc = engine.accuracy(c)["overall"]
+    return {"matches": {"scheduled": one("SELECT COUNT(*) FROM matches WHERE status='scheduled' AND data_origin<>'demo'"),
+                        "live": one("SELECT COUNT(*) FROM matches WHERE status='live' AND data_origin<>'demo'"),
+                        "awaiting_result": one("SELECT COUNT(*) FROM matches m WHERE m.status IN ('scheduled','live') AND m.start_utc<? AND m.data_origin<>'demo'", now()),
+                        "completed": one("SELECT COUNT(*) FROM matches WHERE status NOT IN ('scheduled','live') AND data_origin<>'demo'")},
+            "predictions": {"drafts": one("SELECT COUNT(*) FROM predictions WHERE status='draft'"),
+                            "locked_unpublished": one("SELECT COUNT(*) FROM predictions p WHERE p.locked_at IS NOT NULL AND p.id NOT IN (SELECT prediction_id FROM prediction_publications)"),
+                            "published": one("SELECT COUNT(*) FROM prediction_publications")},
+            "experts": {"total": one("SELECT COUNT(*) FROM expert_profiles"), "unverified": one("SELECT COUNT(*) FROM expert_profiles WHERE verified=0")},
+            "users": one("SELECT COUNT(*) FROM users"), "accuracy": acc,
+            "providers": rows(c.execute("SELECT name,kind,enabled,last_sync_at,last_status FROM data_providers")),
+            "pending_migrations": pending(c)}
+
 # ------------------------------------------------------------------ router
+SYSTEM_PATHS = (("admin", "system", "status"), ("admin", "system", "migrate"))
+
 def route(h, method, path, q, body_fn):
     c = h_db()
     try:
-        migrate(c)
-        bridge_legacy(c)
-        engine.reevaluate_all(c)
-        c.commit()
         ip = h.headers.get("X-Forwarded-For", h.client_address[0]).split(",")[0].strip()
         if not rate_ok(ip):
             raise ApiError(429, "RATE_LIMITED", "too many requests; try again in a minute")
         parts = [p for p in path.split("/") if p][2:]  # strip api, v1
-        # public endpoints
-        if method == "GET" and parts == ["languages"]:
-            return 200, {"items": rows(c.execute("SELECT * FROM languages ORDER BY ui_complete DESC, name"))}
         if method == "GET" and len(parts) == 2 and parts[0] == "i18n":
-            if not c.execute("SELECT 1 FROM languages WHERE code=?", (parts[1],)).fetchone():
-                raise ApiError(404, "NOT_FOUND", "unknown language")
-            r = c.execute("SELECT * FROM languages WHERE code=?", (parts[1],)).fetchone()
-            return 200, {"code": parts[1], "rtl": bool(r["rtl"]), "ui_complete": bool(r["ui_complete"]), "strings": i18n.bundle(parts[1])}
-        who = identity(h, c)
-        if parts[:1] == ["admin"]:
-            if not who or who["role"] != "admin":
+            return 200, i18n_bundle(c, parts[1])
+        todo = pending(c)
+        if todo:
+            # Database changes are applied only by an admin action that backs up first (never on a page load).
+            if tuple(parts) not in SYSTEM_PATHS:
+                raise ApiError(503, "MIGRATION_PENDING", "SH PREDICTION v1 is being prepared; an admin must run the database migration")
+            if not h.admin_ok():
                 raise ApiError(403, "FORBIDDEN", "admin token required")
-        elif not who:
-            raise ApiError(401, "UNAUTHENTICATED", "login required")
+            who = {"user_id": None, "role": "admin", "actor": "admin-token"}
+        else:
+            bridge_legacy(c)
+            engine.reevaluate_all(c)
+            c.commit()
+            who = identity(h, c)
+            if parts[:1] == ["admin"] and not is_admin(who):
+                raise ApiError(403, "FORBIDDEN", "admin token required")
         res = dispatch(c, who, method, parts, q, body_fn)
         c.commit()
         return res
+    except _DryRun as e:
+        c.rollback()
+        return 200, e.report
     except ApiError as e:
         c.rollback()
         return e.status, {"error": {"code": e.code, "message": e.message}}
     except sqlite3.DatabaseError as e:
         c.rollback()
-        if "immutable" in str(e) or "append-only" in str(e) or "cannot be deleted" in str(e):
+        if any(w in str(e) for w in ("immutable", "append-only", "cannot be deleted", "only locked")):
             return 409, {"error": {"code": "IMMUTABLE", "message": str(e)}}
         return 400, {"error": {"code": "DATABASE_ERROR", "message": str(e)}}
-    except (ValueError, TypeError, KeyError) as e:
+    except (LookupError,) as e:
+        c.rollback()
+        return 404, {"error": {"code": "NOT_FOUND", "message": str(e).strip("'")}}
+    except PermissionError as e:
+        c.rollback()
+        return 409, {"error": {"code": "DISABLED", "message": str(e)}}
+    except (ValueError, TypeError) as e:
         c.rollback()
         return 400, {"error": {"code": "VALIDATION_ERROR", "message": str(e)}}
     finally:
         c.close()
+
+def i18n_bundle(c, code):
+    if code not in {l[0] for l in i18n_langs()}:
+        raise ApiError(404, "NOT_FOUND", "unknown language")
+    st = i18n.bundle(code)
+    cov = i18n.coverage(code)
+    rtl = next(l[3] for l in i18n_langs() if l[0] == code)
+    return {"code": code, "rtl": bool(rtl), "coverage_percent": cov, "ui_complete": cov == 100,
+            "fallback_note": None if cov == 100 else "Some text is shown in English until translated", "strings": st}
+
+def i18n_langs():
+    import schema
+    return schema.LANGS
 
 DB_FN = None  # set by main.py to its db() so the legacy tables exist too
 
@@ -756,9 +1241,21 @@ def h_db():
     c.execute("PRAGMA foreign_keys=ON")
     return c
 
+def need_user(who):
+    if not who or not who.get("user_id"):
+        raise ApiError(401, "UNAUTHENTICATED", "login required")
+
 def dispatch(c, who, method, parts, q, body_fn):
     P = parts
+    adm = is_admin(who)
     if method == "GET":
+        # ---------------- public viewer API
+        if P == ["languages"]:
+            items = []
+            for code, name, native, rtl, _ in i18n_langs():
+                cov = i18n.coverage(code)
+                items.append({"code": code, "name": name, "native_name": native, "rtl": bool(rtl), "coverage_percent": cov, "ui_complete": cov == 100})
+            return 200, {"items": sorted(items, key=lambda x: (-x["coverage_percent"], x["name"]))}
         if P == ["matches"]:
             return 200, list_matches(c, q)
         if len(P) >= 2 and P[0] == "matches":
@@ -766,70 +1263,166 @@ def dispatch(c, who, method, parts, q, body_fn):
             if len(P) == 2:
                 return 200, match_detail(c, mid)
             sub = {"scorecard": lambda: scorecard(c, mid), "commentary": lambda: commentary(c, mid, q),
-                   "predictions": lambda: match_predictions(c, mid), "signals": lambda: signals(c, mid)}
+                   "predictions": lambda: match_predictions(c, mid, who),
+                   "signals": lambda: signals(c, mid) if adm else redact_signals(signals(c, mid)),
+                   "graphs": lambda: graphs(c, mid), "partnerships": lambda: partnerships(c, mid),
+                   "fall-of-wickets": lambda: fall_of_wickets(c, mid), "result": lambda: final_result(c, mid),
+                   "fantasy": lambda: fantasy.suggest(c, mid, qv(q, "rule_set"), store=False),
+                   "fantasy-history": lambda: {"items": fantasy.history(c, mid)}}
             if len(P) == 3 and P[2] in sub:
+                get_match(c, mid)
                 return 200, sub[P[2]]()
-        if P == ["master-list"]:
-            return 200, master_list(c, q)
         if P == ["competitions"]:
-            return 200, {"items": rows(c.execute("SELECT * FROM competitions ORDER BY featured DESC, category, name"))}
+            return 200, {"items": rows(c.execute("SELECT id,name,category,division,format,featured,data_origin FROM competitions ORDER BY featured DESC, category, name"))}
         if P == ["teams"]:
             return 200, {"items": rows(c.execute("SELECT id,name,CASE WHEN short_code_approved=1 THEN short_code END AS short_code,gender FROM teams ORDER BY name"))}
         if P == ["experts"]:
-            return 200, experts(c, q)
+            return 200, experts(c, q, who)
         if len(P) == 3 and P[0] == "experts" and P[2] == "history":
-            return 200, expert_history(c, int_id(P[1], "expert id"), q)
-        demo = qv(q, "include_demo") == "1"
-        if P == ["analytics", "accuracy"]:
-            return 200, engine.accuracy(c, demo, qv(q, "prediction_type"))
-        an = {"toss": "toss", "home-away": "home_away", "venue": "venue"}
-        if len(P) == 2 and P[0] == "analytics" and P[1] in an:
-            a = engine.analytics(c, demo)
-            extra = {"batting_first_vs_chasing": a["batting_first_vs_chasing"]} if P[1] == "toss" else {}
-            extra.update({"day_of_week_utc": a["day_of_week_utc"]} if P[1] == "home-away" else {})
-            return 200, dict({an[P[1]]: a[an[P[1]]], "sample_matches": a["sample_matches"], "note": a["note"], "includes_demo": demo}, **extra)
+            return 200, expert_history(c, int_id(P[1], "expert id"), q, who)
+        if len(P) == 2 and P[0] == "analytics":
+            d = dataset(q)
+            if P[1] == "accuracy":
+                a = engine.accuracy(c, prediction_type=qv(q, "prediction_type"), published_only=not adm, dataset=d)
+                if not adm:
+                    a["by_model"] = {PUBLIC_MODEL_NAME: engine.tally([r for v in a["by_model"].values() for r in
+                                     ["correct"] * v["correct"] + ["incorrect"] * v["incorrect"] + ["pending"] * v["pending"] + ["void"] * v["void"] + ["ineligible"] * v["ineligible"]])}
+                return 200, a
+            an = {"toss": "toss", "home-away": "home_away", "venue": "venue"}
+            if P[1] in an:
+                a = engine.analytics(c, dataset=d)
+                extra = {"batting_first_vs_chasing": a["batting_first_vs_chasing"]} if P[1] == "toss" else {}
+                extra.update({"day_of_week_utc": a["day_of_week_utc"]} if P[1] == "home-away" else {})
+                return 200, dict({an[P[1]]: a[an[P[1]]], "sample_matches": a["sample_matches"], "note": a["note"], "dataset": d}, **extra)
+        if P[:1] == ["data"]:
+            g = {("fixtures",): lambda: gw_fixtures(c, q), ("results",): lambda: gw_results(c, q), ("live",): lambda: gw_live(c, q),
+                 ("history",): lambda: gw_history(c, q)}
+            if tuple(P[1:]) in g:
+                return 200, g[tuple(P[1:])]()
+            if len(P) == 3 and P[1] in ("scorecards", "commentary", "squads", "playing-xi"):
+                mid = int_id(P[2], "match id")
+                if P[1] == "scorecards":
+                    return 200, scorecard(c, mid)
+                if P[1] == "commentary":
+                    return 200, commentary(c, mid, q)
+                d = match_detail(c, mid)
+                return 200, {"match_id": mid, "items": d["squads"] if P[1] == "squads" else d["playing_xi"]}
+            if len(P) == 4 and P[3] == "stats" and P[1] in ("players", "teams", "venues"):
+                fn = {"players": gw_player_stats, "teams": gw_team_stats, "venues": gw_venue_stats}[P[1]]
+                return 200, fn(c, int_id(P[2]))
         if P == ["me", "preferences"]:
+            need_user(who)
             return 200, preferences(c, who)
-        if P == ["admin", "audit"]:
-            limit, offset = page(q)
-            return 200, {"items": rows(c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))),
-                         "total": c.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]}
-        if P == ["admin", "monitor"]:
-            return 200, monitor(c)
+        # ---------------- admin API (route() already checked the admin token)
+        if P[:1] == ["admin"]:
+            A = tuple(P[1:])
+            if A == ("audit",):
+                limit, offset = page(q)
+                return 200, {"items": rows(c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))),
+                             "total": c.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]}
+            simple = {("monitor",): lambda: monitor(c), ("dashboard",): lambda: admin_dashboard(c),
+                      ("master-list",): lambda: master_list(c, q), ("predictions",): lambda: prediction_register(c, q),
+                      ("users",): lambda: admin_users(c, q), ("settings",): lambda: admin_settings(c, who),
+                      ("providers",): lambda: {"items": rows(c.execute("SELECT * FROM data_providers ORDER BY name")),
+                                               "runs": rows(c.execute("SELECT * FROM data_sync_runs ORDER BY id DESC LIMIT 20"))},
+                      ("calibration",): lambda: engine.backtest(c, dataset=dataset(q)),
+                      ("accuracy",): lambda: engine.accuracy(c, dataset=dataset(q)),
+                      ("fantasy", "rules"): lambda: {"items": [dict(r, rules=json.loads(r["rules_json"])) for r in c.execute("SELECT * FROM fantasy_rule_sets")]},
+                      ("system", "status"): lambda: {"pending": pending(c), "backups": system.backups(_db_path()),
+                                                     "applied": rows(c.execute("SELECT * FROM schema_migrations"))
+                                                     if c.execute("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone() else []}}
+            if A in simple:
+                return 200, simple[A]()
+            if A == ("model-versions",):
+                items = rows(c.execute("SELECT * FROM model_versions ORDER BY id DESC"))
+                for i in items:
+                    i["params"] = json.loads(i.pop("params_json"))
+                return 200, {"items": items, "active_id": items[0]["id"] if items else None}
         raise ApiError(404, "NOT_FOUND", "unknown endpoint")
     if method in ("POST", "PUT"):
         d = body_fn()
         if not isinstance(d, dict):
             raise bad("JSON object body required")
         if method == "PUT" and P == ["me", "preferences"]:
+            need_user(who)
             return 200, preferences(c, who, d)
-        if method == "POST":
-            if P == ["predictions"]:
-                if who["role"] not in ("admin", "expert"):
-                    raise ApiError(403, "FORBIDDEN", "only verified experts or admins can publish predictions")
-                return 201, create_prediction(c, who, d)
-            if len(P) == 3 and P[0] == "predictions" and P[2] == "lock":
-                return 200, lock_prediction(c, who, int_id(P[1], "prediction id"))
-            if len(P) == 3 and P[0] == "experts" and P[2] == "follow":
-                eid = int_id(P[1], "expert id")
-                if not who["user_id"]:
-                    raise ApiError(400, "USER_REQUIRED", "follow needs a logged-in user")
-                if not c.execute("SELECT 1 FROM expert_profiles WHERE id=?", (eid,)).fetchone():
-                    raise ApiError(404, "NOT_FOUND", "expert not found")
-                if d.get("follow", True):
-                    c.execute("INSERT OR IGNORE INTO expert_follows(user_id,expert_id,created_at) VALUES(?,?,?)", (who["user_id"], eid, now()))
-                else:
-                    c.execute("DELETE FROM expert_follows WHERE user_id=? AND expert_id=?", (who["user_id"], eid))
-                return 200, {"expert_id": eid, "following": bool(d.get("follow", True))}
-            admin = {("admin", "teams"): admin_team, ("admin", "matches"): admin_match, ("admin", "toss"): admin_toss,
-                     ("admin", "results"): admin_result, ("admin", "ball-events"): admin_ball, ("admin", "experts"): admin_expert}
-            if tuple(P) in admin:
-                return 200, admin[tuple(P)](c, who, d)
-            if len(P) == 4 and P[:2] == ["admin", "experts"] and P[3] == "verify":
-                return 200, admin_verify_expert(c, who, int_id(P[2], "expert id"), d)
-            if len(P) == 4 and P[:2] == ["admin", "matches"] and P[3] == "model-prediction":
-                return 201, model_prediction(c, who, int_id(P[2], "match id"))
-            if P == ["admin", "demo-seed"]:
+        if method != "POST":
+            raise ApiError(404, "NOT_FOUND", "unknown endpoint")
+        if P == ["assistant"]:
+            lang = d.get("language") or "en"
+            return 200, assistant.ask(c, d.get("question"), lang, who["user_id"] if who else None)
+        if P == ["predictions"]:
+            need_user(who) if not adm else None
+            if not adm and who["role"] != "expert":
+                raise ApiError(403, "FORBIDDEN", "only verified experts or admins can submit predictions")
+            return 201, create_prediction(c, who, d)
+        if len(P) == 3 and P[0] == "predictions" and P[2] == "lock":
+            if not who:
+                raise ApiError(401, "UNAUTHENTICATED", "login required")
+            return 200, lock_prediction(c, who, int_id(P[1], "prediction id"))
+        if len(P) == 3 and P[0] == "experts" and P[2] == "follow":
+            need_user(who)
+            eid = int_id(P[1], "expert id")
+            if not c.execute("SELECT 1 FROM expert_profiles WHERE id=?", (eid,)).fetchone():
+                raise ApiError(404, "NOT_FOUND", "expert not found")
+            if d.get("follow", True):
+                c.execute("INSERT OR IGNORE INTO expert_follows(user_id,expert_id,created_at) VALUES(?,?,?)", (who["user_id"], eid, now()))
+            else:
+                c.execute("DELETE FROM expert_follows WHERE user_id=? AND expert_id=?", (who["user_id"], eid))
+            return 200, {"expert_id": eid, "following": bool(d.get("follow", True))}
+        if P[:1] == ["admin"]:
+            A = tuple(P[1:])
+            flat = {("teams",): admin_team, ("matches",): admin_match, ("toss",): admin_toss, ("results",): admin_result,
+                    ("ball-events",): admin_ball, ("experts",): admin_expert, ("players",): admin_player,
+                    ("player-stats",): admin_player_stats, ("model-versions",): admin_model_version, ("import",): admin_import}
+            if A in flat:
+                return (201 if A == ("model-versions",) else 200), flat[A](c, who, d)
+            if A == ("settings",):
+                return 200, admin_settings(c, who, d)
+            if A == ("demo-seed",):
                 return 200, demo_seed(c, who)
+            if A == ("system", "migrate"):
+                if d.get("confirm") is not True:
+                    raise bad('send {"confirm": true}; a verified backup is taken first')
+                r = system.run(c, _db_path())
+                if r["status"] != "up_to_date":
+                    audit(c, who["actor"], "system.migrate", "database", ",".join(r["applied"]), {"backup": r["backup"]["path"], "checks": r["checks"]})
+                return 200, r
+            if A == ("fantasy", "rules"):
+                R = fantasy.validate_rules(d.get("rules"))
+                name = (d.get("name") or "").strip()
+                if not name:
+                    raise bad("name required")
+                c.execute("INSERT INTO fantasy_rule_sets(name,rules_json,created_at) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET rules_json=excluded.rules_json",
+                          (name, json.dumps(R), now()))
+                audit(c, who["actor"], "fantasy.rules", "fantasy_rule_set", name, d)
+                return 200, {"name": name, "rules": R}
+            if len(A) == 3 and A[0] == "experts" and A[2] == "verify":
+                return 200, admin_verify_expert(c, who, int_id(A[1], "expert id"), d)
+            if len(A) == 3 and A[0] == "users" and A[2] == "role":
+                return 200, admin_set_role(c, who, int_id(A[1], "user id"), d)
+            if len(A) == 3 and A[0] == "predictions" and A[2] in ("publish", "unpublish", "lock"):
+                pid = int_id(A[1], "prediction id")
+                return 200, {"publish": publish, "unpublish": unpublish, "lock": lambda c_, w_, p_, d_: lock_prediction(c_, w_, p_)}[A[2]](c, who, pid, d)
+            if len(A) == 3 and A[0] == "providers" and A[2] == "sync":
+                return 200, gateway.sync(c, A[1], lambda row: admin_match(c, who, row))
+            if len(A) == 2 and A[0] == "providers":
+                return 200, admin_provider(c, who, A[1], d)
+            if len(A) >= 2 and A[0] == "matches":
+                mid = int_id(A[1], "match id")
+                if len(A) == 2:
+                    return 200, admin_edit_match(c, who, mid, d)
+                ops = {"model-prediction": lambda: (201, model_prediction(c, who, mid)),
+                       "squad": lambda: (200, admin_lineup(c, who, mid, d, "match_squads")),
+                       "playing-xi": lambda: (200, admin_lineup(c, who, mid, d, "playing_xi")),
+                       "scorecard": lambda: (200, admin_scorecard_row(c, who, mid, d)),
+                       "fantasy": lambda: (200, fantasy.suggest(c, mid, d.get("rule_set"), store=True, model_version_id=engine.model_params(c)[0]["id"]))}
+                if len(A) == 3 and A[2] in ops:
+                    return ops[A[2]]()
         raise ApiError(404, "NOT_FOUND", "unknown endpoint")
     raise ApiError(405, "METHOD_NOT_ALLOWED", "method not allowed")
+
+DB_PATH = None  # set by main.py
+
+def _db_path():
+    return DB_PATH

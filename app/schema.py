@@ -6,6 +6,8 @@ keep serving the existing screens; bridge_legacy() mirrors them into v1 tables.
 """
 import datetime
 import json
+import os
+import sqlite3
 
 def now():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -169,10 +171,52 @@ def _seed(c):
     c.execute("INSERT OR IGNORE INTO model_versions(name,version,description,params_json,created_at) VALUES(?,?,?,?,?)",
               (n, v, d, json.dumps(p), now()))
 
-MIGRATIONS = [("001_normalized_core", M001, _seed)]
+M002 = """
+CREATE TABLE IF NOT EXISTS prediction_publications(prediction_id INTEGER PRIMARY KEY REFERENCES predictions(id),
+  published_at TEXT NOT NULL, published_by TEXT NOT NULL, public_note TEXT);
+CREATE TRIGGER IF NOT EXISTS v2_publication_needs_lock BEFORE INSERT ON prediction_publications
+ WHEN (SELECT locked_at FROM predictions WHERE id=NEW.prediction_id) IS NULL
+ BEGIN SELECT RAISE(ABORT,'only locked predictions can be published'); END;
+CREATE TABLE IF NOT EXISTS system_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fantasy_rule_sets(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, rules_json TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS data_providers(name TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('manual','demo','licensed')),
+  enabled INTEGER NOT NULL DEFAULT 0, config_json TEXT NOT NULL DEFAULT '{}', last_sync_at TEXT, last_status TEXT, last_error TEXT);
+CREATE TABLE IF NOT EXISTS data_sync_runs(id INTEGER PRIMARY KEY, provider TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+  status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 1, created INTEGER NOT NULL DEFAULT 0, duplicates INTEGER NOT NULL DEFAULT 0,
+  rejected INTEGER NOT NULL DEFAULT 0, error TEXT);
+CREATE TABLE IF NOT EXISTS assistant_queries(id INTEGER PRIMARY KEY, user_id INTEGER, question TEXT NOT NULL, intent TEXT, grounded INTEGER NOT NULL,
+  language_code TEXT, created_at TEXT NOT NULL);
+"""
+
+FANTASY_DEFAULT = {"team_size": 11, "max_per_team": 7, "credit_cap": None,
+                   "roles": {"wicket_keeper": [1, 4], "batter": [3, 6], "all_rounder": [1, 4], "bowler": [3, 6]},
+                   "captain_multiplier": 2.0, "vice_captain_multiplier": 1.5}
+
+def _seed2(c):
+    c.execute("INSERT OR IGNORE INTO fantasy_rule_sets(name,rules_json,created_at) VALUES('SH Standard 11',?,?)",
+              (json.dumps(FANTASY_DEFAULT), now()))
+    for name, kind, en in (("manual", "manual", 1), ("demo", "demo", 1), ("licensed_feed", "licensed", 0)):
+        c.execute("INSERT OR IGNORE INTO data_providers(name,kind,enabled) VALUES(?,?,?)", (name, kind, en))
+    for k, v in (("public_site_enabled", "1"), ("default_language", "en"), ("viewer_sees_demo_option", "1")):
+        c.execute("INSERT OR IGNORE INTO system_settings(key,value,updated_at,updated_by) VALUES(?,?,?,'migration')", (k, v, now()))
+
+MIGRATIONS = [("001_normalized_core", M001, _seed), ("002_publishing_admin_gateway", M002, _seed2)]
+
+def pending(c):
+    if not c.execute("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone():
+        return [m[0] for m in MIGRATIONS]
+    done = {r[0] for r in c.execute("SELECT name FROM schema_migrations")}
+    return [m[0] for m in MIGRATIONS if m[0] not in done]
 
 def migrate(c):
+    """Apply pending migrations. Never called on a page load: only from tools/migrate.py or the
+    admin 'Run migration' action, which take and verify a backup first."""
     c.execute("PRAGMA foreign_keys=ON")
+    # step 000: the v0 table named "predictions" (with fixture_id) becomes legacy_predictions
+    cols = {r[1] for r in sqlite3.Connection.execute(c, "PRAGMA table_info(predictions)")}
+    if "fixture_id" in cols:
+        sqlite3.Connection.execute(c, "ALTER TABLE predictions RENAME TO legacy_predictions")
+        c.lp = "legacy_predictions"
     c.execute("CREATE TABLE IF NOT EXISTS schema_migrations(name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)")
     done = {r[0] for r in c.execute("SELECT name FROM schema_migrations")}
     for name, ddl, seed in MIGRATIONS:

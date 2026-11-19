@@ -3,15 +3,22 @@ from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlparse,parse_qs
 from pathlib import Path
 from screen_login import generate,verify,authorized,logout
-import api_v1
+import api_v1,apk
 DB=os.getenv("SH_PREDICTION_DB","data/prediction.sqlite3")
 TOKEN=os.getenv("SH_PREDICTION_ADMIN_TOKEN","")
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
+class LegacyConn(sqlite3.Connection):
+ lp="legacy_predictions"
+ def _m(self,sql):return sql if self.lp=="legacy_predictions" else sql.replace("legacy_predictions",self.lp)
+ def execute(self,sql,*a):return super().execute(self._m(sql),*a)
+ def executemany(self,sql,*a):return super().executemany(self._m(sql),*a)
+ def executescript(self,sql):return super().executescript(self._m(sql))
 def db():
  os.makedirs(os.path.dirname(os.path.abspath(DB)),exist_ok=True)
- c=sqlite3.connect(DB);c.row_factory=sqlite3.Row
- # v1 owns the "predictions" table name (master script section 5); the v0 table becomes legacy_predictions
- if "fixture_id" in {r[1] for r in c.execute("PRAGMA table_info(predictions)")}:c.execute("ALTER TABLE predictions RENAME TO legacy_predictions");c.commit()
+ c=sqlite3.connect(DB,timeout=10,factory=LegacyConn);c.row_factory=sqlite3.Row
+ # v1 owns the "predictions" table name. Until an admin runs the migration, the v0 table keeps its old
+ # name and the classic screens keep working through this name mapping (no schema change on page load).
+ c.lp="predictions" if "fixture_id" in {r[1] for r in sqlite3.Connection.execute(c,"PRAGMA table_info(predictions)")} else "legacy_predictions"
  c.executescript("""CREATE TABLE IF NOT EXISTS fixtures(id INTEGER PRIMARY KEY,competition TEXT NOT NULL,season TEXT NOT NULL,home TEXT NOT NULL,away TEXT NOT NULL,start_utc TEXT NOT NULL,source TEXT NOT NULL,UNIQUE(competition,season,home,away,start_utc));
  CREATE TABLE IF NOT EXISTS legacy_predictions(id INTEGER PRIMARY KEY,fixture_id INTEGER UNIQUE NOT NULL,toss_pick TEXT,winner_pick TEXT,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',approved_at TEXT);
  CREATE TABLE IF NOT EXISTS outcomes(fixture_id INTEGER PRIMARY KEY,toss_winner TEXT,match_winner TEXT,source TEXT NOT NULL,verified_at TEXT NOT NULL);
@@ -24,6 +31,7 @@ def db():
  CREATE TRIGGER IF NOT EXISTS predictions_nodelete BEFORE DELETE ON legacy_predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction cannot be deleted'); END;""")
  return c
 api_v1.DB_FN=db
+api_v1.DB_PATH=DB
 def pdt(x):
  d=datetime.datetime.fromisoformat(str(x).replace("Z","+00:00"))
  return d.astimezone(datetime.timezone.utc) if d.tzinfo else d.replace(tzinfo=datetime.timezone.utc)
@@ -85,9 +93,24 @@ class H(BaseHTTPRequestHandler):
  def do_GET(self):
   p=urlparse(self.path).path
   if p.startswith("/api/v1/"):return self.v1("GET")
-  if p=="/hub":
-   b=(Path(__file__).parent/"hub.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
-  if p in ("/","/app"):
+  if p=="/download/sh-prediction.apk":
+   try:
+    kind,x=apk.resolve()
+    if kind=="redirect":
+     self.send_response(302);self.send_header("Location",x);self.send_header("Content-Length","0");self.end_headers();return
+    self.send_response(200);self.send_header("Content-Type","application/vnd.android.package-archive");self.send_header("Content-Disposition","attachment; filename=sh-prediction.apk")
+    if x.headers.get("Content-Length"):self.send_header("Content-Length",x.headers["Content-Length"])
+    self.end_headers()
+    while True:
+     chunk=x.read(65536)
+     if not chunk:break
+     self.wfile.write(chunk)
+    return
+   except Exception:return self.sendj(502,{"error":"APK download is not available right now"})
+  if p in ("/","/app","/hub","/admin-panel"):
+   f={"/admin-panel":"admin.html"}.get(p,"hub.html")
+   b=(Path(__file__).parent/f).read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("X-Frame-Options","DENY");self.send_header("Referrer-Policy","no-referrer");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p=="/classic":
    b=(Path(__file__).parent/"index.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-original-blueprint.html":
    b=(Path(__file__).parent/"sh-original-blueprint.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
@@ -98,9 +121,8 @@ class H(BaseHTTPRequestHandler):
   if p=="/icon.svg":
    b=(Path(__file__).parent/"icon.svg").read_bytes();self.send_response(200);self.send_header("Content-Type","image/svg+xml");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION"})
-  if p.startswith("/admin/"):
-   if not self.admin_ok():return self.sendj(403,{"error":"admin token required"})
-  elif not self.auth():return self.sendj(403,{"error":"login required"})
+  # v0 data endpoints hold the original prediction register: admin only (master script: viewers never see it)
+  if not self.admin_ok():return self.sendj(403,{"error":"admin token required"})
   with db() as c:
    if p=="/fixtures": rows=c.execute("SELECT * FROM fixtures ORDER BY start_utc DESC LIMIT 200")
    elif p=="/results": rows=c.execute("SELECT f.*,o.toss_winner,o.match_winner FROM fixtures f JOIN outcomes o ON f.id=o.fixture_id ORDER BY f.start_utc DESC LIMIT 200")

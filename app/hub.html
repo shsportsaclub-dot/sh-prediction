@@ -13,7 +13,7 @@
 [data-theme=light]{--bg:#f3f6fb;--surface:#ffffff;--surface2:#eef2f9;--line:#d5deec;--text:#0d1a33;--muted:#53627c;
  --home:#1d63d8;--away:#d96a00;--win:#14833b;--lose:#c62828;--unknown:#6b7280;--focus:#1d63d8;color-scheme:light}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Telugu","Noto Sans Devanagari",sans-serif}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Telugu","Noto Sans Devanagari","Noto Sans Tamil","Noto Sans Kannada","Noto Sans Bengali","Noto Nastaliq Urdu",sans-serif}
 a{color:var(--focus)}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 header.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--line)}
@@ -28,15 +28,16 @@ nav.tabs a[aria-current=page]{color:var(--text)}
 nav.tabs a[aria-current=page] svg{stroke:var(--brand-blue)}
 @media(min-width:900px){nav.tabs{position:sticky;top:57px;bottom:auto;max-width:1000px;margin:0 auto;border:1px solid var(--line);border-radius:0 0 14px 14px}main{padding-bottom:30px}}
 h2{font-size:19px;margin:6px 0 10px}h3{font-size:15px;margin:0 0 6px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+.card{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;color:inherit;text-decoration:none}
 .muted{color:var(--muted);font-size:13px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
-.chips::-webkit-scrollbar{display:none}
-button,.btn{font:inherit;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer;white-space:nowrap}
+.chips,.sub{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.chips::-webkit-scrollbar,.sub::-webkit-scrollbar{display:none}
+.sub{margin:8px 0}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
 button.on,.btn.on{background:linear-gradient(100deg,var(--brand-red),var(--brand-blue));border-color:transparent;color:#fff}
 button.primary{background:var(--brand-blue);border-color:transparent;color:#fff}
-input,select{font:inherit;background:var(--surface2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
+input,select,textarea{font:inherit;background:var(--surface2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
 .grow{flex:1}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .stat{background:var(--surface2);border-radius:12px;padding:10px;text-align:center}
@@ -48,101 +49,83 @@ input,select{font:inherit;background:var(--surface2);color:var(--text);border:1p
 @media(prefers-reduced-motion:reduce){.skel{animation:none}}
 .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:6px;background:var(--surface2);color:var(--muted)}
 .tag.demo{background:#5b2a86;color:#fff}.tag.ver{background:#124d2c;color:#bff5d3}
-/* Master List — approved 5-column format; colour is font colour only (no dots, bulbs or symbols) */
-.ml{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.ml th,.ml td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
-.ml th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;top:0;background:var(--surface)}
-.ml td{font-weight:700;font-size:15px}
-.c-home,.p-H{color:var(--home)}.c-away,.p-A{color:var(--away)}
-.o-won{color:var(--win)}.o-lost{color:var(--lose)}.o-unknown,.c-none{color:var(--unknown)}
-.tw{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.c-home{color:var(--home)}.c-away{color:var(--away)}.o-won{color:var(--win)}.o-lost{color:var(--lose)}.o-unknown{color:var(--unknown)}
 .prob{display:flex;height:30px;border-radius:9px;overflow:hidden;font-weight:800;font-size:13px}
 .prob span{display:flex;align-items:center;padding:0 10px;color:#fff;white-space:nowrap;min-width:0}
 .prob .h{background:var(--home)}.prob .a{background:var(--away);justify-content:flex-end}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px}.kv dt{color:var(--muted)}.kv dd{margin:0}
-.list a.item{display:block;color:inherit;text-decoration:none}
 .bars div{display:grid;grid-template-columns:120px 1fr 52px;gap:8px;align-items:center;font-size:13px;margin:5px 0}
 .bars i{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--brand-red),var(--brand-blue))}
-.sub{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0}
-.sub::-webkit-scrollbar{display:none}
 table.simple{width:100%;border-collapse:collapse;font-size:13px}table.simple td,table.simple th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
-canvas{width:100%;height:180px;display:block}
+canvas{width:100%;height:190px;display:block}
+.msg{padding:10px 12px;border-radius:12px;margin:8px 0;max-width:92%;white-space:pre-wrap}
+.msg.q{background:var(--brand-blue);color:#fff;margin-left:auto}.msg.a{background:var(--surface2)}
 </style>
 </head>
 <body>
-<header class="top"><img src="/sh-prediction-icon.png" alt="SH PREDICTION logo"><h1>SH PREDICTION</h1><span id="who" class="muted"></span></header>
+<header class="top"><img src="/sh-prediction-icon.png" alt="SH PREDICTION logo"><h1>SH PREDICTION</h1></header>
 <div class="bar" aria-hidden="true"></div>
 <nav class="tabs" id="tabs" aria-label="Main navigation"></nav>
 <main id="main" tabindex="-1" aria-live="polite"></main>
 <script>
 "use strict";
-const TOKEN=(()=>{try{return localStorage.getItem("shp_session")||""}catch(e){return ""}})();
-const ICONS={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',master:'<path d="M4 5h16M4 10h16M4 15h16M4 20h16M9 5v15"/>',
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+let TOKEN=ls.get("shp_session")||"";
+const ICONS={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
  matches:'<circle cx="12" cy="12" r="8"/><path d="M8 6c3 3 3 9 0 12M16 6c-3 3-3 9 0 12"/>',experts:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 15-5 16 0"/>',
- ai:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><rect x="7" y="7" width="10" height="10" rx="2"/>',accuracy:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
- settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'};
-const NAV=[["home","nav.home"],["master","nav.master"],["matches","nav.matches"],["experts","nav.experts"],["ai","nav.ai"],["accuracy","nav.accuracy"],["settings","nav.settings"]];
-const DEMO=()=>{try{return localStorage.getItem("shp_demo")==="1"}catch(e){return false}};
-const dq=(p)=>DEMO()?p+(p.includes("?")?"&":"?")+"include_demo=1":p;
-let S={},LANG=localStorage.getItem("shp_lang")||"en",PREF=null,CACHE={};
+ ai:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><rect x="7" y="7" width="10" height="10" rx="2"/>',assistant:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/>',
+ accuracy:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'};
+const NAV=[["home","nav.home"],["matches","nav.matches"],["experts","nav.experts"],["ai","nav.ai"],["assistant","nav.assistant"],["accuracy","nav.accuracy"],["settings","nav.settings"]];
+const DEMO=()=>ls.get("shp_demo")==="1";
+const dq=p=>DEMO()?p+(p.includes("?")?"&":"?")+"dataset=demo":p;
+let S={},LANG=ls.get("shp_lang")||"en",PREF=null,CACHE={},CHAT=[];
 const t=k=>S[k]||k;
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const $=s=>document.querySelector(s);
 const when=u=>{const d=new Date(u);return isNaN(d)?"—":d.toLocaleString(LANG,{dateStyle:"medium",timeStyle:"short"})};
 async function api(path,opt={}){
- const o=Object.assign({headers:{"Content-Type":"application/json","Authorization":"Bearer "+TOKEN}},opt);
+ const hd={"Content-Type":"application/json"};if(TOKEN)hd.Authorization="Bearer "+TOKEN;
+ const o=Object.assign({headers:hd},opt);
  try{const r=await fetch("/api/v1"+path,o);const j=await r.json().catch(()=>({}));
   if(!r.ok){const e=new Error((j.error&&j.error.message)||("HTTP "+r.status));e.status=r.status;throw e}
-  if(!opt.method){CACHE[path]=j;try{localStorage.setItem("shp_cache:"+path,JSON.stringify(j))}catch(e){}}
+  if(!opt.method){CACHE[path]=j;ls.set("shp_cache:"+path,JSON.stringify(j))}
   return j}
- catch(e){if(!opt.method&&!navigator.onLine){const c=CACHE[path]||JSON.parse(localStorage.getItem("shp_cache:"+path)||"null");if(c){c.__offline=true;return c}}throw e}}
+ catch(e){if(!opt.method&&!navigator.onLine){const c=CACHE[path]||JSON.parse(ls.get("shp_cache:"+path)||"null");if(c){c.__offline=true;return c}}throw e}}
 const loading=()=>'<div aria-busy="true" aria-label="'+esc(t("state.loading"))+'"><div class="skel"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:85%"></div></div>';
 const emptyS=m=>'<div class="state" role="status">'+esc(m||t("state.empty"))+'</div>';
-function errorS(el,e,retry){el.innerHTML='<div class="state" role="alert">'+esc(t("state.error"))+(e&&e.message?'<br><span class="muted">'+esc(e.message)+'</span>':'')+'<p><button id="retry">'+esc(t("action.retry"))+'</button></p></div>';$("#retry").onclick=retry}
+function errorS(el,e,retry){el.innerHTML='<div class="state" role="alert">'+esc(t("state.error"))+(e&&e.message?'<br><span class="muted">'+esc(e.message)+'</span>':'')+'<p><button class="retry">'+esc(t("action.retry"))+'</button></p></div>';el.querySelector(".retry").onclick=retry}
 const offlineBanner=j=>j&&j.__offline?'<div class="offline" role="status">'+esc(t("state.offline"))+'</div>':"";
-const origin=o=>o==="demo"?' <span class="tag demo">'+esc(t("label.demo"))+'</span>':(o==="verified"?' <span class="tag ver">'+esc(t("label.verified"))+'</span>':"");
-const teamTxt=(x,cls)=>'<span class="'+cls+'">'+esc(x.short_code||x.code||x.name)+'</span>';
-/* Master List cell: "H-UB". Prefix colour is fixed by side; the code carries won/lost/unknown. */
-function mcell(v){if(!v)return '<span class="o-unknown" aria-label="unknown">—</span>';
- const code=v.code||v.name;return '<span class="p-'+v.side+'">'+v.side+'</span><span class="o-unknown">-</span><span class="o-'+(v.outcome||"unknown")+'" aria-label="'+esc((v.outcome||"unknown")+" "+code)+'">'+esc(code)+'</span>'}
-
+const origin=o=>o==="demo"?' <span class="tag demo">'+esc(t("label.demo"))+'</span>':"";
+const teamTxt=(x,cls)=>'<span class="'+cls+'">'+esc(x.short_code||x.name)+'</span>';
 function navRender(cur){$("#tabs").innerHTML=NAV.map(([id,k])=>'<a href="#/'+id+'" '+(cur===id?'aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+ICONS[id]+'</svg>'+esc(t(k))+'</a>').join("")}
+async function loadLang(code){try{const b=await api("/i18n/"+encodeURIComponent(code));S=b.strings;LANG=code;document.documentElement.lang=code;document.documentElement.dir=b.rtl?"rtl":"ltr";ls.set("shp_lang",code)}catch(e){}}
+function setTheme(th){document.documentElement.dataset.theme=th;ls.set("shp_theme",th)}
+function stat(v,l){return '<div class="stat"><b>'+esc(v)+'</b><span class="muted">'+esc(l)+'</span></div>'}
+function pair(a,b,la,lb){const n=a+b,p=n?Math.round(100*a/n):0;return n?'<div class="prob"><span class="h" style="width:'+Math.max(p,12)+'%">'+esc(la)+' '+a+'</span><span class="a" style="width:'+Math.max(100-p,12)+'%">'+esc(lb)+' '+b+'</span></div>':'<span class="muted">—</span>'}
+function probBar(h,m){const a=Math.round((100-h)*10)/10;return '<div class="prob" role="img" aria-label="'+esc(m.home.name)+' '+h+'%, '+esc(m.away.name)+' '+a+'%"><span class="h" style="width:'+Math.max(h,14)+'%">'+esc(m.home.short_code||m.home.name)+' '+h+'%</span><span class="a" style="width:'+Math.max(a,14)+'%">'+a+'% '+esc(m.away.short_code||m.away.name)+'</span></div>'}
+function matchCard(m){return '<a class="card" href="#/match/'+m.id+'"><div class="row"><b class="grow">'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+'</b>'+origin(m.data_origin)+'</div><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+'</div><div class="muted">'+esc(m.competition)+(m.match_no?' · '+esc(m.match_no):'')+' · '+when(m.start_utc)+(m.venue?' · '+esc(m.venue):'')+'</div></a>'}
+function factorsHtml(fs){return fs&&fs.length?'<h3 style="margin-top:12px">'+esc(t("ai.factors"))+'</h3>'+fs.map(f=>'<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>'+esc(f.factor)+'</b>'+(f.favours_team?' — '+esc(t("ai.favours"))+' <b class="'+(f.favours==="home"?"c-home":"c-away")+'">'+esc(f.favours_team)+'</b>':'')+'<div class="muted">'+esc(f.detail)+'</div></div>').join(""):""}
+function drawLine(cv,series,colors){if(!cv)return;const x=cv.getContext("2d"),W=cv.width,H=cv.height,cs=getComputedStyle(document.documentElement);x.clearRect(0,0,W,H);
+ const max=Math.max(1,...series.flat());x.strokeStyle=cs.getPropertyValue("--line");x.beginPath();x.moveTo(0,H-1);x.lineTo(W,H-1);x.stroke();
+ if(!series.some(s=>s.length>1)){x.fillStyle=cs.getPropertyValue("--muted");x.font="14px sans-serif";x.fillText("Needs at least two data points",10,24);return}
+ const n=Math.max(...series.map(s=>s.length));series.forEach((s,k)=>{x.strokeStyle=cs.getPropertyValue(colors[k]);x.lineWidth=3;x.beginPath();s.forEach((v,i)=>{const px=i*(W-10)/Math.max(n-1,1)+5,py=H-6-v/max*(H-16);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()})}
+function drawBars(cv,vals,wk){if(!cv)return;const x=cv.getContext("2d"),W=cv.width,H=cv.height,cs=getComputedStyle(document.documentElement);x.clearRect(0,0,W,H);const max=Math.max(1,...vals),bw=W/Math.max(vals.length,1);
+ vals.forEach((v,i)=>{x.fillStyle=cs.getPropertyValue(wk[i]?"--lose":"--home");const h=v/max*(H-20);x.fillRect(i*bw+2,H-h,bw-4,h)})}
 
-async function loadLang(code){try{const b=await api("/i18n/"+encodeURIComponent(code));S=b.strings;LANG=code;document.documentElement.lang=code;document.documentElement.dir=b.rtl?"rtl":"ltr";localStorage.setItem("shp_lang",code)}catch(e){if(!Object.keys(S).length)S={}}}
-function setTheme(th){document.documentElement.dataset.theme=th;localStorage.setItem("shp_theme",th)}
-
-/* ---------------- screens ---------------- */
 const SCREENS={
 async home(el){
- el.innerHTML='<h2>'+esc(t("nav.home"))+'</h2><div class="row"><input id="q" class="grow" type="search" placeholder="'+esc(t("home.search"))+'" aria-label="'+esc(t("home.search"))+'"></div><div class="chips" role="tablist" id="st"></div><div id="list">'+loading()+'</div><div id="sum"></div>';
+ el.innerHTML='<h2>'+esc(t("nav.home"))+'</h2><input id="q" type="search" style="width:100%" placeholder="'+esc(t("home.search"))+'" aria-label="'+esc(t("home.search"))+'"><div class="chips" role="tablist" id="st" style="margin-top:8px"></div><div id="list">'+loading()+'</div><div id="sum"></div>';
  const st=[["live","home.live"],["upcoming","home.upcoming"],["completed","home.completed"]];let cur=sessionStorage.getItem("shp_home_st")||"upcoming";
  const draw=()=>{$("#st").innerHTML=st.map(([k,l])=>'<button role="tab" aria-selected="'+(k===cur)+'" class="'+(k===cur?"on":"")+'" data-k="'+k+'">'+esc(t(l))+'</button>').join("");
   document.querySelectorAll("#st button").forEach(b=>b.onclick=()=>{cur=b.dataset.k;sessionStorage.setItem("shp_home_st",cur);draw();go()})};
  const go=async()=>{const L=$("#list");L.innerHTML=loading();const q=$("#q").value.trim();
-  try{const j=await api(dq("/matches?status="+cur+"&limit=30"+(q?"&q="+encodeURIComponent(q):"")));L.innerHTML=offlineBanner(j)+(j.items.length?'<div class="list">'+j.items.map(matchCard).join("")+'</div>':emptyS())}
-  catch(e){errorS(L,e,go)}};
+  try{const j=await api(dq("/matches?status="+cur+"&limit=30"+(q?"&q="+encodeURIComponent(q):"")));L.innerHTML=offlineBanner(j)+(j.items.length?j.items.map(matchCard).join(""):emptyS())}catch(e){errorS(L,e,go)}};
  draw();go();let tm;$("#q").oninput=()=>{clearTimeout(tm);tm=setTimeout(go,300)};
  try{const a=await api(dq("/analytics/accuracy"));const o=a.overall;$("#sum").innerHTML='<div class="card"><h3>'+esc(t("acc.overall"))+'</h3><div class="stats">'+stat(o.accuracy==null?"—":o.accuracy+"%",t("acc.overall"))+stat(o.correct,t("acc.correct"))+stat(o.incorrect,t("acc.incorrect"))+stat(o.pending,t("acc.pending"))+'</div><p class="muted">'+esc(t("acc.formula"))+'</p></div>'}catch(e){}
  try{const c=await api("/competitions");const fav=new Set((PREF&&PREF.favorite_competition_ids)||[]);
-  $("#sum").innerHTML+='<div class="card"><h3>'+esc(t("label.competition"))+'</h3><div class="chips">'+c.items.slice(0,40).map(x=>'<button class="'+(fav.has(x.id)?"on":"")+'" data-c="'+x.id+'" aria-pressed="'+fav.has(x.id)+'">'+esc(x.name)+'</button>').join("")+'</div><p class="muted">Tap to add or remove a favourite competition.</p></div>';
-  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.c;const s=new Set((PREF&&PREF.favorite_competition_ids)||[]);s.has(id)?s.delete(id):s.add(id);
+  $("#sum").innerHTML+='<div class="card"><h3>'+esc(t("label.competition"))+'</h3><div class="chips">'+c.items.slice(0,40).map(x=>'<button class="'+(fav.has(x.id)?"on":"")+'" data-c="'+x.id+'" aria-pressed="'+fav.has(x.id)+'">'+esc(x.name)+'</button>').join("")+'</div></div>';
+  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=async()=>{if(!TOKEN){location.hash="#/settings";return}const id=+b.dataset.c;const s=new Set((PREF&&PREF.favorite_competition_ids)||[]);s.has(id)?s.delete(id):s.add(id);
    try{PREF=await api("/me/preferences",{method:"PUT",body:JSON.stringify({favorite_competition_ids:[...s]})});b.classList.toggle("on",s.has(id));b.setAttribute("aria-pressed",s.has(id))}catch(e){}})}catch(e){}
-},
-async master(el){
- el.innerHTML='<h2>'+esc(t("nav.master"))+'</h2><div class="row"><select id="comp" class="grow" aria-label="'+esc(t("label.competition"))+'"><option value="">'+esc(t("label.all"))+'</option></select><div class="chips" role="tablist" id="view"></div></div><div id="ml">'+loading()+'</div>';
- let view=sessionStorage.getItem("shp_ml_view")||"pred";
- try{const c=await api("/competitions");$("#comp").innerHTML+=c.items.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");$("#comp").value=sessionStorage.getItem("shp_ml_comp")||""}catch(e){}
- const drawV=()=>{$("#view").innerHTML=[["pred","view.predicted"],["act","view.actual"]].map(([k,l])=>'<button role="tab" aria-selected="'+(k===view)+'" class="'+(k===view?"on":"")+'" data-v="'+k+'">'+esc(t(l))+'</button>').join("");
-  document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{view=b.dataset.v;sessionStorage.setItem("shp_ml_view",view);drawV();go()})};
- const go=async()=>{const M=$("#ml");M.innerHTML=loading();const cid=$("#comp").value;sessionStorage.setItem("shp_ml_comp",cid);
-  try{const j=await api(dq("/master-list"+(cid?"?competition_id="+cid:"")));
-   if(!j.items.length){M.innerHTML=offlineBanner(j)+emptyS();return}
-   M.innerHTML=offlineBanner(j)+'<div class="tw"><table class="ml"><thead><tr>'+["col.match","col.home","col.away","col.toss","col.winner"].map(k=>'<th scope="col">'+esc(t(k))+'</th>').join("")+'</tr></thead><tbody>'+
-    j.items.map(r=>'<tr><td><a href="#/match/'+r.match_id+'" style="color:inherit">'+esc(r.match)+'</a></td><td>'+teamTxt(r.home,"c-home")+'</td><td>'+teamTxt(r.away,"c-away")+'</td><td>'+
-     mcell(view==="pred"?r.toss_prediction:r.toss_actual)+'</td><td>'+mcell(view==="pred"?r.winner_prediction:r.winner_actual)+'</td></tr>').join("")+'</tbody></table></div>'+
-    '<p class="muted">'+(view==="pred"?"Locked pre-match picks. Team code turns green when the pick was right, red when wrong, grey while the result is unknown.":"Verified toss and match winners. Grey — means no verified result.")+' H = home team, A = away team. Codes show only when the short code is approved.</p>'}
-  catch(e){errorS(M,e,go)}};
- drawV();$("#comp").onchange=go;go();
 },
 async matches(el){
  el.innerHTML='<h2>'+esc(t("nav.matches"))+'</h2><div id="list">'+loading()+'</div>';
@@ -153,85 +136,102 @@ async matches(el){
 async match(el,id,tab){
  tab=tab||"info";el.innerHTML=loading();
  let m;try{m=await api("/matches/"+id)}catch(e){return errorS(el,e,()=>SCREENS.match(el,id,tab))}
- const tabs=[["info","Info"],["xi","Playing XI"],["preds","Predictions"],["ai","AI"],["live","Live"],["score","Scorecard"],["comm","Commentary"]];
+ const tabs=["info","weather","toss","pitch","h2h","prediction","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","result"];
  el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p><div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
-  '<div class="sub" role="tablist">'+tabs.map(([k,l])=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(l)+'</a>').join("")+'</div><div id="tb">'+loading()+'</div>';
+  '<div class="sub" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t("mc."+k))+'</a>').join("")+'</div><div id="tb">'+loading()+'</div>';
+ const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});
  const tb=$("#tb");const nm=tid=>tid===m.home.id?teamTxt(m.home,"c-home"):(tid===m.away.id?teamTxt(m.away,"c-away"):"—");
- try{
- if(tab==="info"){tb.innerHTML='<div class="card"><dl class="kv"><dt>Status</dt><dd>'+esc(m.status)+'</dd><dt>Venue</dt><dd>'+esc(m.venue||"—")+'</dd><dt>Match</dt><dd>'+esc(m.match_no||"—")+'</dd>'+
-  '<dt>'+esc(t("col.toss"))+'</dt><dd>'+(m.toss_winner_id?nm(m.toss_winner_id)+" · "+esc(m.toss_decision||""):"—")+'</dd><dt>Result</dt><dd>'+(m.result_type?esc(m.result_type)+(m.winner_team_id?" · "+nm(m.winner_team_id):"")+(m.margin?" · "+esc(m.margin):"")+(m.method?" ("+esc(m.method)+")":""):"—")+'</dd>'+
-  '<dt>Weather</dt><dd>'+esc(m.weather||"Not reported")+'</dd><dt>Pitch</dt><dd>'+esc(m.pitch_report||"Not reported")+'</dd><dt>Head to head</dt><dd>'+m.head_to_head.matches+' · '+teamTxt(m.home,"c-home")+' '+m.head_to_head.home_won+' – '+m.head_to_head.away_won+' '+teamTxt(m.away,"c-away")+'</dd>'+
-  '<dt>Form (last 5)</dt><dd>'+teamTxt(m.home,"c-home")+' '+esc(m.form.home_last5||"—")+' · '+teamTxt(m.away,"c-away")+' '+esc(m.form.away_last5||"—")+'</dd><dt>Source</dt><dd class="muted">'+esc(m.source)+'</dd></dl></div>';return}
- if(tab==="xi"){const xi=m.playing_xi.length?m.playing_xi:m.squads;tb.innerHTML=xi.length?[m.home,m.away].map(T=>'<div class="card"><h3>'+teamTxt(T,T===m.home?"c-home":"c-away")+' '+esc(T.name)+'</h3>'+xi.filter(p=>p.team_id===T.id).map(p=>'<div>'+esc(p.name)+(p.is_captain?" (c)":"")+(p.is_keeper?" (wk)":"")+' <span class="muted">'+esc(p.role||"")+'</span></div>').join("")+'</div>').join(""):emptyS("Playing XI not announced or not verified yet");return}
- if(tab==="preds"){const j=await api("/matches/"+id+"/predictions");tb.innerHTML=j.items.length?j.items.map(p=>'<div class="card"><h3>'+esc(p.prediction_type)+' · '+(p.predicted_team_id?nm(p.predicted_team_id):esc(p.predicted_value))+origin(p.data_origin)+'</h3><div class="muted">'+esc(p.expert_name?p.expert_name+(p.expert_verified?" ✔︎ "+t("exp.verified"):""):(p.model||"SH v0 register"))+' · '+esc(t("ai.confidence"))+': '+(p.confidence==null?"—":p.confidence+"%")+'</div>'+(p.explanation?'<p>'+esc(p.explanation)+'</p>':'')+
-   '<dl class="kv"><dt>Created</dt><dd>'+when(p.created_at)+'</dd><dt>Locked</dt><dd>'+when(p.locked_at)+'</dd><dt>Evaluation</dt><dd class="'+({correct:"o-won",incorrect:"o-lost"}[p.evaluation]||"o-unknown")+'">'+esc(p.evaluation||"pending")+(p.rule?' <span class="muted">('+esc(p.rule)+')</span>':'')+'</dd>'+(p.versions.length?'<dt>Live versions</dt><dd>'+p.versions.length+'</dd>':'')+'</dl></div>').join(""):emptyS("No locked predictions for this match");return}
- if(tab==="ai"){const s=await api("/matches/"+id+"/signals");const pm=s.pre_match;
-  tb.innerHTML='<div class="card"><h3>'+esc(t("nav.ai"))+' <span class="tag">'+esc(pm.model)+'</span></h3>'+probBar(pm.home_win_probability,m)+'<p class="muted">'+esc(t("ai.confidence"))+': '+esc(pm.confidence_level)+' · '+pm.history_matches_used+' verified matches used</p><h3>'+esc(t("ai.factors"))+'</h3><table class="simple"><tbody>'+pm.factors.map(f=>'<tr><td>'+esc(f.factor.replace(/_/g," "))+'</td><td class="muted">'+esc(f.detail||(f.home+" vs "+f.away))+'</td><td>'+(f.contribution>0?"+":"")+f.contribution+'</td></tr>').join("")+'</tbody></table><p class="muted">Positive values favour the home team. '+esc(t("ai.toss_note"))+'</p></div>'+
-   '<div class="card"><h3>First innings projection</h3>'+(s.projected_first_innings.available?'<b>'+s.projected_first_innings.projected+'</b> <span class="muted">(range '+s.projected_first_innings.low+'–'+s.projected_first_innings.high+', '+s.projected_first_innings.samples+' innings)</span>':'<span class="muted">'+esc(s.projected_first_innings.reason)+'</span>')+'</div>';return}
- if(tab==="live"){const s=await api("/matches/"+id+"/signals");const L=s.live;if(!L){tb.innerHTML=emptyS("No ball-by-ball data for this match yet");return}
-  tb.innerHTML='<div class="card"><h3>Innings '+L.innings_no+' · '+esc(L.score)+' ('+esc(L.overs)+' ov)</h3>'+probBar(L.home_win_probability,m)+'<dl class="kv"><dt>CRR</dt><dd>'+L.current_run_rate+'</dd>'+(L.required_run_rate!=null?'<dt>RRR</dt><dd>'+L.required_run_rate+' · need '+L.runs_needed+'</dd>':'<dt>Projected</dt><dd>'+L.projected_score+'</dd>')+'<dt>Partnership</dt><dd>'+L.partnership.runs+' ('+L.partnership.balls+')</dd><dt>Last 12 balls</dt><dd>'+L.momentum_last_12_balls.runs+' runs, '+L.momentum_last_12_balls.wickets+' wkts</dd></dl></div>'+
-   '<div class="card"><h3>Live prediction history</h3><canvas id="lh" width="700" height="200" aria-label="Home win probability over time"></canvas><h3 style="margin-top:10px">Turning points</h3>'+(s.turning_points.length?s.turning_points.map(x=>'<div>'+esc(x.at)+': <b class="'+(x.home_swing>=0?"c-home":"c-away")+'">'+(x.home_swing>0?"+":"")+x.home_swing+'%</b></div>').join(""):'<span class="muted">—</span>')+'</div>';
-  drawLine($("#lh"),s.live_history.map(v=>v.predicted_team_id===m.home.id?v.confidence:100-v.confidence));return}
- if(tab==="score"){const j=await api("/matches/"+id+"/scorecard");tb.innerHTML=j.innings.length?j.innings.map(i=>'<div class="card"><h3>'+nm(i.batting_team_id)+' '+i.runs+'/'+i.wickets+' ('+i.overs+' ov)'+(i.target?' · target '+i.target:'')+'</h3>'+(i.players.length?'<table class="simple"><thead><tr><th>Player</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>O</th><th>W</th></tr></thead><tbody>'+i.players.map(p=>'<tr><td>'+esc(p.name)+' <span class="muted">'+esc(p.dismissal||"")+'</span></td><td>'+(p.runs??"")+'</td><td>'+(p.balls??"")+'</td><td>'+(p.fours??"")+'</td><td>'+(p.sixes??"")+'</td><td>'+esc(p.overs_bowled||"")+'</td><td>'+(p.wickets??"")+'</td></tr>').join("")+'</tbody></table>':'<p class="muted">Player figures not verified yet.</p>')+(i.fall_of_wickets.length?'<p class="muted">Wickets at balls: '+i.fall_of_wickets.map(w=>w.over_no+"."+w.ball_in_over).join(", ")+'</p>':'')+'</div>').join(""):emptyS("Scorecard not available yet");return}
- if(tab==="comm"){const j=await api("/matches/"+id+"/commentary?limit=60");tb.innerHTML=j.items.length?'<div class="card">'+j.items.map(b=>'<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>'+b.over_no+'.'+b.ball_in_over+'</b> '+(b.is_wicket?'<b class="o-lost">W</b> ':'')+'<b>'+(b.runs_bat+b.extras)+'</b>'+(b.extra_type?' <span class="muted">'+esc(b.extra_type)+'</span>':'')+' '+esc(b.commentary||"")+'</div>').join("")+'</div>':emptyS("No commentary yet");return}
- }catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
+ const kv=pairs=>'<div class="card"><dl class="kv">'+pairs.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+b+'</dd>').join("")+'</dl></div>';
+ const T={
+  info:async()=>kv([[t("mc.status"),esc(m.status)],[t("mc.venue"),esc(m.venue||"—")],["Match",esc(m.match_no||"—")],["Format",esc(m.format)],["Source",'<span class="muted">'+esc(m.source)+'</span>']]),
+  weather:async()=>m.weather?kv([[t("mc.weather"),esc(m.weather)]]):emptyS(t("mc.not_reported")),
+  pitch:async()=>m.pitch_report?kv([[t("mc.pitch"),esc(m.pitch_report)]]):emptyS(t("mc.not_reported")),
+  toss:async()=>m.toss_winner_id?kv([[t("col.toss"),nm(m.toss_winner_id)],["Decision",esc(m.toss_decision||"—")]])+'<p class="muted">'+esc(t("ai.toss_note"))+'</p>':emptyS(t("mc.not_reported")),
+  h2h:async()=>kv([[t("mc.h2h"),m.head_to_head.matches+' · '+teamTxt(m.home,"c-home")+' '+m.head_to_head.home_won+' – '+m.head_to_head.away_won+' '+teamTxt(m.away,"c-away")],[t("mc.form"),teamTxt(m.home,"c-home")+' '+esc(m.form.home_last5||"—")+' · '+teamTxt(m.away,"c-away")+' '+esc(m.form.away_last5||"—")]]),
+  prediction:async()=>{const [p,s]=await Promise.all([api("/matches/"+id+"/predictions"),api("/matches/"+id+"/signals")]);const pm=s.pre_match;
+   return '<div class="card"><h3>SH AI</h3>'+probBar(pm.home_win_probability,m)+'<p class="muted">'+esc(t("ai.confidence"))+': '+esc(pm.confidence_level)+' · '+esc(t("ai.toss_note"))+'</p>'+factorsHtml(pm.public_factors)+'</div>'+
+    (p.items.length?p.items.map(x=>'<div class="card"><h3>'+esc(x.prediction_type.replace(/_/g," "))+' · '+(x.predicted_team_id?nm(x.predicted_team_id):esc(x.predicted_value))+'</h3><div class="muted">'+esc(x.expert_name?x.expert_name+(x.expert_verified?" · "+t("exp.verified"):""):(x.model||"SH"))+' · '+esc(t("ai.confidence"))+': '+(x.confidence==null?"—":x.confidence+"%")+'</div>'+(x.public_note?'<p>'+esc(x.public_note)+'</p>':(x.explanation?'<p>'+esc(x.explanation)+'</p>':''))+'<dl class="kv"><dt>Locked</dt><dd>'+when(x.locked_at)+'</dd><dt>Result</dt><dd class="'+({correct:"o-won",incorrect:"o-lost"}[x.evaluation]||"o-unknown")+'">'+esc(x.evaluation||"pending")+'</dd></dl></div>').join(""):emptyS(t("mc.no_pred")))},
+  xi:async()=>{const xi=m.playing_xi.length?m.playing_xi:m.squads;return xi.length?(m.playing_xi.length?"":'<p class="muted">Squad shown; Playing XI not announced yet.</p>')+[m.home,m.away].map(T=>'<div class="card"><h3>'+teamTxt(T,T===m.home?"c-home":"c-away")+' '+esc(T.name)+'</h3>'+xi.filter(p=>p.team_id===T.id).map(p=>'<div>'+esc(p.name)+(p.is_captain?" (c)":"")+(p.is_keeper?" (wk)":"")+' <span class="muted">'+esc((p.role||"").replace("_"," "))+'</span></div>').join("")+'</div>').join(""):emptyS(t("mc.not_reported"))},
+  fantasy:async()=>{const f=await api("/matches/"+id+"/fantasy");if(!f.available)return emptyS(f.reason);
+   return '<p class="muted">'+esc(t("fan.free"))+' '+esc(f.note)+' Rules: '+esc(f.rule_set)+'.</p>'+f.teams.map(x=>'<div class="card"><h3>'+esc(x.label)+' · '+esc(t("fan.risk"))+': '+esc(x.risk)+'</h3><div class="muted">'+esc(t("fan.captain"))+': <b>'+esc(x.captain.name)+'</b> · '+esc(t("fan.vice"))+': <b>'+esc(x.vice_captain.name)+'</b> · '+x.expected_points+' pts</div><table class="simple"><tbody>'+x.players.map(p=>'<tr><td>'+nm(p.team_id)+' '+esc(p.name)+'</td><td class="muted">'+esc(p.role.replace("_"," "))+'</td><td>'+p.expected_points+'</td><td class="muted">'+esc(p.confidence)+'</td></tr>').join("")+'</tbody></table></div>').join("")},
+  live:async()=>{const s=await api("/matches/"+id+"/signals");const L=s.live;if(!L)return emptyS("No ball-by-ball data for this match yet");
+   setTimeout(()=>drawLine($("#lh"),[s.live_history.map(v=>v.predicted_team_id===m.home.id?v.confidence:100-v.confidence)],["--home"]),0);
+   return '<div class="card"><h3>Innings '+L.innings_no+' · '+esc(L.score)+' ('+esc(L.overs)+' ov)</h3>'+probBar(L.home_win_probability,m)+'<dl class="kv"><dt>CRR</dt><dd>'+L.current_run_rate+'</dd>'+(L.required_run_rate!=null?'<dt>RRR</dt><dd>'+L.required_run_rate+' · need '+L.runs_needed+'</dd>':'<dt>Projected</dt><dd>'+L.projected_score+'</dd>')+'<dt>'+esc(t("mc.partnerships"))+'</dt><dd>'+L.partnership.runs+' ('+L.partnership.balls+')</dd><dt>Last 12 balls</dt><dd>'+L.momentum_last_12_balls.runs+' runs, '+L.momentum_last_12_balls.wickets+' wkts</dd>'+(s.wicket_impact?'<dt>Next wicket</dt><dd>'+s.wicket_impact.next_wicket_swing+'% for the batting side</dd>':'')+'</dl></div>'+
+    (s.over_by_over?'<div class="card"><h3>Phases</h3><table class="simple"><tbody>'+s.over_by_over.phases.map(p=>'<tr><td>'+esc(p.phase)+'</td><td class="muted">overs '+esc(p.overs)+'</td><td>'+p.runs+'</td><td class="muted">'+esc(p.status)+'</td></tr>').join("")+'</tbody></table><p class="muted">Projected total '+s.over_by_over.projected_total+'</p></div>':'')+
+    '<div class="card"><h3>Win probability history</h3><canvas id="lh" width="700" height="200" aria-label="Home win probability over time"></canvas><h3 style="margin-top:10px">Turning points</h3>'+(s.turning_points.length?s.turning_points.map(x=>'<div>'+esc(x.at)+': <b class="'+(x.home_swing>=0?"c-home":"c-away")+'">'+(x.home_swing>0?"+":"")+x.home_swing+'%</b></div>').join(""):'<span class="muted">—</span>')+'</div>'},
+  scorecard:async()=>{const j=await api("/matches/"+id+"/scorecard");return j.innings.length?j.innings.map(i=>'<div class="card"><h3>'+nm(i.batting_team_id)+' '+i.runs+'/'+i.wickets+' ('+i.overs+' ov)'+(i.target?' · target '+i.target:'')+'</h3>'+(i.players.length?'<table class="simple"><thead><tr><th>Player</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>O</th><th>W</th></tr></thead><tbody>'+i.players.map(p=>'<tr><td>'+esc(p.name)+' <span class="muted">'+esc(p.dismissal||"")+'</span></td><td>'+(p.runs??"")+'</td><td>'+(p.balls??"")+'</td><td>'+(p.fours??"")+'</td><td>'+(p.sixes??"")+'</td><td>'+esc(p.overs_bowled||"")+'</td><td>'+(p.wickets??"")+'</td></tr>').join("")+'</tbody></table>':'<p class="muted">Player figures not verified yet.</p>')+'</div>').join(""):emptyS(t("mc.not_reported"))},
+  commentary:async()=>{const j=await api("/matches/"+id+"/commentary?limit=60");return j.items.length?'<div class="card">'+j.items.map(b=>'<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>'+b.over_no+'.'+b.ball_in_over+'</b> '+(b.is_wicket?'<b class="o-lost">W</b> ':'')+'<b>'+(b.runs_bat+b.extras)+'</b>'+(b.extra_type?' <span class="muted">'+esc(b.extra_type)+'</span>':'')+' '+esc(b.commentary||"")+'</div>').join("")+'</div>':emptyS(t("mc.not_reported"))},
+  partnerships:async()=>{const j=await api("/matches/"+id+"/partnerships");return j.innings.length?j.innings.map(i=>'<div class="card"><h3>Innings '+i.innings_no+'</h3><table class="simple"><tbody>'+i.partnerships.map(p=>'<tr><td>Wicket '+p.wicket+'</td><td>'+p.runs+' ('+p.balls+')</td><td class="muted">'+(p.ended?'ended '+esc(p.ended):'unbroken')+'</td></tr>').join("")+'</tbody></table></div>').join(""):emptyS(t("mc.not_reported"))},
+  fow:async()=>{const j=await api("/matches/"+id+"/fall-of-wickets");const any=j.innings.some(i=>i.fall_of_wickets.length);return any?j.innings.map(i=>'<div class="card"><h3>Innings '+i.innings_no+'</h3>'+(i.fall_of_wickets.map(w=>'<div>'+w.wicket+'-'+w.score+' <span class="muted">('+esc(w.over)+' ov'+(w.batter?', '+esc(w.batter):'')+(w.how?', '+esc(w.how):'')+')</span></div>').join("")||'<span class="muted">—</span>')+'</div>').join(""):emptyS(t("mc.not_reported"))},
+  graphs:async()=>{const g=await api("/matches/"+id+"/graphs");if(!g.innings.length)return emptyS(t("mc.not_reported"));
+   setTimeout(()=>{drawLine($("#worm"),g.innings.map(i=>i.worm),["--home","--away"]);g.innings.forEach(i=>drawBars($("#man"+i.innings_no),i.manhattan.map(o=>o.runs),i.manhattan.map(o=>o.wickets)))},0);
+   return '<div class="card"><h3>Worm</h3><canvas id="worm" width="700" height="200" aria-label="Cumulative runs by over"></canvas></div>'+g.innings.map(i=>'<div class="card"><h3>Manhattan · innings '+i.innings_no+'</h3><canvas id="man'+i.innings_no+'" width="700" height="160" aria-label="Runs per over, red bars had a wicket"></canvas></div>').join("")},
+  result:async()=>{const r=await api("/matches/"+id+"/result");return r.available?'<div class="card"><h3>'+esc(r.summary)+'</h3>'+(r.margin?'<div>'+esc(r.margin)+(r.method?' ('+esc(r.method)+')':'')+'</div>':'')+'</div>':emptyS(t("mc.not_reported"))}
+ };
+ try{tb.innerHTML=await (T[tab]||T.info)()}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
 },
 async experts(el,id){
  if(id){el.innerHTML=loading();try{const j=await api("/experts/"+id+"/history");const x=j.expert,s=j.summary;
   el.innerHTML='<p><a href="#/experts">← '+esc(t("nav.experts"))+'</a></p><div class="card"><h3>'+esc(x.display_name)+(x.verified?' <span class="tag ver">'+esc(t("exp.verified"))+'</span>':'')+'</h3><p>'+esc(x.bio||"")+'</p><div class="stats">'+stat(s.accuracy==null?"—":s.accuracy+"%",t("acc.overall"))+stat(s.correct,t("acc.correct"))+stat(s.incorrect,t("acc.incorrect"))+stat(s.pending,t("acc.pending"))+'</div>'+(x.contact_url?'<p><a href="'+esc(x.contact_url)+'" rel="noopener" target="_blank">Contact</a></p>':'')+'</div><h3>'+esc(t("exp.history"))+'</h3>'+
-   (j.items.length?j.items.map(p=>'<a class="card item" style="display:block;color:inherit;text-decoration:none" href="#/match/'+p.match_id+'/preds"><b>'+esc(p.prediction_type)+'</b> · '+esc(p.predicted_team||"")+' · '+(p.confidence??"—")+'% <span class="'+({correct:"o-won",incorrect:"o-lost"}[p.evaluation]||"o-unknown")+'">'+esc(p.evaluation||"pending")+'</span><div class="muted">'+when(p.created_at)+'</div></a>').join(""):emptyS())}catch(e){errorS(el,e,()=>SCREENS.experts(el,id))}return}
+   (j.items.length?j.items.map(p=>'<a class="card" href="#/match/'+p.match_id+'/prediction"><b>'+esc(p.prediction_type)+'</b> · '+esc(p.predicted_team||"")+' · '+(p.confidence??"—")+'% <span class="'+({correct:"o-won",incorrect:"o-lost"}[p.evaluation]||"o-unknown")+'">'+esc(p.evaluation||"pending")+'</span><div class="muted">'+when(p.created_at)+'</div></a>').join(""):emptyS())}catch(e){errorS(el,e,()=>SCREENS.experts(el,id))}return}
  el.innerHTML='<h2>'+esc(t("nav.experts"))+'</h2><div id="ex">'+loading()+'</div>';
- const go=async()=>{try{const j=await api("/experts?limit=50");$("#ex").innerHTML=j.items.length?j.items.map(x=>'<div class="card"><div class="row"><b class="grow">#'+x.rank+' '+esc(x.display_name)+(x.verified?' <span class="tag ver">'+esc(t("exp.verified"))+'</span>':'')+'</b><button data-f="'+x.id+'">'+esc(t("exp.follow"))+'</button></div><div class="muted">'+esc(x.country||"—")+' · '+esc(x.language_code||"")+' · '+x.followers+' followers</div><div>'+esc(t("acc.overall"))+': <b>'+(x.accuracy.accuracy==null?"—":x.accuracy.accuracy+"%")+'</b> <span class="muted">('+x.accuracy.correct+'/'+x.accuracy.settled+')</span></div><p><a href="#/experts/'+x.id+'">'+esc(t("exp.history"))+' →</a></p></div>').join(""):emptyS("No expert profiles yet");
-  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=async()=>{try{await api("/experts/"+b.dataset.f+"/follow",{method:"POST",body:'{"follow":true}'});b.textContent=t("exp.following");b.classList.add("on")}catch(e){b.textContent=e.message}})}
+ const go=async()=>{try{const j=await api("/experts?limit=50");$("#ex").innerHTML=j.items.length?j.items.map(x=>'<div class="card"><div class="row"><b class="grow">#'+x.rank+' '+esc(x.display_name)+(x.verified?' <span class="tag ver">'+esc(t("exp.verified"))+'</span>':'')+'</b><button data-f="'+x.id+'">'+esc(t("exp.follow"))+'</button></div><div class="muted">'+esc(x.country||"—")+' · '+esc(x.language_code||"")+' · '+x.followers+' followers</div><div>'+esc(t("acc.overall"))+': <b>'+(x.accuracy.accuracy==null?"—":x.accuracy.accuracy+"%")+'</b> <span class="muted">('+x.accuracy.correct+'/'+x.accuracy.settled+')</span></div><p><a href="#/experts/'+x.id+'">'+esc(t("exp.history"))+' →</a></p></div>').join(""):emptyS();
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=async()=>{if(!TOKEN){location.hash="#/settings";return}try{await api("/experts/"+b.dataset.f+"/follow",{method:"POST",body:'{"follow":true}'});b.textContent=t("exp.following");b.classList.add("on")}catch(e){b.textContent=e.message}})}
   catch(e){errorS($("#ex"),e,go)}};go();
 },
 async ai(el){
  el.innerHTML='<h2>'+esc(t("nav.ai"))+'</h2><p class="muted">'+esc(t("ai.toss_note"))+'</p><div id="ai">'+loading()+'</div>';
  const go=async()=>{try{const j=await api(dq("/matches?status=upcoming&limit=10"));if(!j.items.length){$("#ai").innerHTML=emptyS();return}
   const sig=await Promise.all(j.items.map(m=>api("/matches/"+m.id+"/signals").catch(()=>null)));
-  $("#ai").innerHTML=j.items.map((m,i)=>'<a class="card" style="display:block;color:inherit;text-decoration:none" href="#/match/'+m.id+'/ai"><h3>'+teamTxt(m.home,"c-home")+' vs '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.competition)+' · '+when(m.start_utc)+'</div>'+(sig[i]?probBar(sig[i].pre_match.home_win_probability,m)+'<div class="muted">'+esc(t("ai.confidence"))+': '+esc(sig[i].pre_match.confidence_level)+'</div>':'')+'</a>').join("")}
+  $("#ai").innerHTML=j.items.map((m,i)=>'<a class="card" href="#/match/'+m.id+'/prediction"><h3>'+teamTxt(m.home,"c-home")+' vs '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.competition)+' · '+when(m.start_utc)+'</div>'+(sig[i]?probBar(sig[i].pre_match.home_win_probability,m)+'<div class="muted">'+esc(t("ai.confidence"))+': '+esc(sig[i].pre_match.confidence_level)+'</div>':'')+'</a>').join("")}
   catch(e){errorS($("#ai"),e,go)}};go();
 },
+async assistant(el){
+ el.innerHTML='<h2>'+esc(t("nav.assistant"))+'</h2><div id="chat"></div><form id="af" class="row"><input id="aq" class="grow" maxlength="500" placeholder="'+esc(t("as.placeholder"))+'" aria-label="'+esc(t("as.placeholder"))+'"><button class="primary">'+esc(t("as.ask"))+'</button></form>';
+ const draw=()=>{$("#chat").innerHTML=CHAT.map(m=>'<div class="msg '+m.k+'">'+esc(m.text)+(m.src&&m.src.length?'<div class="muted" style="margin-top:6px">'+esc(t("as.sources"))+': '+esc(m.src.join("; "))+'</div>':'')+'</div>').join("")};
+ draw();
+ $("#af").onsubmit=async e=>{e.preventDefault();const q=$("#aq").value.trim();if(!q)return;CHAT.push({k:"q",text:q});$("#aq").value="";draw();
+  try{const r=await api("/assistant",{method:"POST",body:JSON.stringify({question:q,language:LANG})});CHAT.push({k:"a",text:r.answer+(r.language_note?"\n"+r.language_note:""),src:r.sources})}catch(err){CHAT.push({k:"a",text:t("state.error")+": "+err.message})}draw()};
+},
 async accuracy(el){
- const demo=DEMO();
- el.innerHTML='<h2>'+esc(t("nav.accuracy"))+'</h2><label class="row muted"><input type="checkbox" id="dm" '+(demo?"checked":"")+'> Include demo data</label><div id="acc">'+loading()+'</div>';
- $("#dm").onchange=e=>{localStorage.setItem("shp_demo",e.target.checked?"1":"0");SCREENS.accuracy(el)};
- const go=async()=>{try{const q=demo?"?include_demo=1":"";const [a,tos,ha,v]=await Promise.all([api("/analytics/accuracy"+q),api("/analytics/toss"+q),api("/analytics/home-away"+q),api("/analytics/venue"+q)]);
+ el.innerHTML='<h2>'+esc(t("nav.accuracy"))+'</h2>'+(DEMO()?'<p><span class="tag demo">'+esc(t("label.demo"))+'</span></p>':'')+'<div id="acc">'+loading()+'</div>';
+ const go=async()=>{try{const [a,tos,ha,v]=await Promise.all([api(dq("/analytics/accuracy")),api(dq("/analytics/toss")),api(dq("/analytics/home-away")),api(dq("/analytics/venue"))]);
   const o=a.overall,tbl=(title,obj)=>{const k=Object.keys(obj);return '<div class="card"><h3>'+esc(title)+'</h3>'+(k.length?'<div class="bars">'+k.map(n=>'<div><span>'+esc(n)+'</span><span><i style="width:'+(obj[n].accuracy||0)+'%"></i></span><b>'+(obj[n].accuracy==null?"—":obj[n].accuracy+"%")+'</b></div>').join("")+'</div>':'<span class="muted">—</span>')+'</div>'};
-  $("#acc").innerHTML='<div class="card"><div class="stats">'+stat(o.total_predictions,t("acc.total"))+stat(o.correct,t("acc.correct"))+stat(o.incorrect,t("acc.incorrect"))+stat(o.pending,t("acc.pending"))+stat(o.void,t("acc.void"))+stat(o.accuracy==null?"—":o.accuracy+"%",t("acc.overall"))+'</div><p class="muted">'+esc(t("acc.formula"))+'. Pending, void and ineligible are not in the denominator.</p></div>'+
-   tbl("Prediction type",a.by_type)+tbl(t("acc.by_league"),a.by_league)+tbl(t("acc.by_expert"),a.by_expert)+tbl(t("acc.by_team"),a.by_team)+
-   '<div class="card"><h3>'+esc(t("an.toss"))+'</h3>'+pair(tos.toss.toss_winner_won,tos.toss.toss_winner_lost,"Toss winner won","Toss winner lost")+'<h3 style="margin-top:12px">'+esc(t("an.batfirst"))+'</h3>'+pair(tos.batting_first_vs_chasing.batting_first_won,tos.batting_first_vs_chasing.chasing_won,"Batting first","Chasing")+'</div>'+
-   '<div class="card"><h3>'+esc(t("an.homeaway"))+'</h3>'+pair(ha.home_away.home_won,ha.home_away.away_won,"Home","Away")+'<h3 style="margin-top:12px">'+esc(t("an.day"))+'</h3><table class="simple"><tbody>'+Object.entries(ha.day_of_week_utc).map(([d,x])=>'<tr><td>'+esc(d)+'</td><td>'+x.matches+' matches</td><td>home '+(x.home_win_pct??"—")+'%</td></tr>').join("")+'</tbody></table></div>'+
-   '<div class="card"><h3>'+esc(t("an.venue"))+'</h3><table class="simple"><tbody>'+Object.entries(v.venue).map(([n,x])=>'<tr><td>'+esc(n)+'</td><td>'+x.matches+'</td><td>bat first '+(x.batting_first_win_pct??"—")+'%</td></tr>').join("")+'</tbody></table><p class="muted">'+esc(v.note)+' Sample: '+v.sample_matches+' matches.</p></div>'}
+  $("#acc").innerHTML='<div class="card"><div class="stats">'+stat(o.total_predictions,t("acc.total"))+stat(o.correct,t("acc.correct"))+stat(o.incorrect,t("acc.incorrect"))+stat(o.pending,t("acc.pending"))+stat(o.void,t("acc.void"))+stat(o.accuracy==null?"—":o.accuracy+"%",t("acc.overall"))+'</div><p class="muted">'+esc(t("acc.formula"))+'</p></div>'+
+   tbl(t("acc.by_league"),a.by_league)+tbl(t("acc.by_expert"),a.by_expert)+tbl(t("acc.by_team"),a.by_team)+
+   '<div class="card"><h3>'+esc(t("an.toss"))+'</h3>'+pair(tos.toss.toss_winner_won,tos.toss.toss_winner_lost,"✓","✗")+'<h3 style="margin-top:12px">'+esc(t("an.batfirst"))+'</h3>'+pair(tos.batting_first_vs_chasing.batting_first_won,tos.batting_first_vs_chasing.chasing_won,"1st","2nd")+'</div>'+
+   '<div class="card"><h3>'+esc(t("an.homeaway"))+'</h3>'+pair(ha.home_away.home_won,ha.home_away.away_won,"H","A")+'<h3 style="margin-top:12px">'+esc(t("an.day"))+'</h3><table class="simple"><tbody>'+Object.entries(ha.day_of_week_utc).map(([d,x])=>'<tr><td>'+esc(d)+'</td><td>'+x.matches+'</td><td>H '+(x.home_win_pct??"—")+'%</td></tr>').join("")+'</tbody></table></div>'+
+   '<div class="card"><h3>'+esc(t("an.venue"))+'</h3><table class="simple"><tbody>'+Object.entries(v.venue).map(([n,x])=>'<tr><td>'+esc(n)+'</td><td>'+x.matches+'</td><td>1st '+(x.batting_first_win_pct??"—")+'%</td></tr>').join("")+'</tbody></table></div>'}
   catch(e){errorS($("#acc"),e,go)}};go();
 },
 async settings(el){
- el.innerHTML='<h2>'+esc(t("nav.settings"))+'</h2><div class="card"><label>'+esc(t("label.language"))+'<br><select id="lang" style="width:100%;margin-top:6px"></select></label><p class="muted" id="langnote"></p><label>'+esc(t("label.theme"))+'<br><select id="theme" style="width:100%;margin-top:6px"><option value="dark">'+esc(t("theme.dark"))+'</option><option value="light">'+esc(t("theme.light"))+'</option></select></label><label class="row" style="margin-top:12px"><input type="checkbox" id="demo"> Show demo data (marked DEMO, never counted unless you choose)</label><p id="msg" role="status" class="muted"></p></div><div class="card"><a href="/">Classic screens, login and admin</a></div>';
- try{const L=await api("/languages");$("#lang").innerHTML=L.items.map(l=>'<option value="'+l.code+'">'+esc(l.native_name)+' — '+esc(l.name)+(l.ui_complete?"":" (English fallback)")+'</option>').join("");$("#lang").value=LANG}catch(e){$("#langnote").textContent=t("state.error")+": "+e.message;return}
- $("#theme").value=document.documentElement.dataset.theme;$("#demo").checked=DEMO();$("#demo").onchange=e=>{localStorage.setItem("shp_demo",e.target.checked?"1":"0");$("#msg").textContent=t("settings.saved")};
+ el.innerHTML='<h2>'+esc(t("nav.settings"))+'</h2><div class="card"><label>'+esc(t("label.language"))+'<br><select id="lang" style="width:100%;margin-top:6px"></select></label><p class="muted" id="langnote"></p><label>'+esc(t("label.theme"))+'<br><select id="theme" style="width:100%;margin-top:6px"><option value="dark">'+esc(t("theme.dark"))+'</option><option value="light">'+esc(t("theme.light"))+'</option></select></label>'+
+  '<label class="row" style="margin-top:12px"><input type="checkbox" id="demo"> '+esc(t("label.demo_toggle"))+'</label><p id="msg" role="status" class="muted"></p></div>'+
+  '<div class="card" id="acct"></div><div class="card"><a href="/download/sh-prediction.apk">Android app (APK)</a></div>';
+ try{const L=await api("/languages");$("#lang").innerHTML=L.items.map(l=>'<option value="'+l.code+'">'+esc(l.native_name)+' — '+esc(l.name)+(l.ui_complete?"":" ("+l.coverage_percent+"% translated, rest in English)")+'</option>').join("");$("#lang").value=LANG}catch(e){$("#langnote").textContent=t("state.error")}
+ $("#theme").value=document.documentElement.dataset.theme;$("#demo").checked=DEMO();
  if(!$("#langnote").textContent)$("#langnote").textContent="Team, player and venue names, numbers and cricket terms stay in their official form.";
- const save=async b=>{try{PREF=await api("/me/preferences",{method:"PUT",body:JSON.stringify(b)});$("#msg").textContent=t("settings.saved")}catch(e){$("#msg").textContent=e.message}};
- $("#lang").onchange=async e=>{await save({language_code:e.target.value});await loadLang(e.target.value);route()};
+ const save=async b=>{if(!TOKEN){$("#msg").textContent=t("settings.saved");return}try{PREF=await api("/me/preferences",{method:"PUT",body:JSON.stringify(b)});$("#msg").textContent=t("settings.saved")}catch(e){$("#msg").textContent=e.message}};
+ $("#lang").onchange=async e=>{await loadLang(e.target.value);await save({language_code:e.target.value});route()};
  $("#theme").onchange=async e=>{setTheme(e.target.value);await save({theme:e.target.value})};
+ $("#demo").onchange=e=>{ls.set("shp_demo",e.target.checked?"1":"0");$("#msg").textContent=t("settings.saved")};
+ const acct=()=>{if(TOKEN){$("#acct").innerHTML='<p class="muted">'+esc(t("settings.saved"))+' ✓</p><button id="lo">'+esc(t("settings.logout"))+'</button>';$("#lo").onclick=async()=>{try{await fetch("/auth/logout",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+TOKEN},body:"{}"})}catch(e){}TOKEN="";ls.del("shp_session");PREF=null;acct()};return}
+  $("#acct").innerHTML='<p class="muted">'+esc(t("settings.login"))+'</p><div class="row"><input id="ph" class="grow" type="tel" inputmode="numeric" maxlength="15" placeholder="'+esc(t("settings.phone"))+'" aria-label="'+esc(t("settings.phone"))+'"><button id="gc">'+esc(t("settings.get_code"))+'</button></div><p id="code" class="muted"></p><div class="row"><input id="otp" class="grow" inputmode="numeric" maxlength="6" placeholder="OTP" aria-label="OTP"><button class="primary" id="vf">'+esc(t("settings.verify"))+'</button></div>';
+  const post=(p,b)=>fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(async r=>({ok:r.ok,j:await r.json()}));
+  $("#gc").onclick=async()=>{const r=await post("/auth/generate",{phone:$("#ph").value.trim()});$("#code").textContent=r.ok?"Code: "+r.j.otp:(r.j.error||"Error")};
+  $("#vf").onclick=async()=>{const r=await post("/auth/verify",{phone:$("#ph").value.trim(),otp:$("#otp").value.trim()});if(r.ok){TOKEN=r.j.token;ls.set("shp_session",TOKEN);await save({language_code:LANG,theme:document.documentElement.dataset.theme});acct()}else $("#code").textContent=r.j.error||"Error"}};
+ acct();
 }};
-function stat(v,l){return '<div class="stat"><b>'+esc(v)+'</b><span class="muted">'+esc(l)+'</span></div>'}
-function pair(a,b,la,lb){const n=a+b,p=n?Math.round(100*a/n):0;return n?'<div class="prob"><span class="h" style="width:'+Math.max(p,12)+'%">'+esc(la)+' '+a+'</span><span class="a" style="width:'+Math.max(100-p,12)+'%">'+esc(lb)+' '+b+'</span></div>':'<span class="muted">—</span>'}
-function probBar(h,m){const a=Math.round((100-h)*10)/10;return '<div class="prob" role="img" aria-label="'+esc(m.home.name)+' '+h+'%, '+esc(m.away.name)+' '+a+'%"><span class="h" style="width:'+Math.max(h,14)+'%">'+esc(m.home.short_code||m.home.name)+' '+h+'%</span><span class="a" style="width:'+Math.max(a,14)+'%">'+a+'% '+esc(m.away.short_code||m.away.name)+'</span></div>'}
-function matchCard(m){return '<a class="card" style="display:block;color:inherit;text-decoration:none" href="#/match/'+m.id+'"><div class="row"><b class="grow">'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+'</b>'+origin(m.data_origin)+'</div><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+'</div><div class="muted">'+esc(m.competition)+' · '+esc(m.match_no||"")+' · '+when(m.start_utc)+(m.venue?' · '+esc(m.venue):'')+'</div></a>'}
-function drawLine(cv,vals){const x=cv.getContext("2d"),W=cv.width,H=cv.height,cs=getComputedStyle(document.documentElement);x.clearRect(0,0,W,H);
- x.strokeStyle=cs.getPropertyValue("--line");x.beginPath();x.moveTo(0,H/2);x.lineTo(W,H/2);x.stroke();if(vals.length<2){x.fillStyle=cs.getPropertyValue("--muted");x.fillText("Needs at least two updates",10,20);return}
- x.strokeStyle=cs.getPropertyValue("--home");x.lineWidth=3;x.beginPath();vals.forEach((v,i)=>{const px=i*(W-10)/(vals.length-1)+5,py=H-v/100*H;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
 
 async function route(){
  const h=(location.hash||"#/home").slice(2).split("/");const el=$("#main");
- if(!TOKEN){navRender("");el.innerHTML='<div class="card"><h3>Login needed</h3><p class="muted">Sign in once on the main screen; this hub uses the same session.</p><p><a class="btn primary" href="/">Go to login</a></p></div>';return}
  const page=h[0]||"home";navRender(page==="match"?"matches":page);window.scrollTo(0,0);
  const fn=SCREENS[page]||SCREENS.home;try{await fn(el,h[1],h[2])}catch(e){errorS(el,e,route)}
 }
 window.addEventListener("hashchange",route);
-window.addEventListener("online",route);window.addEventListener("offline",()=>{const el=$("#main");el.insertAdjacentHTML("afterbegin",'<div class="offline" role="status">'+esc(t("state.offline"))+'</div>')});
-(async()=>{setTheme(localStorage.getItem("shp_theme")||"dark");await loadLang(LANG);
- if(TOKEN){try{PREF=await api("/me/preferences");if(PREF.language_code!==LANG)await loadLang(PREF.language_code);setTheme(PREF.theme)}catch(e){}}
+window.addEventListener("online",route);window.addEventListener("offline",()=>{$("#main").insertAdjacentHTML("afterbegin",'<div class="offline" role="status">'+esc(t("state.offline"))+'</div>')});
+(async()=>{setTheme(ls.get("shp_theme")||"dark");await loadLang(LANG);
+ if(TOKEN){try{PREF=await api("/me/preferences");if(PREF.language_code!==LANG)await loadLang(PREF.language_code);setTheme(PREF.theme)}catch(e){if(e.status===401){TOKEN="";ls.del("shp_session")}}}
  route()})();
 </script>
 </body>

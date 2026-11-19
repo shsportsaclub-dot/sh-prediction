@@ -10,6 +10,8 @@ import screen_login, main, api_v1, engine
 # test_api.py may have imported these first with another DB path: rebind to ours
 for mod in (screen_login, main):
     mod.DB = os.environ["SH_PREDICTION_DB"]
+api_v1.DB_PATH = os.environ["SH_PREDICTION_DB"]
+api_v1.RATE["capacity"] = 100000  # the suite makes thousands of calls from one IP; test_rate_limit checks the limiter itself
 from http.server import ThreadingHTTPServer
 
 main.H.log_message = lambda *a: None  # keep test output readable
@@ -17,7 +19,15 @@ srv = ThreadingHTTPServer(("127.0.0.1", 0), main.H)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 B = "http://127.0.0.1:%d" % srv.server_port
 A = {"X-Admin-Token": "adm-test-token"}
+PRE_MIGRATION = None
 SOON, SOON_WAIT = 2.5 / 86400, 3.0  # a match starting 2.5 s from now
+
+def _migrate_once():
+    global PRE_MIGRATION
+    if PRE_MIGRATION is None:
+        PRE_MIGRATION = call("/api/v1/matches")
+        s, r = call("/api/v1/admin/system/migrate", {"confirm": True}, A)
+        assert s == 200 and r["status"] in ("migrated", "up_to_date"), r
 
 def call(path, data=None, h=None, method=None):
     r = urllib.request.Request(B + path, data=json.dumps(data).encode() if data is not None else None,
@@ -27,6 +37,9 @@ def call(path, data=None, h=None, method=None):
         return x.status, json.loads(x.read())
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read())
+
+def setUpModule():
+    _migrate_once()
 
 def login(phone):
     s, o = call("/auth/generate", {"phone": phone})
@@ -64,7 +77,7 @@ def predict(mid, kind, team, eid, conf=60):
 
 class Security(unittest.TestCase):
     def test_auth_required_and_structured_errors(self):
-        s, r = call("/api/v1/matches")
+        s, r = call("/api/v1/me/preferences")
         self.assertEqual(s, 401)
         self.assertEqual(r["error"]["code"], "UNAUTHENTICATED")
 
@@ -90,7 +103,7 @@ class Security(unittest.TestCase):
     def test_audit_logged(self):
         mid = mk_match("AudA", "AudB")
         s, log = call("/api/v1/admin/audit?limit=100", h=A)
-        self.assertTrue(any(x["action"] == "match.create" and x["entity_id"] == str(mid) and x["actor"] == "admin-token" for x in log["items"]))
+        self.assertTrue(any(x["action"] == "match.create" and x["entity_id"] == str(mid) and x["actor"].startswith("admin-token") for x in log["items"]))
 
     def test_validation_and_pagination(self):
         self.assertEqual(call("/api/v1/matches?limit=500", h=A)[0], 400)
@@ -210,31 +223,54 @@ class Evaluation(unittest.TestCase):
 
     def test_missing_result_handling(self):
         mid = mk_match("MrA", "MrB")
-        s, ml = call("/api/v1/master-list?competition_id=%d" % db().execute("SELECT competition_id FROM matches WHERE id=?", (mid,)).fetchone()[0], h=A)
+        s, ml = call("/api/v1/admin/master-list?competition_id=%d" % db().execute("SELECT competition_id FROM matches WHERE id=?", (mid,)).fetchone()[0], h=A)
         row = [r for r in ml["items"] if r["match_id"] == mid][0]
-        self.assertEqual((row["toss_actual"], row["winner_actual"], row["winner_prediction"]), (None, None, None))
+        self.assertEqual((row["toss"], row["winner"]), (None, None))
 
 class MasterList(unittest.TestCase):
-    def test_toss_winner_mapping_and_codes(self):
+    """Approved meaning: ACTUAL results master, admin only. Toss code green if the toss winner won the match, red if it lost."""
+    def test_results_master_colours_and_admin_only(self):
         call("/api/v1/admin/teams", {"name": "Ultra Blasters", "short_code": "UB"}, A)
         call("/api/v1/admin/teams", {"name": "Eagle Eyes", "short_code": "EE"}, A)
         self.assertEqual(call("/api/v1/admin/teams", {"name": "Other XI", "short_code": "UB"}, A)[0], 409)
-        eid = expert("Map Tipster")
-        mid = mk_match("Ultra Blasters", "Eagle Eyes", comp="Map Cup", days=SOON)
-        h, a = team_ids(mid)
-        predict(mid, "toss", h, eid)
-        predict(mid, "winner", a, eid)
-        time.sleep(SOON_WAIT)
-        call("/api/v1/admin/toss", {"match_id": mid, "winner_team_id": h, "decision": "bowl", "source": "s"}, A)
-        call("/api/v1/admin/results", {"match_id": mid, "result_type": "win", "winner_team_id": h, "source": "s"}, A)
-        cid = db().execute("SELECT competition_id FROM matches WHERE id=?", (mid,)).fetchone()[0]
-        s, ml = call("/api/v1/master-list?competition_id=%d" % cid, h=A)
+        comp = "Results Master Cup"
+        m1 = mk_match("Ultra Blasters", "Eagle Eyes", comp=comp, days=-1, match_no="1")
+        m2 = mk_match("Eagle Eyes", "Ultra Blasters", comp=comp, days=-0.5, match_no="2")
+        m3 = mk_match("Ultra Blasters", "Eagle Eyes", comp=comp, days=-0.2, match_no="3")
+        u1, e1 = team_ids(m1)
+        call("/api/v1/admin/toss", {"match_id": m1, "winner_team_id": u1, "decision": "bat", "source": "s"}, A)
+        call("/api/v1/admin/results", {"match_id": m1, "result_type": "win", "winner_team_id": u1, "source": "s"}, A)   # H-UB green, H-UB green
+        e2, u2 = team_ids(m2)
+        call("/api/v1/admin/toss", {"match_id": m2, "winner_team_id": e2, "decision": "bowl", "source": "s"}, A)
+        call("/api/v1/admin/results", {"match_id": m2, "result_type": "win", "winner_team_id": u2, "source": "s"}, A)   # H-EE red, A-UB green
+        u3, _ = team_ids(m3)
+        call("/api/v1/admin/toss", {"match_id": m3, "winner_team_id": u3, "decision": "bat", "source": "s"}, A)         # no result yet
+        cid = db().execute("SELECT competition_id FROM matches WHERE id=?", (m1,)).fetchone()[0]
+        s, ml = call("/api/v1/admin/master-list?competition_id=%d" % cid, h=A)
         self.assertEqual(ml["columns"], ["Match", "Home", "Away", "Toss", "Winner"])
-        r = ml["items"][0]
-        self.assertEqual((r["home"]["side"], r["home"]["code"], r["away"]["side"], r["away"]["code"]), ("H", "UB", "A", "EE"))
-        self.assertEqual((r["toss_prediction"]["side"], r["toss_prediction"]["code"], r["toss_prediction"]["outcome"]), ("H", "UB", "won"))
-        self.assertEqual((r["winner_prediction"]["side"], r["winner_prediction"]["code"], r["winner_prediction"]["outcome"]), ("A", "EE", "lost"))
-        self.assertEqual((r["winner_actual"]["side"], r["winner_actual"]["code"]), ("H", "UB"))
+        cell = lambda x: x and (x["side"], x["code"], x["outcome"])
+        r1, r2, r3 = ml["items"]
+        self.assertEqual((r1["match"], cell(r1["toss"]), cell(r1["winner"])), ("01", ("H", "UB", "won"), ("H", "UB", "won")))
+        self.assertEqual((r2["home"]["code"], cell(r2["toss"]), cell(r2["winner"])), ("EE", ("H", "EE", "lost"), ("A", "UB", "won")))
+        self.assertEqual((cell(r3["toss"]), r3["winner"]), (("H", "UB", "unknown"), None))
+        # viewers and logged-in users can never read it
+        self.assertEqual(call("/api/v1/admin/master-list")[0], 403)
+        self.assertEqual(call("/api/v1/admin/master-list", h=login("9100000030"))[0], 403)
+        self.assertEqual(call("/api/v1/master-list")[0], 404)
+
+    def test_no_result_and_super_over(self):
+        comp = "NR Cup"
+        m = mk_match("NrA", "NrB", comp=comp, days=-1)
+        h, a = team_ids(m)
+        call("/api/v1/admin/toss", {"match_id": m, "winner_team_id": h, "decision": "bat", "source": "s"}, A)
+        call("/api/v1/admin/results", {"match_id": m, "result_type": "no_result", "source": "s"}, A)
+        m2 = mk_match("NrA", "NrB", comp=comp, days=-0.5)
+        call("/api/v1/admin/toss", {"match_id": m2, "winner_team_id": h, "decision": "bat", "source": "s"}, A)
+        call("/api/v1/admin/results", {"match_id": m2, "result_type": "tie_super_over", "winner_team_id": a, "source": "s"}, A)
+        cid = db().execute("SELECT competition_id FROM matches WHERE id=?", (m,)).fetchone()[0]
+        r1, r2 = call("/api/v1/admin/master-list?competition_id=%d" % cid, h=A)[1]["items"]
+        self.assertEqual((r1["toss"]["outcome"], r1["winner"]), ("unknown", None))
+        self.assertEqual((r2["toss"]["outcome"], r2["winner"]["side"]), ("lost", "A"))
 
     def test_unapproved_code_not_shown(self):
         mid = mk_match("No Code Club", "Other Club", comp="Code Cup")
@@ -284,7 +320,7 @@ class LanguageAndDemo(unittest.TestCase):
         self.assertEqual(call("/api/v1/me/preferences", {"language_code": "xx"}, u, "PUT")[0], 400)
         s, b = call("/api/v1/i18n/te")
         self.assertEqual(b["strings"]["col.toss"], "టాస్")
-        s, b = call("/api/v1/i18n/ta")  # incomplete language falls back to English
+        s, b = call("/api/v1/i18n/ml")  # incomplete language falls back to English
         self.assertEqual(b["strings"]["col.toss"], "Toss")
 
     def test_demo_excluded_from_headline(self):
@@ -292,12 +328,14 @@ class LanguageAndDemo(unittest.TestCase):
         s, r = call("/api/v1/admin/demo-seed", {}, A)
         self.assertEqual(s, 200, r)
         after = call("/api/v1/analytics/accuracy", h=A)[1]["overall"]["settled"]
-        with_demo = call("/api/v1/analytics/accuracy?include_demo=1", h=A)[1]
+        demo = call("/api/v1/analytics/accuracy?dataset=demo", h=A)[1]
         self.assertEqual(before, after)
-        self.assertTrue(with_demo["includes_demo"])
-        self.assertGreater(with_demo["overall"]["settled"], after)
-        ml = call("/api/v1/master-list?include_demo=1", h=A)[1]
-        self.assertTrue(any(r["data_origin"] == "demo" for r in ml["items"]))
+        self.assertEqual(demo["dataset"], "demo")
+        self.assertGreater(demo["overall"]["settled"], 0)
+        verified = call("/api/v1/matches?limit=100")[1]["items"]
+        demo_list = call("/api/v1/matches?limit=100&dataset=demo")[1]["items"]
+        self.assertFalse(any(m["data_origin"] == "demo" for m in verified))
+        self.assertTrue(demo_list and all(m["data_origin"] == "demo" for m in demo_list))
 
 class Legacy(unittest.TestCase):
     def test_legacy_bridge(self):
@@ -306,9 +344,364 @@ class Legacy(unittest.TestCase):
         call("/admin/predictions", {"fixture_id": fid, "toss_pick": "LgA", "winner_pick": "LgB"}, A)
         pid = db().execute("SELECT id FROM legacy_predictions WHERE fixture_id=?", (fid,)).fetchone()[0]
         call("/admin/approve", {"prediction_id": pid}, A)
-        s, ml = call("/api/v1/master-list", h=A)
-        r = [x for x in ml["items"] if x["competition"] == "Legacy Cup"][0]
-        self.assertEqual((r["toss_prediction"]["side"], r["winner_prediction"]["side"]), ("H", "A"))
+        s, reg = call("/api/v1/admin/predictions?limit=100", h=A)
+        mine = {(x["prediction_type"], x["predicted_team"]) for x in reg["items"] if x["home"] == "LgA"}
+        self.assertEqual(mine, {("toss", "LgA"), ("winner", "LgB")})
 
 if __name__ == "__main__":
     unittest.main()
+
+class Privacy(unittest.TestCase):
+    """Owner rule: SH logic (factors, weights, model versions) is visible only to admin."""
+    def test_users_see_outcomes_not_logic(self):
+        mid = mk_match("PvA", "PvB", days=6)
+        self.assertEqual(call("/api/v1/admin/matches/%d/model-prediction" % mid, {}, A)[0], 201)
+        u = login("9100000020")
+        s, sig = call("/api/v1/matches/%d/signals" % mid, h=u)
+        self.assertEqual(s, 200)
+        self.assertNotIn("factors", sig["pre_match"])
+        self.assertNotIn("history_matches_used", sig["pre_match"])
+        self.assertEqual(sig["pre_match"]["model"], "SH AI")
+        self.assertIn("home_win_probability", sig["pre_match"])
+        s, pr = call("/api/v1/matches/%d/predictions" % mid, h=u)
+        self.assertEqual(pr["items"], [])  # locked but not published: invisible to viewers
+        pid = call("/api/v1/admin/predictions?match_id=%d" % mid, h=A)[1]["items"][0]["id"]
+        self.assertEqual(call("/api/v1/admin/predictions/%d/publish" % pid, {"public_note": "SH AI pick"}, A)[0], 200)
+        self.assertEqual(call("/api/v1/admin/predictions/%d/publish" % pid, {}, A)[0], 409)
+        self.assertEqual(sig["pre_match"]["public_factors"][0]["factor"], "Recent form")
+        s, pr = call("/api/v1/matches/%d/predictions" % mid)  # anonymous viewer
+        p = pr["items"][0]
+        self.assertNotIn("factors", p)
+        self.assertNotIn("model_version_id", p)
+        self.assertEqual((p["model"], p["explanation"]), ("SH AI", "SH AI prediction"))
+        raw = json.dumps([sig, pr])
+        self.assertNotIn("sh-baseline", raw)
+        self.assertNotIn("contribution", raw)
+        # admin sees everything
+        s, sig_a = call("/api/v1/matches/%d/signals" % mid, h=A)
+        self.assertEqual(len(sig_a["pre_match"]["factors"]), 4)
+        self.assertIn("factors", call("/api/v1/matches/%d/predictions" % mid, h=A)[1]["items"][0])
+        acc = call("/api/v1/analytics/accuracy", h=u)[1]
+        self.assertEqual(list(acc["by_model"]), ["SH AI"])
+        self.assertEqual(call("/api/v1/admin/model-versions", h=u)[0], 403)
+
+    def test_admin_model_versions_secret_weights(self):
+        bad_ = call("/api/v1/admin/model-versions", {"version": "x1", "params": {"form_weight": 1}}, A)
+        self.assertEqual(bad_[0], 400)
+        params = {"form_window": 8, "form_weight": 2.0, "h2h_weight": 0.5, "home_weight": 0.9, "venue_weight": 0.4, "laplace": 1}
+        s, r = call("/api/v1/admin/model-versions", {"version": "2.0.0-test", "description": "tuned", "params": params}, A)
+        self.assertEqual(s, 201, r)
+        self.assertEqual(call("/api/v1/admin/model-versions", {"version": "2.0.0-test", "params": params}, A)[0], 409)
+        mid = mk_match("MvA", "MvB", days=6)
+        sig = call("/api/v1/matches/%d/signals" % mid, h=A)[1]["pre_match"]
+        self.assertEqual(sig["model"], "sh-baseline 2.0.0-test")
+        home = [f for f in sig["factors"] if f["factor"] == "home_advantage"][0]
+        self.assertEqual(home["contribution"], 0.9)
+        log = call("/api/v1/admin/audit?limit=100", h=A)[1]["items"]
+        self.assertFalse(any("form_weight" in (x["payload"] or "") for x in log if x["action"] == "model.version"))
+
+    def test_admin_key_with_user_session_keeps_preferences(self):
+        u = login("9100000021")
+        h = dict(u, **A)
+        self.assertEqual(call("/api/v1/me/preferences", {"theme": "light"}, h, "PUT")[0], 200)
+        self.assertEqual(call("/api/v1/me/preferences", h=u)[1]["theme"], "light")
+
+class OwnApk(unittest.TestCase):
+    def test_redirect_without_token_and_stream_with_token(self):
+        import apk, io
+        self.assertEqual(apk.resolve(token=""), ("redirect", apk.PUBLIC_URL))
+        seen = []
+        class Resp(io.BytesIO):
+            headers = {}
+        def opener(req, follow=True):
+            seen.append((req.full_url, req.headers.get("Authorization"), follow))
+            if "releases/tags" in req.full_url:
+                return Resp(json.dumps({"assets": [{"name": "sh-prediction.apk", "url": "https://api.github.com/assets/9"}]}).encode())
+            if req.full_url.endswith("/assets/9"):
+                raise urllib.error.HTTPError(req.full_url, 302, "Found", {"Location": "https://objects.example/apk?sig=1"}, None)
+            return Resp(b"APKBYTES")
+        kind, r = apk.resolve(token="t0k", opener=opener)
+        self.assertEqual((kind, r.read()), ("stream", b"APKBYTES"))
+        self.assertEqual(seen[-1][1], None)  # the token is never sent to the storage host
+        self.assertEqual(seen[1][2], False)
+
+class MigrationSafety(unittest.TestCase):
+    def test_no_migration_on_page_load(self):
+        self.assertEqual(PRE_MIGRATION[0], 503)
+        self.assertEqual(PRE_MIGRATION[1]["error"]["code"], "MIGRATION_PENDING")
+
+    def test_backup_verified_and_legacy_kept(self):
+        import shutil, system, schema
+        d = tempfile.mkdtemp()
+        path = d + "/old.sqlite3"
+        c = sqlite3.connect(path)
+        c.executescript("""CREATE TABLE fixtures(id INTEGER PRIMARY KEY,competition TEXT,season TEXT,home TEXT,away TEXT,start_utc TEXT,source TEXT,venue TEXT,match_no TEXT);
+        CREATE TABLE predictions(id INTEGER PRIMARY KEY,fixture_id INTEGER UNIQUE,toss_pick TEXT,winner_pick TEXT,created_at TEXT,status TEXT,approved_at TEXT);
+        CREATE TABLE outcomes(fixture_id INTEGER PRIMARY KEY,toss_winner TEXT,match_winner TEXT,source TEXT,verified_at TEXT,status TEXT,toss_decision TEXT,remarks TEXT);
+        INSERT INTO fixtures VALUES(1,'Old Cup','2026','OA','OB','2026-01-01T10:00:00+00:00','sheet',NULL,'1');
+        INSERT INTO predictions VALUES(1,1,'OA','OB','2025-12-31T10:00:00+00:00','approved','2025-12-31T10:00:00+00:00');
+        INSERT INTO outcomes VALUES(1,'OA','OA','sheet','2026-01-01T15:00:00+00:00','completed','Bat',NULL);""")
+        c.commit(); c.close()
+        old_db = main.DB
+        main.DB = path
+        try:
+            conn = main.db()
+            self.assertEqual(conn.lp, "predictions")                  # classic screens keep working un-migrated
+            _, acc = main.compute(conn)
+            self.assertEqual(acc["toss"]["percent"], 100.0)
+            r = system.run(conn, path)
+            conn.commit()
+            self.assertEqual(r["status"], "migrated", r)
+            self.assertTrue(os.path.exists(r["backup"]["path"]))
+            self.assertTrue(r["checks"]["legacy_predictions_kept"])
+            b = sqlite3.connect(r["backup"]["path"])
+            self.assertEqual(b.execute("SELECT COUNT(*) FROM predictions WHERE fixture_id=1").fetchone()[0], 1)  # backup = pre-migration copy
+            b.close()
+            self.assertEqual(schema.pending(conn), [])
+            self.assertEqual(system.run(conn, path)["status"], "up_to_date")
+            conn.close()
+            conn = main.db()
+            self.assertEqual(main.compute(conn)[1]["toss"]["percent"], 100.0)   # classic accuracy unchanged after migration
+            conn.close()
+        finally:
+            main.DB = old_db
+
+class ViewerIsolation(unittest.TestCase):
+    def test_viewer_cannot_see_private_things(self):
+        eid = expert("Hidden Tipster")
+        mid = mk_match("ViA", "ViB", days=4)
+        h, _ = team_ids(mid)
+        pid = predict(mid, "winner", h, eid)[1]["prediction_id"]
+        draft = call("/api/v1/predictions", {"match_id": mid, "prediction_type": "toss", "predicted_team_id": h, "expert_id": eid, "lock": False}, A)[1]["prediction_id"]
+        u = login("9100000040")
+        for who in ({}, u):
+            self.assertEqual(call("/api/v1/matches/%d/predictions" % mid, h=who)[1]["items"], [])
+            hist = call("/api/v1/experts/%d/history" % eid, h=who)[1]
+            self.assertEqual((hist["items"], hist["summary"]["total_predictions"]), ([], 0))
+            for p in ("/api/v1/admin/master-list", "/api/v1/admin/predictions", "/api/v1/admin/audit", "/api/v1/admin/dashboard",
+                      "/api/v1/admin/users", "/api/v1/admin/settings", "/api/v1/admin/providers", "/api/v1/admin/calibration"):
+                self.assertEqual(call(p, h=who)[0], 403, p)
+            self.assertEqual(call("/api/v1/admin/predictions/%d/publish" % pid, {}, who)[0], 403)
+        self.assertEqual(call("/api/v1/admin/predictions/%d/publish" % draft, {}, A)[1]["error"]["code"], "NOT_LOCKED")
+        call("/api/v1/admin/predictions/%d/publish" % pid, {}, A)
+        self.assertEqual(len(call("/api/v1/matches/%d/predictions" % mid)[1]["items"]), 1)
+        self.assertEqual(call("/api/v1/admin/predictions/%d/unpublish" % pid, {}, A)[0], 400)   # reason required
+        self.assertEqual(call("/api/v1/admin/predictions/%d/unpublish" % pid, {"reason": "test"}, A)[0], 200)
+        self.assertEqual(call("/api/v1/matches/%d/predictions" % mid)[1]["items"], [])
+
+    def test_publication_cannot_bypass_lock_in_db(self):
+        mid = mk_match("PbA", "PbB", days=4)
+        h, _ = team_ids(mid)
+        eid = expert("Db Tipster")
+        draft = call("/api/v1/predictions", {"match_id": mid, "prediction_type": "toss", "predicted_team_id": h, "expert_id": eid, "lock": False}, A)[1]["prediction_id"]
+        c = db()
+        with self.assertRaises(sqlite3.DatabaseError):
+            c.execute("INSERT INTO prediction_publications(prediction_id,published_at,published_by) VALUES(?,?,?)", (draft, "x", "x"))
+        c.close()
+
+class Engines(unittest.TestCase):
+    def test_over_projection_and_phases(self):
+        p = engine.over_projection("T20", 50, 1, 36, actual_overs={1: 8, 2: 9, 3: 10, 4: 7, 5: 8, 6: 8})
+        self.assertEqual(len(p["overs"]), 20)
+        self.assertEqual([x["status"] for x in p["phases"]], ["completed", "projected", "projected"])
+        self.assertEqual(p["phases"][0]["runs"], 50)
+        self.assertGreater(p["projected_total"], 50)
+        self.assertLess(engine.wicket_impact("T20", 2, 120, 5, 96, 160)["next_wicket_swing"], 0)
+
+    def test_calibration_backtest(self):
+        comp = "Backtest Cup"
+        for i in range(6):
+            m = mk_match("BtA", "BtB", comp=comp, days=-30 + i)
+            h, a = team_ids(m)
+            call("/api/v1/admin/results", {"match_id": m, "result_type": "win", "winner_team_id": h if i % 3 else a, "source": "s"}, A)
+        s, r = call("/api/v1/admin/calibration", h=A)
+        self.assertEqual(s, 200)
+        self.assertGreaterEqual(r["matches_evaluated"], 5)
+        self.assertTrue(0 <= r["brier_score"] <= 1)
+        self.assertIn("not evidence of skill", r["note"])
+
+    def test_match_centre_sections(self):
+        mid = mk_match("McA", "McB", days=-0.01, format="T10")
+        h, a = team_ids(mid)
+        seq = 0
+        for x in (4, 1, "W", 6, 0, 2, "W", 1):
+            seq += 1
+            b = {"match_id": mid, "innings_no": 1, "batting_team_id": h, "seq": seq}
+            b.update({"is_wicket": 1, "wicket_kind": "caught"} if x == "W" else {"runs_bat": x})
+            call("/api/v1/admin/ball-events", b, A)
+        g = call("/api/v1/matches/%d/graphs" % mid)[1]["innings"][0]
+        self.assertEqual(g["worm"], [13, 14])  # over 1: 4+1+0+6+0+2, over 2: W then 1
+        fow = call("/api/v1/matches/%d/fall-of-wickets" % mid)[1]["innings"][0]["fall_of_wickets"]
+        self.assertEqual([(w["wicket"], w["score"]) for w in fow], [(1, 5), (2, 13)])
+        parts = call("/api/v1/matches/%d/partnerships" % mid)[1]["innings"][0]["partnerships"]
+        self.assertEqual([(p["runs"], p["wicket"]) for p in parts], [(5, 1), (8, 2), (1, 3)])
+        sig = call("/api/v1/matches/%d/signals" % mid)[1]
+        self.assertIn("over_by_over", sig)
+        self.assertIn("next_wicket_swing", sig["wicket_impact"])
+        self.assertFalse(call("/api/v1/matches/%d/result" % mid)[1]["available"])
+        call("/api/v1/admin/results", {"match_id": mid, "result_type": "win", "winner_team_id": h, "margin": "12 runs", "source": "s"}, A)
+        self.assertEqual(call("/api/v1/matches/%d/result" % mid)[1]["summary"], "McA won")
+
+class Fantasy(unittest.TestCase):
+    def setUp(self):
+        Fantasy.n = getattr(Fantasy, "n", 0) + 1
+        self.mid = mk_match("FnA", "FnB", days=3, format="T20", comp="Fantasy Cup %d" % Fantasy.n)
+        self.h, self.a = team_ids(self.mid)
+        roles = ["wicket_keeper", "batter", "batter", "batter", "all_rounder", "all_rounder", "bowler", "bowler", "bowler", "bowler", "batter"]
+        self.ids = {self.h: [], self.a: []}
+        for t in (self.h, self.a):
+            for i, r in enumerate(roles):
+                pid = call("/api/v1/admin/players", {"name": "FP%d-%d" % (t, i), "role": r}, A)[1]["player_id"]
+                self.ids[t].append(pid)
+                if i < 6:
+                    call("/api/v1/admin/player-stats", {"player_id": pid, "format": "T20", "matches": 20, "runs": 300 + 40 * i, "batting_avg": 25,
+                                                        "strike_rate": 130, "wickets": 5 * (i % 3), "economy": 8.0, "source": "SH sample"}, A)
+
+    def test_unavailable_until_squad_then_provisional_then_confirmed(self):
+        self.assertFalse(call("/api/v1/matches/%d/fantasy" % self.mid)[1]["available"])
+        for t in (self.h, self.a):
+            call("/api/v1/admin/matches/%d/squad" % self.mid, {"team_id": t, "players": [{"player_id": p} for p in self.ids[t]]}, A)
+        r = call("/api/v1/matches/%d/fantasy" % self.mid)[1]
+        self.assertEqual((r["available"], r["availability"]), (True, "provisional"))
+        for t in (self.h, self.a):
+            call("/api/v1/admin/matches/%d/playing-xi" % self.mid, {"team_id": t, "players": [{"player_id": p} for p in self.ids[t]]}, A)
+        r = call("/api/v1/matches/%d/fantasy" % self.mid)[1]
+        self.assertEqual(r["availability"], "confirmed")
+        for team in r["teams"]:
+            ps = team["players"]
+            self.assertEqual(len(ps), 11)
+            self.assertLessEqual(max(sum(1 for p in ps if p["team_id"] == t) for t in (self.h, self.a)), 7)
+            roles = [p["role"] for p in ps]
+            self.assertTrue(1 <= roles.count("wicket_keeper") <= 4 and 3 <= roles.count("bowler") <= 6)
+            self.assertNotEqual(team["captain"]["player_id"], team["vice_captain"]["player_id"])
+            self.assertIn(team["risk"], ("low", "medium", "high"))
+        labels = [t["label"] for t in r["teams"]]
+        self.assertIn("Safe", labels)
+        s, st = call("/api/v1/admin/matches/%d/fantasy" % self.mid, {}, A)
+        self.assertEqual(s, 200)
+        self.assertGreaterEqual(len(call("/api/v1/matches/%d/fantasy-history" % self.mid)[1]["items"]), 1)
+
+    def test_configurable_rules(self):
+        bad_rules = {"team_size": 11, "max_per_team": 7, "roles": {"batter": [1, 2]}, "captain_multiplier": 2, "vice_captain_multiplier": 1.5}
+        self.assertEqual(call("/api/v1/admin/fantasy/rules", {"name": "Broken", "rules": bad_rules}, A)[0], 400)
+        ok = {"team_size": 11, "max_per_team": 10, "roles": {"wicket_keeper": [1, 1], "batter": [4, 5], "all_rounder": [1, 3], "bowler": [3, 5]},
+              "captain_multiplier": 2, "vice_captain_multiplier": 1.5}
+        self.assertEqual(call("/api/v1/admin/fantasy/rules", {"name": "Strict Keeper", "rules": ok}, A)[0], 200)
+        for t in (self.h, self.a):
+            call("/api/v1/admin/matches/%d/playing-xi" % self.mid, {"team_id": t, "players": [{"player_id": p} for p in self.ids[t]]}, A)
+        r = call("/api/v1/matches/%d/fantasy?rule_set=Strict%%20Keeper" % self.mid)[1]
+        self.assertEqual(r["rule_set"], "Strict Keeper")
+        self.assertTrue(all([p["role"] for p in t["players"]].count("wicket_keeper") == 1 for t in r["teams"]))
+
+class Assistant(unittest.TestCase):
+    def test_grounded_and_honest(self):
+        r = call("/api/v1/assistant", {"question": "What is the LBW law?"})[1]
+        self.assertTrue(r["grounded"])
+        self.assertIn("Law 36", r["answer"])
+        r = call("/api/v1/assistant", {"question": "Who is the best player on Mars?"})[1]
+        self.assertFalse(r["grounded"])
+        self.assertIn("don't have verified data", r["answer"])
+        call("/api/v1/admin/teams", {"name": "Assist Lions", "short_code": "ASL"}, A)
+        call("/api/v1/admin/teams", {"name": "Assist Tigers", "short_code": "AST"}, A)
+        m = mk_match("Assist Lions", "Assist Tigers", days=-2, comp="Assist Cup")
+        h, a = team_ids(m)
+        call("/api/v1/admin/results", {"match_id": m, "result_type": "win", "winner_team_id": h, "source": "s"}, A)
+        r = call("/api/v1/assistant", {"question": "ASL vs AST head to head"})[1]
+        self.assertIn("Assist Lions (ASL) won 1", r["answer"])
+        self.assertEqual(call("/api/v1/assistant", {"question": "x"})[0], 400)
+
+class DataGateway(unittest.TestCase):
+    def test_contract_and_provider_sync(self):
+        import gateway
+        for p in ("/api/v1/data/fixtures", "/api/v1/data/results", "/api/v1/data/live", "/api/v1/data/history"):
+            s, r = call(p)
+            self.assertEqual(s, 200, p)
+            self.assertTrue(all(x["data_origin"] != "demo" for x in r["items"]))
+        s, r = call("/api/v1/admin/providers/demo/sync", {}, A)
+        self.assertEqual((s, r["status"], r["rejected"]), (200, "ok", 0))
+        s, r2 = call("/api/v1/admin/providers/demo/sync", {}, A)
+        self.assertEqual((r2["created"], r2["duplicates"]), (0, r["created"] + r["duplicates"]))
+        demo = call("/api/v1/data/fixtures?dataset=demo")[1]["items"]
+        self.assertTrue(any(x["match_no"] == "G1" for x in demo))
+        self.assertEqual(call("/api/v1/admin/providers/licensed_feed/sync", {}, A)[1]["error"]["code"], "DISABLED")
+        self.assertEqual(call("/api/v1/admin/providers/licensed_feed", {"enabled": True}, A)[1]["error"]["code"], "NOT_CONFIGURED")
+        self.assertEqual(call("/api/v1/admin/providers/licensed_feed", {"config": {"api_key": "x"}}, A)[0], 400)
+        self.assertEqual(gateway.validate({"provider_id": "1", "competition": "c", "home": "a", "away": "b", "start_utc": "2030-01-01T10:00:00", "source": "s"}),
+                         "start_utc needs a timezone")
+
+    def test_retry_then_fail_recorded(self):
+        import gateway
+        calls = []
+        class Flaky(gateway.ProviderAdapter):
+            name, kind = "manual", "manual"
+            def fetch_fixtures(self):
+                calls.append(1)
+                raise RuntimeError("timeout")
+        c = main.db()
+        try:
+            r = gateway.sync(c, "manual", lambda row: {"status": "created"}, adapter=Flaky(), retries=3, backoff=0)
+            self.assertEqual((r["status"], r["attempts"], len(calls)), ("failed", 3, 3))
+        finally:
+            c.rollback(); c.close()
+
+    def test_stats_endpoints(self):
+        mid = mk_match("StA", "StB", days=-3)
+        h, _ = team_ids(mid)
+        call("/api/v1/admin/results", {"match_id": mid, "result_type": "win", "winner_team_id": h, "source": "s"}, A)
+        self.assertEqual(call("/api/v1/data/teams/%d/stats" % h)[1]["won"], 1)
+        vid = db().execute("SELECT venue_id FROM matches WHERE id=?", (mid,)).fetchone()[0]
+        self.assertEqual(call("/api/v1/data/venues/%d/stats" % vid)[0], 200)
+        self.assertEqual(call("/api/v1/data/players/999999/stats")[0], 404)
+
+class AdminOps(unittest.TestCase):
+    def test_csv_import_dry_run_then_commit(self):
+        csv_text = ("competition,season,match_no,home,away,start_utc,venue,format,source,toss_winner,toss_decision,result_type,winner\n"
+                    "Import Cup,2026,1,Imp A,Imp B,2026-03-01T10:00:00+00:00,Imp Ground,T20,manual scorer sheet,Imp A,bat,win,Imp B\n"
+                    "Import Cup,2026,2,Imp B,Imp A,2026-03-02T10:00:00+00:00,Imp Ground,T20,manual scorer sheet,,,,\n"
+                    "Import Cup,2026,3,Imp B,Imp B,2026-03-03T10:00:00+00:00,Imp Ground,T20,manual scorer sheet,,,,\n")
+        s, dry = call("/api/v1/admin/import", {"csv": csv_text}, A)
+        self.assertEqual((s, dry["committed"], dry["created"], dry["results"], len(dry["errors"])), (200, False, 2, 1, 1))
+        self.assertEqual(db().execute("SELECT COUNT(*) FROM matches m JOIN competitions c ON c.id=m.competition_id WHERE c.name='Import Cup'").fetchone()[0], 0)
+        s, real = call("/api/v1/admin/import", {"csv": csv_text, "commit": True}, A)
+        self.assertEqual((real["created"], real["results"]), (2, 1))
+        again = call("/api/v1/admin/import", {"csv": csv_text, "commit": True}, A)[1]
+        self.assertEqual((again["created"], again["duplicates"]), (0, 2))
+        cid = db().execute("SELECT id FROM competitions WHERE name='Import Cup'").fetchone()[0]
+        r = call("/api/v1/admin/master-list?competition_id=%d" % cid, h=A)[1]["items"][0]
+        self.assertEqual((r["toss"]["code"] or r["toss"]["name"], r["toss"]["outcome"], r["winner"]["side"]), ("Imp A", "lost", "A"))
+
+    def test_edit_match_guarded(self):
+        eid = expert("Edit Tipster")
+        mid = mk_match("EdA", "EdB", days=4)
+        h, _ = team_ids(mid)
+        predict(mid, "winner", h, eid)
+        self.assertEqual(call("/api/v1/admin/matches/%d" % mid, {"start_utc": iso(5)}, A)[1]["error"]["code"], "HAS_LOCKED_PREDICTIONS")
+        self.assertEqual(call("/api/v1/admin/matches/%d" % mid, {"weather": "Clear, 31°C", "pitch_report": "Dry, good for spin"}, A)[0], 200)
+        self.assertEqual(call("/api/v1/matches/%d" % mid)[1]["weather"], "Clear, 31°C")
+        self.assertEqual(call("/api/v1/admin/matches/%d" % mid, {"status": "completed"}, A)[0], 400)
+
+    def test_roles_settings_dashboard(self):
+        call("/api/v1/me/preferences", h=login("9100000050"))
+        users = call("/api/v1/admin/users?limit=100", h=A)[1]["items"]
+        uid = users[0]["id"]
+        self.assertNotIn("9100000050", json.dumps(users))  # phone numbers masked
+        self.assertEqual(call("/api/v1/admin/users/%d/role" % uid, {"role": "admin"}, A)[0], 400)
+        self.assertEqual(call("/api/v1/admin/users/%d/role" % uid, {"role": "expert"}, A)[1]["role"], "expert")
+        self.assertEqual(call("/api/v1/admin/settings", {"default_language": "te"}, A)[0], 200)
+        self.assertEqual(call("/api/v1/admin/settings", {"default_language": "zz"}, A)[0], 400)
+        d = call("/api/v1/admin/dashboard", h=A)[1]
+        self.assertIn("locked_unpublished", d["predictions"])
+        self.assertEqual(d["pending_migrations"], [])
+
+class Languages(unittest.TestCase):
+    def test_coverage_is_honest(self):
+        langs = {l["code"]: l for l in call("/api/v1/languages")[1]["items"]}
+        self.assertEqual(langs["en"]["coverage_percent"], 100)
+        for code in ("te", "hi"):
+            self.assertEqual(langs[code]["coverage_percent"], 100, code)
+        for code, l in langs.items():
+            b = call("/api/v1/i18n/" + code)[1]
+            self.assertEqual(b["ui_complete"], l["coverage_percent"] == 100)
+            if not b["ui_complete"]:
+                self.assertIsNotNone(b["fallback_note"])
+        self.assertGreaterEqual(sum(1 for l in langs.values() if l["coverage_percent"] == 100), 6)

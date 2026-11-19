@@ -17,7 +17,8 @@ class T(unittest.TestCase):
  def test_data_needs_login(self):self.assertEqual(call("/fixtures")[0],403)
  def test_user_cannot_use_admin(self):
   tok=login("9000000001");h={"Authorization":"Bearer "+tok}
-  self.assertEqual(call("/fixtures",h=h)[0],200)
+  self.assertEqual(call("/fixtures",h=h)[0],403)  # v0 register data is admin-only now
+  self.assertEqual(call("/fixtures",h={"X-Admin-Token":"adm-test-token"})[0],200)
   self.assertEqual(call("/admin/fixtures",{"competition":"x","season":"1","home":"A","away":"B","start_utc":"2030-01-01T00:00:00Z","source":"s"},h)[0],403)
   self.assertEqual(call("/admin/drafts",h=h)[0],403)
  def test_admin_flow(self):
@@ -54,18 +55,18 @@ class Acc(unittest.TestCase):
   f2=fx("P2","Q2","Acc Cup");predict(f2,"Q2","Q2");call("/admin/outcomes",{"fixture_id":f2,"toss_winner":"P2","match_winner":"Q2","source":"m"},A)                       # toss wrong, winner correct
   f3=fx("P3","Q3","Acc Cup");predict(f3,"P3","P3")                                                                                                                   # pending
   f4=fx("P4","Q4","Acc Cup");predict(f4,"P4","P4");call("/admin/outcomes",{"fixture_id":f4,"match_winner":None,"source":"m","status":"abandoned"},A)                # void
-  s,acc=call("/accuracy",h=h);self.assertEqual(s,200)
+  s,acc=call("/accuracy",h=A);self.assertEqual(s,200)
   t,w=acc["by_competition"]["Acc Cup"]["toss"],acc["by_competition"]["Acc Cup"]["winner"]
   self.assertEqual((t["correct"],t["wrong"],t["pending"],t["void"],t["total"],t["percent"]),(1,1,1,1,2,50.0))
   self.assertEqual((w["correct"],w["wrong"],w["pending"],w["void"],w["total"],w["percent"]),(1,1,1,1,2,50.0))
   self.assertEqual(acc["toss"]["total"],acc["toss"]["correct"]+acc["toss"]["wrong"])
-  s,reg=call("/register",h=h);row=[r for r in reg if r["match_id"]==f1][0]
+  s,reg=call("/register",h=A);row=[r for r in reg if r["match_id"]==f1][0]
   self.assertEqual((row["toss_result"],row["winner_result"],row["toss_decision"],row["venue"]),("Correct","Wrong","Bat","Test Ground"))
  def test_late_prediction_excluded(self):
   f=fx("L1","L2")
   c=sqlite3.connect(os.environ["SH_PREDICTION_DB"],timeout=10);c.execute("INSERT INTO legacy_predictions(fixture_id,toss_pick,winner_pick,created_at,status,approved_at) VALUES(?,?,?,?,?,?)",(f,"L1","L1","2031-01-02T00:00:00+00:00","approved","2031-01-02T00:00:00+00:00"));c.commit();c.close()
   call("/admin/outcomes",{"fixture_id":f,"toss_winner":"L1","match_winner":"L1","source":"m"},A)
-  s,reg=call("/register",h={"Authorization":"Bearer "+login("9000000003")});r=[x for x in reg if x["match_id"]==f][0]
+  s,reg=call("/register",h=A);r=[x for x in reg if x["match_id"]==f][0]
   self.assertEqual((r["toss_result"],r["winner_result"]),("Ineligible","Ineligible"))
  def test_approved_prediction_immutable(self):
   f=fx("I1","I2");pid=predict(f,"I1","I1")
