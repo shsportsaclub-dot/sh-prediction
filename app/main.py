@@ -5,7 +5,7 @@ from pathlib import Path
 from screen_login import generate,verify,authorized,logout
 import api_v1,apk,live,media,social,re
 DB=os.getenv("SH_PREDICTION_DB","data/prediction.sqlite3")
-TOKEN=os.getenv("SH_PREDICTION_ADMIN_TOKEN","")
+TOKEN=os.getenv("SH_PREDICTION_ADMIN_TOKEN","").strip()
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 class LegacyConn(sqlite3.Connection):
  lp="legacy_predictions"
@@ -190,7 +190,7 @@ class H(BaseHTTPRequestHandler):
    b=(Path(__file__).parent/"sh-prediction-icon.png").read_bytes();self.send_response(200);self.send_header("Content-Type","image/png");self.send_header("Cache-Control","public, max-age=86400");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/icon.svg":
    b=(Path(__file__).parent/"icon.svg").read_bytes();self.send_response(200);self.send_header("Content-Type","image/svg+xml");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
-  if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION"})
+  if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION","admin_key_configured":bool(TOKEN),"admin_key_length":len(TOKEN)})
   # v0 data endpoints hold the original prediction register: admin only (master script: viewers never see it)
   if not self.admin_ok():return self.sendj(403,{"error":"admin token required"})
   with db() as c:

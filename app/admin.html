@@ -164,7 +164,7 @@ async settings(el){const [s,sys,fr]=await Promise.all([api("/admin/settings"),ap
 };
 function login(){$("#nav").innerHTML="";$("#lock").hidden=true;
  $("#view").innerHTML='<div class="card" style="max-width:420px;margin:40px auto"><h2>Admin sign-in</h2><p class="muted">The admin key is kept only while this tab is open. It is never saved on the device.</p><input id="k" type="password" autocomplete="off" style="width:100%" aria-label="Admin key"><p><button class="p" id="kgo">Unlock</button></p></div>';
- $("#kgo").onclick=async()=>{KEY=$("#k").value.trim();try{await api("/admin/system/status");try{sessionStorage.setItem("shp_admin",KEY)}catch(e){}route()}catch(e){KEY="";msg("Wrong admin key",false)}}}
+ $("#kgo").onclick=async()=>{KEY=$("#k").value.trim();try{await api("/admin/system/status");try{sessionStorage.setItem("shp_admin",KEY)}catch(e){}route()}catch(e){KEY="";msg(/403|401|token/i.test(e.message)?"Wrong admin key ("+esc(e.message)+")":"Server error: "+esc(e.message),false)}}}
 async function route(){if(!KEY)return login();$("#lock").hidden=false;
  let sys;try{sys=await api("/admin/system/status")}catch(e){KEY="";return login()}
  let sec=(location.hash||"#dashboard").slice(1);if(sys.pending.length)sec="settings";if(!V[sec])sec="dashboard";
