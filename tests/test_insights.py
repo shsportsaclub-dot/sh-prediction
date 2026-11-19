@@ -163,3 +163,45 @@ class InsightParts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TipsterDesk(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def test_desk_picks_change_and_private_sheet(self):
+        H = T.account("desk_tipster_1")
+        c = T.db(); uid = c.execute("SELECT user_id FROM accounts WHERE username='desk_tipster_1'").fetchone()[0]; c.close()
+        self.assertEqual(T.call("/api/v1/me/tipster/series", h=H)[0], 403)                 # not a tipster yet
+        T.call("/api/v1/me/tipster-application", {}, H)
+        T.call("/api/v1/admin/social/moderate", {"action": "approve_tipster", "target_type": "user", "target_id": uid, "reason": "test"}, T.A)
+        mid = T.mk_match("DkA", "DkB", days=1, comp="Desk Cup 2026")
+        T.mk_match("DkC", "DkD", days=2, comp="Desk Cup 2026")
+        h, a = T.team_ids(mid)
+        ser = T.call("/api/v1/me/tipster/series", h=H)[1]["items"]
+        cid = next(s["id"] for s in ser if s["name"] == "Desk Cup 2026")
+        s, p = T.call("/api/v1/social/posts", {"kind": "toss_prediction", "prediction_type": "toss", "predicted_team_id": h, "match_id": mid, "body": ""}, H)
+        self.assertEqual(s, 201, p)
+        T.call("/api/v1/social/posts", {"kind": "prediction", "prediction_type": "winner", "predicted_team_id": a, "match_id": mid, "body": ""}, H)
+        b = T.call("/api/v1/me/tipster/board?competition_id=%d" % cid, h=H)[1]
+        m = next(x for x in b["matches"] if x["id"] == mid)
+        self.assertEqual((m["picks"]["toss"]["team_id"], m["picks"]["winner"]["team_id"], len(b["matches"])), (h, a, 2))
+        self.assertTrue(0 < m["picks"]["toss"]["changeable_seconds"] <= 300)
+        s, r = T.call("/api/v1/predictions/%d/change" % m["picks"]["toss"]["prediction_id"], {"predicted_team_id": a}, H)
+        self.assertEqual(s, 200, r)
+        b = T.call("/api/v1/me/tipster/board?competition_id=%d" % cid, h=H)[1]
+        self.assertEqual(next(x for x in b["matches"] if x["id"] == mid)["picks"]["toss"]["team_id"], a)
+        L = T.call("/api/v1/me/tipster/link", h=H)[1]
+        import urllib.request
+        csv_text = urllib.request.urlopen(T.B + L["csv"] + "?competition_id=%d" % cid).read().decode()
+        lines = csv_text.strip().splitlines()
+        self.assertEqual(lines[0], "Desk Cup 2026")
+        self.assertTrue(lines[1].startswith("Match,Date,Time (UTC),Home,Away,Venue,Toss,Decision,My toss pick"))
+        self.assertIn("A-DkB", lines[2])
+        x = urllib.request.urlopen(T.B + L["xlsx"]).read()
+        self.assertEqual(x[:2], b"PK")                                                     # a real .xlsx
+        L2 = T.call("/api/v1/me/tipster/link", {"reset": True}, H)[1]
+        self.assertNotEqual(L2["csv"], L["csv"])
+        with self.assertRaises(urllib.error.HTTPError):
+            urllib.request.urlopen(T.B + L["csv"])                                         # old link stops working

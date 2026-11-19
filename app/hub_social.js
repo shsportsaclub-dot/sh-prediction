@@ -85,7 +85,7 @@ async compose(el){if(needLogin())return;
   if(kind==="photo")X.innerHTML='<input id="pf" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin:8px 0;width:100%">';
   else if(kind==="video"||kind==="reel")X.innerHTML='<input id="pf" type="file" accept="video/mp4,video/quicktime,video/webm" style="margin:8px 0;width:100%"><p class="muted">'+(kind==="reel"?"9:16 vertical, up to 90 s":"up to 180 s")+'. Only upload videos you own or have permission to use.</p>';
   else if(kind==="poll")X.innerHTML='<input class="po" placeholder="Option 1" style="width:100%;margin:4px 0"><input class="po" placeholder="Option 2" style="width:100%;margin:4px 0"><input class="po" placeholder="Option 3 (optional)" style="width:100%;margin:4px 0">';
-  else if(kind==="prediction")X.innerHTML='<p class="muted">'+esc(t("ins.pick_rule"))+'</p><select id="pt" style="width:100%;margin:4px 0"><option value="winner">'+esc(t("col.winner"))+'</option><option value="toss">'+esc(t("col.toss"))+'</option></select><select id="pk" style="width:100%;margin:4px 0"><option value="">'+esc(t("so.tag_match"))+'</option></select><input id="pc" type="number" min="0" max="100" placeholder="'+esc(t("ai.confidence"))+' %" style="width:100%;margin:4px 0">';
+  else if(kind==="prediction")X.innerHTML='<p class="muted">'+esc(t("ins.pick_rule"))+' <a href="#/tipster">📋 '+esc(t("td.title"))+' ›</a></p><select id="pt" style="width:100%;margin:4px 0"><option value="winner">'+esc(t("col.winner"))+'</option><option value="toss">'+esc(t("col.toss"))+'</option></select><select id="pk" style="width:100%;margin:4px 0"><option value="">'+esc(t("so.tag_match"))+'</option></select><input id="pc" type="number" min="0" max="100" placeholder="'+esc(t("ai.confidence"))+' %" style="width:100%;margin:4px 0">';
   else X.innerHTML="";
   if(kind==="prediction")$("#pm").onchange=()=>{const m=all.find(x=>x.id==$("#pm").value);$("#pk").innerHTML=m?'<option value="'+m.home.id+'">H · '+esc(m.home.name)+'</option><option value="'+m.away.id+'">A · '+esc(m.away.name)+'</option>':''}};
  drawK();extra();
@@ -195,3 +195,38 @@ function changePanel(el,pid,m,cur,postId){const until=Date.now()+5*60*1000;
    '<p id="cmsg" class="muted" role="status"></p><a class="btn primary" href="#/post/'+postId+'">'+esc(t("ins.view"))+' ›</a></div>';
   el.querySelectorAll("[data-tm]").forEach(b=>b.onclick=async()=>{try{const r=await api("/predictions/"+pid+"/change",{method:"POST",body:JSON.stringify({predicted_team_id:+b.dataset.tm})});pid=r.prediction_id;cur=+b.dataset.tm;draw()}catch(e){$("#cmsg").textContent=e.message}})};
  draw();const iv=setInterval(()=>{if(!document.body.contains(el)||location.hash.indexOf("compose")<0){clearInterval(iv);return}if(Date.now()>until+1000){clearInterval(iv)}draw()},1000)}
+
+/* ---------------- SH Tipster desk: the whole series schedule with toss and winner picks (owner's sheet layout) */
+SCREENS.tipster=async function(el,cidArg){if(needLogin())return;
+ el.innerHTML='<h2>'+esc(t("td.title"))+'</h2><div id="tds" class="chips"></div><div id="tdb">'+loading()+'</div>';
+ let ser;try{ser=await api("/me/tipster/series")}catch(e){$("#tdb").innerHTML='<div class="state">'+esc(e.message)+'</div><p><a class="btn primary" href="#/me">'+esc(t("td.apply"))+'</a></p>';return}
+ const cid=cidArg||sessionStorage.getItem("shp_tdc")||"";
+ $("#tds").innerHTML=ser.items.map(s=>'<a class="btn'+(String(s.id)===String(cid)?" on":"")+'" href="#/tipster/'+s.id+'">'+esc(s.name)+(s.open_matches?' <small>('+s.open_matches+')</small>':'')+'</a>').join("")||'';
+ let b;try{b=await api("/me/tipster/board"+(cid?"?competition_id="+cid:""))}catch(e){$("#tdb").innerHTML='<div class="state">'+esc(e.message)+'</div>';return}
+ if(!b.series){$("#tdb").innerHTML='<div class="state">'+esc(t("td.no_series"))+'</div>';return}
+ sessionStorage.setItem("shp_tdc",b.series.id);if(!cid){const a=$("#tds").querySelector('[href="#/tipster/'+b.series.id+'"]');if(a)a.classList.add("on")}
+ const L=await api("/me/tipster/link").catch(()=>null),base=location.origin;
+ const tm=(x,id)=>x.id===id;const nm=(m,id)=>id===m.home.id?m.home.name:id===m.away.id?m.away.name:"";
+ const res=r=>r==="correct"?'<b style="color:#58c04a">✓</b>':r==="incorrect"?'<b style="color:#ef6a6a">✗</b>':'<span class="muted">'+esc(r)+'</span>';
+ const pickRow=(m,kind,can)=>{const p=m.picks[kind];const open=can&&(!p||p.changeable_seconds>0);
+  return '<div class="td-pk"><span class="muted">'+esc(t(kind==="toss"?"ins.pt_toss":"ins.pt_winner"))+'</span>'+
+   (open?'<span class="td-btns">'+[m.home,m.away].map(x=>'<button data-m="'+m.id+'" data-k="'+kind+'" data-t="'+x.id+'"'+(p?' data-p="'+p.prediction_id+'"':'')+' class="'+(p&&p.team_id===x.id?"on":"")+'">'+esc(x.name)+'</button>').join("")+'</span>'+(p?'<small class="muted" data-cd="'+(Date.now()+p.changeable_seconds*1000)+'"></small>':'')
+    :(p?'<b>'+esc(nm(m,p.team_id))+'</b> '+res(p.result)+' <small class="muted">'+esc(p.timing)+'</small>':'<span class="muted">'+esc(t(m.status==="scheduled"?"td.closed":"td.no_pick"))+'</span>'))+'</div>'};
+ const rows=b.matches.map((m,i)=>'<div class="mcard"><div class="mh">'+esc(m.match_no?("Match "+m.match_no):("#"+(i+1)))+' · '+esc(new Date(m.start_utc).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+(m.venue?' · '+esc(m.venue):'')+' · <span class="tag">'+esc(m.status)+'</span></div>'+
+  '<a href="#/match/'+m.id+'"><b>'+esc(m.home.name)+'</b> <span class="muted">vs</span> <b>'+esc(m.away.name)+'</b></a>'+
+  (m.toss?'<div class="muted">'+esc(t("ins.pt_toss"))+': '+esc(nm(m,m.toss.team_id))+(m.toss.decision?' · '+esc(m.toss.decision):'')+'</div>':'')+
+  (m.result?'<div><b style="color:#f6d77a">'+esc(m.result.winner_id?nm(m,m.result.winner_id)+" won"+(m.result.margin?" by "+m.result.margin:""):m.result.type)+'</b></div>':'')+
+  pickRow(m,"toss",m.can_pick_toss)+pickRow(m,"winner",m.can_pick_winner)+(m.picks.live_winner?'<div class="td-pk"><span class="muted">'+esc(t("ins.update"))+'</span><b>'+esc(nm(m,m.picks.live_winner.team_id))+'</b></div>':'')+'</div>').join("");
+ const S=b.summary;
+ $("#tdb").innerHTML='<div class="mcard dl"><span><b>'+esc(b.series.name)+'</b><div class="muted">'+S.picks+' '+esc(t("td.picks"))+' · '+S.correct+'/'+S.settled+' '+esc(t("td.correct"))+'</div></span>'+
+  (L?'<a class="btn" href="'+esc(L.xlsx)+'">⬇ Excel</a>':'')+'</div>'+
+  (L?'<details class="gx"><summary>'+esc(t("td.google_sheet"))+'</summary><p class="muted">'+esc(t("td.google_help"))+'</p><input readonly style="width:100%" value=\'=IMPORTDATA("'+esc(base+L.csv+"?competition_id="+b.series.id)+'")\' onclick="this.select()"><p><button class="btn" id="tdcp">'+esc(t("td.copy"))+'</button> <button class="btn" id="tdrs">'+esc(t("td.reset"))+'</button></p></details>':'')+
+  '<p class="muted">'+esc(b.rule)+'</p>'+(rows||'<div class="state">—</div>');
+ const cp=$("#tdcp");if(cp)cp.onclick=()=>{const i=$("#tdb input");i.select();try{navigator.clipboard.writeText(i.value)}catch(e){document.execCommand("copy")}cp.textContent="✓"};
+ const rs=$("#tdrs");if(rs)rs.onclick=async()=>{await api("/me/tipster/link",{method:"POST",body:JSON.stringify({reset:true})});route()};
+ el.querySelectorAll(".td-btns button").forEach(x=>x.onclick=async()=>{x.disabled=true;
+  try{if(x.dataset.p)await api("/predictions/"+x.dataset.p+"/change",{method:"POST",body:JSON.stringify({predicted_team_id:+x.dataset.t})});
+   else await api("/social/posts",{method:"POST",body:JSON.stringify({kind:x.dataset.k==="toss"?"toss_prediction":"prediction",prediction_type:x.dataset.k,predicted_team_id:+x.dataset.t,match_id:+x.dataset.m,body:""})});
+   route()}catch(e){alert(e.message);x.disabled=false}});
+ const tick=()=>{if(!document.body.contains(el))return;let any=false;el.querySelectorAll("[data-cd]").forEach(s=>{const left=Math.max(0,Math.round((+s.dataset.cd-Date.now())/1000));
+  if(left>0){any=true;s.textContent=t("td.change_for")+" "+Math.floor(left/60)+":"+String(left%60).padStart(2,"0")}else{s.textContent=t("ins.locked_now")}});if(any)setTimeout(tick,1000);else if(el.querySelector("[data-cd]"))setTimeout(route,800)};tick()};

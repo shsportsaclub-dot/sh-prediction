@@ -1058,3 +1058,22 @@ for _code, _vals in _PK.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+KEYS9 = ["td.title", "td.apply", "td.no_series", "td.closed", "td.no_pick", "td.picks", "td.correct", "td.google_sheet", "td.google_help", "td.copy", "td.reset", "td.change_for"]
+_TD = {
+ "en": ["Tipster desk", "Apply to become a tipster", "No open series yet.", "Closed", "No pick", "picks", "correct", "My Google Sheet", "Open a new Google Sheet with your email and paste this into cell A1. Your picks for this series appear and keep updating by themselves.", "Copy", "Reset link", "change for"],
+ "hi": ["टिप्स्टर डेस्क", "टिप्स्टर बनने के लिए आवेदन करें", "अभी कोई खुली सीरीज़ नहीं।", "बंद", "कोई पिक नहीं", "पिक", "सही", "मेरी Google शीट", "अपने ईमेल से नई Google शीट खोलें और इसे सेल A1 में पेस्ट करें। इस सीरीज़ की आपकी पिक दिखेंगी और अपने-आप अपडेट होंगी।", "कॉपी", "लिंक रीसेट करें", "बदलें:"],
+ "te": ["టిప్‌స్టర్ డెస్క్", "టిప్‌స్టర్ కావడానికి దరఖాస్తు చేయండి", "ఇంకా ఓపెన్ సిరీస్ లేదు.", "ముగిసింది", "పిక్ లేదు", "పిక్స్", "సరైనవి", "నా Google షీట్", "మీ మెయిల్‌తో కొత్త Google షీట్ తెరిచి దీన్ని A1 సెల్‌లో పేస్ట్ చేయండి. ఈ సిరీస్ మీ పిక్స్ కనిపిస్తాయి, అవే అప్‌డేట్ అవుతాయి.", "కాపీ", "లింక్ రీసెట్", "మార్చుకోవచ్చు:"],
+ "ta": ["டிப்ஸ்டர் மேசை", "டிப்ஸ்டராக விண்ணப்பிக்கவும்", "இன்னும் திறந்த தொடர் இல்லை.", "மூடப்பட்டது", "தேர்வு இல்லை", "தேர்வுகள்", "சரி", "என் Google தாள்", "உங்கள் மின்னஞ்சலில் புதிய Google தாளைத் திறந்து இதை A1 கலத்தில் ஒட்டவும். இந்தத் தொடரின் உங்கள் தேர்வுகள் தானாகப் புதுப்பிக்கப்படும்.", "நகலெடு", "இணைப்பை மீட்டமை", "மாற்றலாம்:"],
+ "kn": ["ಟಿಪ್‌ಸ್ಟರ್ ಡೆಸ್ಕ್", "ಟಿಪ್‌ಸ್ಟರ್ ಆಗಲು ಅರ್ಜಿ ಸಲ್ಲಿಸಿ", "ಇನ್ನೂ ತೆರೆದ ಸರಣಿ ಇಲ್ಲ.", "ಮುಚ್ಚಲಾಗಿದೆ", "ಆಯ್ಕೆ ಇಲ್ಲ", "ಆಯ್ಕೆಗಳು", "ಸರಿ", "ನನ್ನ Google ಶೀಟ್", "ನಿಮ್ಮ ಇಮೇಲ್‌ನಿಂದ ಹೊಸ Google ಶೀಟ್ ತೆರೆದು ಇದನ್ನು A1 ಸೆಲ್‌ನಲ್ಲಿ ಅಂಟಿಸಿ. ಈ ಸರಣಿಯ ನಿಮ್ಮ ಆಯ್ಕೆಗಳು ತಾನಾಗಿ ನವೀಕರಣಗೊಳ್ಳುತ್ತವೆ.", "ನಕಲಿಸಿ", "ಲಿಂಕ್ ಮರುಹೊಂದಿಸಿ", "ಬದಲಿಸಬಹುದು:"],
+ "bn": ["টিপস্টার ডেস্ক", "টিপস্টার হতে আবেদন করুন", "এখনও খোলা সিরিজ নেই।", "বন্ধ", "পিক নেই", "পিক", "সঠিক", "আমার Google শিট", "আপনার ইমেলে নতুন Google শিট খুলে এটি A1 সেলে পেস্ট করুন। এই সিরিজের আপনার পিক নিজে থেকেই আপডেট হবে।", "কপি", "লিঙ্ক রিসেট", "বদলাতে পারেন:"],
+ "mr": ["टिप्स्टर डेस्क", "टिप्स्टर होण्यासाठी अर्ज करा", "अजून खुली मालिका नाही.", "बंद", "निवड नाही", "निवडी", "बरोबर", "माझी Google शीट", "तुमच्या ईमेलने नवी Google शीट उघडा आणि हे A1 सेलमध्ये पेस्ट करा. या मालिकेतील तुमच्या निवडी आपोआप अपडेट होतील.", "कॉपी", "लिंक रीसेट", "बदलता येईल:"],
+ "ur": ["ٹپسٹر ڈیسک", "ٹپسٹر بننے کے لیے درخواست دیں", "ابھی کوئی کھلی سیریز نہیں۔", "بند", "کوئی پک نہیں", "پکس", "درست", "میری Google شیٹ", "اپنی ای میل سے نئی Google شیٹ کھولیں اور اسے سیل A1 میں پیسٹ کریں۔ اس سیریز کی آپ کی پکس خود بخود اپ ڈیٹ ہوں گی۔", "کاپی", "لنک ری سیٹ", "بدل سکتے ہیں:"],
+ "es": ["Mesa del pronosticador", "Solicita ser pronosticador", "Aún no hay series abiertas.", "Cerrado", "Sin pick", "picks", "acertados", "Mi hoja de Google", "Abre una hoja de Google nueva con tu correo y pega esto en la celda A1. Tus picks de esta serie aparecen y se actualizan solos.", "Copiar", "Restablecer enlace", "cambiar durante"],
+}
+for _code, _vals in _TD.items():
+    assert len(_vals) == len(KEYS9)
+    _d = dict(zip(KEYS9, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)

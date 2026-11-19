@@ -105,12 +105,12 @@ SCREENS.series=async function(el,id){
 
 /* ---------------- Predictions hub */
 SCREENS.predictions=async function(el){
- el.innerHTML='<h2>'+esc(t("nav.predictions"))+'</h2><div class="sub"><a class="btn on" href="#/predictions">SH AI</a><a class="btn" href="#/experts">'+esc(t("nav.experts"))+'</a><a class="btn" href="#/leaderboard">'+esc(t("so.leaderboard"))+'</a><a class="btn" href="#/accuracy">'+esc(t("nav.accuracy"))+'</a></div><div id="pp"></div>';
+ el.innerHTML='<h2>'+esc(t("nav.predictions"))+'</h2><div class="sub"><a class="btn on" href="#/predictions">SH AI</a><a class="btn" href="#/experts">'+esc(t("nav.experts"))+'</a><a class="btn" href="#/leaderboard">'+esc(t("so.leaderboard"))+'</a><a class="btn" href="#/accuracy">'+esc(t("nav.accuracy"))+'</a><a class="btn" href="#/tipster">📋 '+esc(t("td.title"))+'</a></div><div id="pp"></div>';
  await SCREENS.ai($("#pp"))};
 
 /* More menu: everything that left the bottom bar stays one tap away */
 const oldMore=SCREENS.more;
-SCREENS.more=async function(el){await oldMore(el);el.insertAdjacentHTML("afterbegin",'<div class="shf" style="margin-bottom:12px">'+[["#/social","nav.social","💬"],["#/reels","nav.reels","🎬"],["#/experts","nav.experts","🧠"],["#/series","nav.series","🏆"]].map(([h,k,i])=>'<a class="shf-i" href="'+h+'"><span>'+i+'</span>'+esc(t(k))+'</a>').join("")+'</div>')};
+SCREENS.more=async function(el){await oldMore(el);el.insertAdjacentHTML("afterbegin",'<div class="shf" style="margin-bottom:12px">'+[["#/social","nav.social","💬"],["#/reels","nav.reels","🎬"],["#/experts","nav.experts","🧠"],["#/series","nav.series","🏆"],["#/tipster","td.title","📋"]].map(([h,k,i])=>'<a class="shf-i" href="'+h+'"><span>'+i+'</span>'+esc(t(k))+'</a>').join("")+'</div>')};
 SCREENS.search=async function(el){el.innerHTML='<h2>Search</h2><input id="gq" type="search" autofocus style="width:100%" placeholder="Team, player, series or user"><div id="gr"></div>';
  let tm;$("#gq").oninput=()=>{clearTimeout(tm);tm=setTimeout(async()=>{const q=$("#gq").value.trim();if(q.length<2){$("#gr").innerHTML="";return}
   const [m,s,u]=await Promise.all([api("/matches?q="+encodeURIComponent(q)+"&limit=10").catch(()=>({items:[]})),api("/series?q="+encodeURIComponent(q)).catch(()=>({items:[]})),api("/social/search/users?q="+encodeURIComponent(q)).catch(()=>({items:[]}))]);

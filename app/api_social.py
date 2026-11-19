@@ -61,6 +61,28 @@ def dispatch(c, h, who, method, P, q, body_fn, helpers):
         if method == "GET" and P == ["me", "notifications"]:
             limit, offset = _page(q)
             return 200, social.notifications(c, a["user_id"], limit, offset, _qv(q, "unread") == "1")
+        if P[:2] == ["me", "tipster"]:
+            import tipster, api_v1 as V
+            if a["account_type"] not in ("tipster", "expert_tipster"):
+                raise social.SocialError(403, "NOT_A_TIPSTER", "the tipster desk is for approved tipsters; apply from your account page")
+            if method == "GET" and P == ["me", "tipster", "series"]:
+                return 200, {"items": tipster.series_list(c, a["user_id"])}
+            if method == "GET" and P == ["me", "tipster", "board"]:
+                cid = _qv(q, "competition_id")
+                if not cid:
+                    sl = tipster.series_list(c, a["user_id"])
+                    cid = next((s["id"] for s in sl if s["open_matches"]), sl[0]["id"] if sl else None)
+                if not cid:
+                    return 200, {"series": None, "matches": [], "summary": {"picks": 0, "settled": 0, "correct": 0}}
+                b = tipster.board(c, a["user_id"], int(cid), V.prediction_window, V.timing_weight, now)
+                if not b:
+                    raise social.SocialError(404, "NOT_FOUND", "series not found")
+                return 200, b
+            if P == ["me", "tipster", "link"] and method in ("GET", "POST"):
+                reset = method == "POST" and bool((body_fn() or {}).get("reset"))
+                tok = tipster.link(c, a["user_id"], reset, now)
+                return 200, {"csv": "/tipster-sheet/%s.csv" % tok, "xlsx": "/tipster-sheet/%s.xlsx" % tok,
+                             "note": "Private link to your own picks. In Google Sheets type =IMPORTDATA(\"<full csv link>\") in cell A1; it refreshes by itself. Reset the link if you shared it by mistake."}
         if method == "GET" and P == ["me", "dashboard"]:
             return 200, social.dashboard(c, a)
         if method == "GET" and P == ["me", "blocked"]:

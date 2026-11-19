@@ -205,6 +205,27 @@ class H(BaseHTTPRequestHandler):
    b=(Path(__file__).parent/"sh-prediction-icon.png").read_bytes();self.send_response(200);self.send_header("Content-Type","image/png");self.send_header("Cache-Control","public, max-age=86400");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/icon.svg":
    b=(Path(__file__).parent/"icon.svg").read_bytes();self.send_response(200);self.send_header("Content-Type","image/svg+xml");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p.startswith("/tipster-sheet/") and (p.endswith(".csv") or p.endswith(".xlsx")):
+   # a tipster's private sheet link (Google Sheets =IMPORTDATA or Excel): read-only, their own picks only
+   import tipster,api_v1 as V
+   tok=p[len("/tipster-sheet/"):].rsplit(".",1)[0];qq=parse_qs(urlparse(self.path).query);cid=(qq.get("competition_id") or [None])[0]
+   c=db()
+   try:
+    uid=tipster.user_for_token(c,tok)
+    if not uid:return self.sendj(404,{"error":"unknown or reset sheet link"})
+    if p.endswith(".csv"):
+     if not cid:
+      sl=tipster.series_list(c,uid);cid=next((s["id"] for s in sl if s["open_matches"]),sl[0]["id"] if sl else None)
+     series,data=tipster.rows(c,uid,int(cid),V.prediction_window,V.timing_weight,V.now) if cid else (None,[])
+     b=tipster.to_csv(series,data);ct="text/csv; charset=utf-8"
+    else:
+     ids=[int(cid)] if cid else [s["id"] for s in tipster.series_list(c,uid)]
+     b=tipster.to_xlsx([tipster.rows(c,uid,i,V.prediction_window,V.timing_weight,V.now) for i in ids]);ct="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    c.commit()
+   finally:c.close()
+   self.send_response(200);self.send_header("Content-Type",ct);self.send_header("Cache-Control","no-store");self.send_header("X-Robots-Tag","noindex")
+   if ct.startswith("application/"):self.send_header("Content-Disposition",'attachment; filename="SH-Tipster-Sheet.xlsx"')
+   self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/version":return self.sendj(200,{"build":BUILD})
   if p=="/health":return self.sendj(200,{"status":"ok","app":"SH PREDICTION","build":BUILD,"admin_key_configured":bool(TOKEN),"admin_key_length":len(TOKEN)})
   # v0 data endpoints hold the original prediction register: admin only (master script: viewers never see it)
