@@ -205,3 +205,56 @@ class TipsterDesk(unittest.TestCase):
         self.assertNotEqual(L2["csv"], L["csv"])
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(T.B + L["csv"])                                         # old link stops working
+
+
+class SeriesAnalysis(unittest.TestCase):
+    """Player stats in series: categories and independent filters (last 5 / venue / vs team) from provider scorecards."""
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def _played(self, home, away, days, venue, card):
+        mid = T.mk_match(home, away, days=days, comp="Analysis Cup 2026", venue=venue)
+        c = T.db()
+        c.execute("UPDATE matches SET status='completed' WHERE id=?", (mid,))
+        c.execute("INSERT INTO ext_match_detail(match_id,source,scorecard_json,scorecard_at) VALUES(?,?,?,?)", (mid, "cricketdata", json.dumps(card), iso_min(0)))
+        c.commit(); c.close()
+        return mid
+
+    def test_categories_and_filters(self):
+        inn = lambda team, bat, bowl: {"inning": team + " Inning 1", "batting": [{"name": n, "r": r, "b": b, "fours": 0, "sixes": s, "dismissal": d} for n, r, b, s, d in bat],
+                                       "bowling": [{"name": n, "o": o, "m": 0, "r": r, "w": w} for n, o, r, w in bowl]}
+        # three Lions v Tigers games and one Lions v Bears game
+        self._played("An Lions", "An Tigers", -9, "North Park", [inn("An Lions", [("Leo Bat", 40, 20, 3, "c X b Tim Ball"), ("Lou Hit", 10, 12, 0, "not out")], [("Tim Ball", "4", 30, 1)]),
+                                                                 inn("An Tigers", [("Tom Bat", 25, 25, 1, "b Lee Spin")], [("Lee Spin", "4", 21, 3)])])
+        self._played("An Lions", "An Tigers", -7, "South Park", [inn("An Lions", [("Leo Bat", 5, 6, 0, "b Tim Ball")], [("Tim Ball", "2", 6, 2)]),
+                                                                 inn("An Tigers", [("Tom Bat", 70, 40, 5, "not out")], [("Lee Spin", "4", 40, 0)])])
+        self._played("An Lions", "An Bears", -5, "North Park", [inn("An Lions", [("Leo Bat", 60, 30, 4, "c Y b Z")], [("Bo Bowl", "4", 23, 2)]),
+                                                                inn("An Bears", [("Ben Bat", 12, 10, 0, "lbw b Lee Spin")], [("Lee Spin", "4", 18, 2)])])
+        cur = T.mk_match("An Lions", "An Tigers", days=1, comp="Analysis Cup 2026", venue="North Park")
+        q = lambda **k: T.call("/api/v1/matches/%d/insights?part=series_stats&%s" % (cur, "&".join("%s=%s" % x for x in k.items())))[1]
+        runs = q(cat="runs")
+        self.assertEqual([(x["name"], x["value"], x["inns"]) for x in runs["items"][:3]], [("Leo Bat", 105, 3), ("Tom Bat", 95, 2), ("Ben Bat", 12, 1)])
+        self.assertEqual(runs["matches_used"], 3)
+        self.assertEqual([x["name"] for x in q(cat="runs", vs="away")["items"]], ["Leo Bat", "Lou Hit"])              # players who faced the Tigers
+        self.assertEqual([(x["name"], x["value"]) for x in q(cat="runs", venue="1")["items"][:2]], [("Leo Bat", 100), ("Tom Bat", 25)])
+        # venue and opponent combine: North Park AND vs Tigers -> only the first game
+        self.assertEqual([(x["name"], x["value"]) for x in q(cat="runs", venue="1", vs="away")["items"]], [("Leo Bat", 40), ("Lou Hit", 10)])
+        self.assertEqual(q(cat="runs", last="1")["items"][0]["value"], 70)                                          # each player's own last match
+        fig = q(cat="figures")["items"]
+        self.assertEqual([(x["name"], x["display"]) for x in fig[:3]], [("Lee Spin", "21-3"), ("Tim Ball", "6-2"), ("Bo Bowl", "23-2")])  # wkts desc, runs asc
+        econ = q(cat="econ")["items"]
+        self.assertEqual([(x["name"], x["display"]) for x in econ[:3]], [("Bo Bowl", "5.75"), ("Tim Ball", "6.00"), ("Lee Spin", "6.58")])  # ascending
+        self.assertEqual([x["display"] for x in q(cat="highest")["items"][:2]], ["70*", "60"])
+        self.assertEqual(q(cat="sr")["items"][0]["name"], "Leo Bat")                                                # 105 off 56
+        self.assertEqual(q(cat="runs", vs="home", venue="1", last="5")["items"][0]["name"], "Tom Bat")
+        empty = q(cat="sixes", vs="home", venue="1")
+        self.assertTrue(empty["items"][0]["name"] == "Tom Bat")
+        self.assertEqual(T.call("/api/v1/matches/%d/insights?part=series_stats&cat=nope" % cur)[0], 400)
+        rec = q(cat="fantasy", view="recent")
+        self.assertTrue(rec["recent"] and all("opp" in x for x in rec["recent"]))
+        none = q(cat="wickets", vs="away", venue="1", last="1")      # Lions bowlers vs Tigers at North Park: Lee Spin's last such match
+        self.assertEqual([x["name"] for x in none["items"]], ["Lee Spin"])
+        lone = T.mk_match("An Lions", "An Tigers", days=1, comp="Empty Cup 2026")
+        e = T.call("/api/v1/matches/%d/insights?part=series_stats&cat=runs&last=5&venue=1" % lone)[1]
+        self.assertEqual((e["items"], e["empty"]), ([], "No matching statistics"))   # never borrows other series' records

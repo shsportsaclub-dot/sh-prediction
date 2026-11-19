@@ -1,3 +1,11 @@
+# QA addendum — Fantasy "Player stats in series" + Analysis drill-down (contract §Fantasy analysis, 19 Nov 2026)
+
+`pytest`: **103 passed** (new SeriesAnalysis test with hand-checked numbers). Chrome 390/1366 px: no errors, no overflow; Back returns to Fantasy with the last category kept.
+`GET /matches/{id}/insights?part=series_stats&cat=fantasy|runs|wickets|sixes|highest|figures|sr|econ&last=5&venue=1&vs=home|away&view=recent`.
+Filters are independent dimensions: time (each player's own last 5), venue, opponent (vs home / vs away, mutually exclusive); All resets. Both the top-3 and the table follow every change; the URL holds the state (deep link). Best Figures ranks wickets desc then runs asc and shows runs-wickets; Best Economy ascending, qualification 2 overs (1 over in T10); Best Strike Rate qualification 10 balls. "Recent matches" switches the table to per-match rows. Empty intersections show "No matching statistics". Only completed matches of the same series with a scorecard (CricketData.org or SH database) are used; reference screenshot numbers were not seeded.
+
+---
+
 # QA addendum — Match Center data depth (owner's 18 reference screenshots) and tipster timing rules (19 Nov 2026)
 
 `pytest`: **101 passed** (7 new in tests/test_insights.py). Chrome: 20 route loads at 390 px and 1366 px plus 10 tab checks: no JavaScript errors, no overflow.

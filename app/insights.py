@@ -588,3 +588,156 @@ def tipsters(c, r, window):
     return {"items": sorted(by.values(), key=lambda x: x["first_at"]), "window": window,
             "rule": "Toss picks lock at the toss; winner and score picks close 10 minutes after the toss or at the first ball. A pick can be changed for 5 minutes after posting. "
                     "Each tipster may add one update only in the innings break, before the next innings' first ball; the original report never changes. Picks made before the toss rank higher."}
+
+
+# ------------------------------------------------------------------ series player stats + Analysis drill-down
+CATS = {"fantasy": "Fantasy Points", "runs": "Most Runs", "wickets": "Most Wickets", "sixes": "Most Sixes", "highest": "Highest Score",
+        "figures": "Best Figures", "sr": "Best Strike Rate", "econ": "Best Economy"}
+MIN_SR_BALLS = 10                    # strike rate needs at least 10 balls faced in the selection
+MIN_ECON_BALLS = {"T10": 6}          # economy needs 1 over in T10, 2 overs elsewhere
+
+def _records(c, r, provider_detail):
+    """One record per player per completed match of this series: batting, bowling, fantasy points, opponent, venue, date."""
+    ms = c.execute("""SELECT m.id, m.start_utc, m.venue_id, m.home_team_id, m.away_team_id, m.format, h.name AS home_name, a.name AS away_name,
+                      CASE WHEN h.short_code_approved THEN h.short_code END AS home_short, CASE WHEN a.short_code_approved THEN a.short_code END AS away_short
+                      FROM matches m JOIN teams h ON h.id=m.home_team_id JOIN teams a ON a.id=m.away_team_id
+                      WHERE m.competition_id=? AND m.data_origin<>'demo' AND m.status='completed' ORDER BY m.start_utc""", (r["competition_id"],)).fetchall()
+    out, used = [], []
+    for m in ms:
+        M = dict(m)
+        M["status"] = "completed"
+        pd = provider_detail(c, m["id"])
+        inns, _, src = _scorecard_source(c, m["id"], pd)
+        if not inns or not any(i.get("batting") or i.get("bowling") for i in inns):
+            continue
+        used.append(m["id"])
+        fp = {p["name"]: p for p in fantasy(c, M, pd)["players"]}
+        names = [(m["home_name"], m["home_short"], m["home_team_id"]), (m["away_name"], m["away_short"], m["away_team_id"])]
+        def side(inn_name, idx):
+            n = re.sub(r"\s*inning\s*\d+$", "", str(inn_name or ""), flags=re.I).strip().lower()
+            for i, (full, short, _) in enumerate(names):
+                if n and n in ((full or "").lower(), (short or "").lower()):
+                    return i
+            if pd is None:
+                b = c.execute("SELECT batting_team_id FROM innings WHERE match_id=? AND innings_no=?", (m["id"], idx + 1)).fetchone()
+                if b:
+                    return 0 if b[0] == m["home_team_id"] else 1
+            return None
+        P = {}
+        def rec(name, si):
+            k = name
+            if k not in P:
+                team = names[si] if si is not None else (None, None, None)
+                opp = names[1 - si] if si is not None else (None, None, None)
+                P[k] = {"name": name, "team": team[1] or team[0], "team_id": team[2], "opp_id": opp[2], "opp": opp[1] or opp[0],
+                        "match_id": m["id"], "date": m["start_utc"][:10], "venue_id": m["venue_id"],
+                        "bat": None, "bowl": None, "fantasy": fp.get(name, {}).get("points", 0.0), "source": src}
+            return P[k]
+        for idx, inn in enumerate(inns):
+            si = side(inn.get("inning"), idx)
+            for b in inn.get("batting") or []:
+                if not b.get("name"):
+                    continue
+                x = rec(b["name"], si)
+                d = (b.get("dismissal") or "").strip()
+                x["bat"] = {"r": b.get("r") or 0, "b": b.get("b") or 0, "fours": b.get("fours") or 0, "sixes": b.get("sixes") or 0,
+                            "out": bool(d) and not re.search(r"not out|batting|retired hurt", d, re.I)}
+            for w in inn.get("bowling") or []:
+                if not w.get("name"):
+                    continue
+                x = rec(w["name"], 1 - si if si is not None else None)
+                x["bowl"] = {"balls": _balls(w.get("o")), "o": str(w.get("o")), "r": w.get("r") or 0, "w": w.get("w") or 0}
+        out += P.values()
+    return out, used
+
+def series_stats(c, r, provider_detail, cat="fantasy", last=None, venue=False, vs=None, view="table", limit=50):
+    if not r["competition_id"]:
+        return {"items": [], "note": NA}
+    if cat not in CATS:
+        raise ValueError("cat must be one of " + ", ".join(CATS))
+    if vs not in (None, "", "home", "away"):
+        raise ValueError("vs must be home or away")
+    recs, used = _records(c, r, provider_detail)
+    # filters are independent dimensions: time window (last N per player), venue, opponent
+    if venue:
+        vids = _venue_ids(c, r["venue_id"])
+        recs = [x for x in recs if x["venue_id"] in vids]
+    if vs:
+        opp = r["home_team_id"] if vs == "home" else r["away_team_id"]
+        recs = [x for x in recs if x["opp_id"] == opp]
+    by = {}
+    for x in sorted(recs, key=lambda x: x["date"], reverse=True):
+        by.setdefault((x["name"], x["team"]), []).append(x)
+    if last:
+        by = {k: v[:int(last)] for k, v in by.items()}
+    rows_, min_econ = [], MIN_ECON_BALLS.get(r["format"], 12)
+    for (name, team), xs in by.items():
+        bats = [x["bat"] for x in xs if x["bat"]]
+        bowls = [x["bowl"] for x in xs if x["bowl"]]
+        row = {"name": name, "team": team, "matches": len(xs), "match_ids": [x["match_id"] for x in xs]}
+        if cat == "fantasy":
+            row.update(value=round(sum(x["fantasy"] for x in xs), 1), inns=len(xs), display="%g" % round(sum(x["fantasy"] for x in xs), 1))
+        elif cat in ("runs", "sixes"):
+            if not bats:
+                continue
+            key = "r" if cat == "runs" else "sixes"
+            v = sum(b[key] for b in bats)
+            row.update(value=v, inns=len(bats), display=str(v), runs=sum(b["r"] for b in bats), balls=sum(b["b"] for b in bats),
+                       fours=sum(b["fours"] for b in bats), sixes=sum(b["sixes"] for b in bats),
+                       avg=round(sum(b["r"] for b in bats) / max(1, sum(1 for b in bats if b["out"])), 2) if any(b["out"] for b in bats) else None,
+                       sr=round(100 * sum(b["r"] for b in bats) / sum(b["b"] for b in bats), 2) if sum(b["b"] for b in bats) else None)
+        elif cat == "highest":
+            if not bats:
+                continue
+            best = max(bats, key=lambda b: (b["r"], not b["out"], -b["b"]))
+            row.update(value=best["r"], inns=len(bats), display="%d%s" % (best["r"], "" if best["out"] else "*"), balls=best["b"])
+        elif cat == "sr":
+            balls = sum(b["b"] for b in bats)
+            if balls < MIN_SR_BALLS:
+                continue
+            v = round(100 * sum(b["r"] for b in bats) / balls, 2)
+            row.update(value=v, inns=len(bats), display="%.2f" % v, runs=sum(b["r"] for b in bats), balls=balls)
+        elif cat == "wickets":
+            if not bowls:
+                continue
+            v = sum(b["w"] for b in bowls)
+            balls = sum(b["balls"] for b in bowls)
+            row.update(value=v, inns=len(bowls), display=str(v), runs_conceded=sum(b["r"] for b in bowls), overs=_ovs(balls),
+                       econ=round(6 * sum(b["r"] for b in bowls) / balls, 2) if balls else None)
+        elif cat == "figures":
+            if not bowls:
+                continue
+            best = max(bowls, key=lambda b: (b["w"], -b["r"], -b["balls"]))
+            row.update(value=(best["w"], -best["r"]), inns=len(bowls), display="%d-%d" % (best["r"], best["w"]), overs=best["o"])
+        elif cat == "econ":
+            balls = sum(b["balls"] for b in bowls)
+            if balls < min_econ:
+                continue
+            v = round(6 * sum(b["r"] for b in bowls) / balls, 2)
+            row.update(value=v, inns=len(bowls), display="%.2f" % v, overs=_ovs(balls))
+        rows_.append(row)
+    asc = cat == "econ"
+    rows_.sort(key=lambda x: (x["value"] if not asc else -x["value"], -x["inns"] if cat in ("sr", "econ") else 0), reverse=True)
+    for i, x in enumerate(rows_):
+        x["rank"] = i + 1
+        if isinstance(x["value"], tuple):
+            x["value"] = x["value"][0]
+    recent = None
+    if view == "recent":
+        keys = {(x["name"], x["team"]) for x in rows_[:10]}
+        recent = []
+        for (name, team), xs in by.items():
+            if (name, team) not in keys:
+                continue
+            for x in xs:
+                b, w = x["bat"], x["bowl"]
+                recent.append({"name": name, "team": team, "match_id": x["match_id"], "date": x["date"], "opp": x["opp"], "fantasy": x["fantasy"],
+                               "bat": "%d%s (%d)" % (b["r"], "" if b["out"] else "*", b["b"]) if b else None,
+                               "bowl": "%d-%d (%s)" % (b2["r"], b2["w"], b2["o"]) if (b2 := w) else None})
+        recent.sort(key=lambda x: (x["date"], x["name"]), reverse=True)
+    teams = {"home": r["home_short"] or r["home_name"], "away": r["away_short"] or r["away_name"]}
+    return {"category": cat, "label": CATS[cat], "categories": CATS, "filters": {"last": int(last) if last else None, "venue": bool(venue), "vs": vs or None},
+            "teams": teams, "items": rows_[:limit], "recent": recent, "matches_used": len(used),
+            "qualification": {"sr": "at least %d balls faced" % MIN_SR_BALLS, "econ": "at least %s overs bowled" % _ovs(min_econ)}.get(cat),
+            "empty": "No matching statistics" if not rows_ else None,
+            "note": "From %d completed match(es) of this series with a scorecard (CricketData.org or the SH database). Last 5 = each player's own last 5 matches." % len(used)}

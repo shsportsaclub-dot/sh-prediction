@@ -61,9 +61,50 @@ window.mcTab.info=async m=>{let d;try{d=await I(m,"info")}catch(e){d=null}
  return out+'<p class="muted">'+esc(d.note)+'</p>'};
 window.mcTabAfter=window.mcTabAfter||{};delete window.mcTabAfter.info;
 
+/* ---------------- Player stats in series (Fantasy tab) + full-screen Analysis with independent filters */
+const CAT_KEYS=["fantasy","runs","wickets","sixes","highest","figures","sr","econ"];
+const catLabel=k=>t("an.cat_"+k);
+async function seriesStatsBlock(m){if(!m.competition_id)return "";const cur=sessionStorage.getItem("shp_ssc")||"fantasy";let d;
+ try{d=await api("/matches/"+m.id+"/insights?part=series_stats&cat="+cur)}catch(e){return ""}
+ const id="ss"+m.id;
+ later(()=>{const b=document.getElementById(id);if(!b)return;const on=b.querySelector(".an-cats .on");if(on)on.parentNode.scrollLeft=on.offsetLeft-on.parentNode.offsetLeft-12;b.querySelectorAll("[data-c]").forEach(x=>x.onclick=async()=>{sessionStorage.setItem("shp_ssc",x.dataset.c);
+  b.outerHTML=await seriesStatsBlock(m);(window._mcq||[]).splice(0).forEach(f=>f())})});
+ const list=d.items.slice(0,5).map(x=>'<div class="dl"><span><b>'+x.rank+'. '+esc(x.name)+'</b> <small class="muted">'+esc(x.team||"")+'</small></span><span><b>'+esc(x.display)+'</b> <small class="muted">'+x.inns+' '+esc(t("an.inns"))+'</small></span></div>').join("");
+ return '<section class="ins-sec" id="'+id+'"><h3><span>'+esc(t("an.player_stats"))+'</span><a href="#/analysis/'+m.id+'/cat='+cur+'">'+esc(t("an.analysis"))+' ›</a></h3>'+
+  '<div class="chips an-cats">'+CAT_KEYS.map(k=>'<button class="btn'+(k===cur?" on":"")+'" data-c="'+k+'">'+esc(catLabel(k))+'</button>').join("")+'</div>'+
+  '<div class="mcard">'+(list||'<p class="muted">'+esc(d.empty||t("an.no_stats"))+'</p>')+'</div><p class="muted">'+esc(d.note)+'</p></section>'}
+SCREENS.analysis=async function(el,mid,qs){const Q=new URLSearchParams(qs||"");const st={cat:Q.get("cat")||"fantasy",last:Q.get("last")||"",venue:Q.get("venue")==="1",vs:Q.get("vs")||"",view:Q.get("view")||"table"};
+ let m;try{m=await api("/matches/"+mid)}catch(e){errorS(el,e);return}
+ const H=m.home.short_code||m.home.name,A=m.away.short_code||m.away.name;
+ const qstr=s=>["cat="+s.cat,s.last?"last="+s.last:"",s.venue?"venue=1":"",s.vs?"vs="+s.vs:"",s.view!=="table"?"view="+s.view:""].filter(Boolean).join("&");
+ const go=s=>{location.replace("#/analysis/"+mid+"/"+qstr(s))};   // filter changes replace the entry, so Back returns to Fantasy
+ el.innerHTML='<div class="an-top"><button class="btn" id="anb">‹</button><h2>'+esc(H)+' vs '+esc(A)+' '+esc(t("an.in_series"))+'</h2></div>'+
+  '<div class="chips an-cats">'+CAT_KEYS.map(k=>'<button class="btn'+(k===st.cat?" on":"")+'" data-c="'+k+'">'+esc(catLabel(k))+'</button>').join("")+'</div>'+
+  '<div class="chips an-f"><button class="btn'+(!st.last&&!st.venue&&!st.vs?" on":"")+'" data-f="all">'+esc(t("an.all"))+'</button><button class="btn'+(st.last?" on":"")+'" data-f="last">'+esc(t("an.last5"))+'</button>'+
+  '<button class="btn'+(st.venue?" on":"")+'" data-f="venue">'+esc(t("an.at_venue"))+'</button><button class="btn'+(st.vs==="home"?" on":"")+'" data-f="vs:home">vs '+esc(H)+'</button><button class="btn'+(st.vs==="away"?" on":"")+'" data-f="vs:away">vs '+esc(A)+'</button></div><div id="anr">'+loading()+'</div>';
+ el.querySelectorAll(".an-cats .on").forEach(x=>{const r=x.parentNode;r.scrollLeft=x.offsetLeft-r.offsetLeft-12});
+ $("#anb").onclick=()=>{sessionStorage.setItem("shp_ssc",st.cat);if(history.length>1)history.back();else location.hash="#/match/"+mid+"/fantasy"};
+ el.querySelectorAll("[data-c]").forEach(x=>x.onclick=()=>go(Object.assign({},st,{cat:x.dataset.c})));
+ el.querySelectorAll("[data-f]").forEach(x=>x.onclick=()=>{const f=x.dataset.f,s=Object.assign({},st);
+  if(f==="all"){s.last="";s.venue=false;s.vs=""}else if(f==="last")s.last=s.last?"":"5";else if(f==="venue")s.venue=!s.venue;else{const v=f.split(":")[1];s.vs=s.vs===v?"":v}go(s)});
+ let d;try{d=await api("/matches/"+mid+"/insights?part=series_stats&"+qstr(st))}catch(e){errorS($("#anr"),e);return}
+ const cols={fantasy:[["display","an.points"]],runs:[["display","an.runs"],["balls","B"],["sr","SR"],["avg","Avg"]],wickets:[["display","an.wkts"],["overs","Ov"],["econ","Econ"]],
+  sixes:[["display","6s"],["fours","4s"],["runs","an.runs"]],highest:[["display","HS"],["balls","B"]],figures:[["display","an.figures"],["overs","Ov"]],sr:[["display","SR"],["runs","an.runs"],["balls","B"]],econ:[["display","Econ"],["overs","Ov"]]}[st.cat];
+ const lab=k=>k.indexOf("an.")===0?t(k):k;
+ const top=d.items.slice(0,3).map(x=>'<div class="an-tc"><div class="an-rk">#'+x.rank+'</div><b>'+esc(x.name.split(" ").slice(-1)[0])+'</b><small class="muted">'+esc(x.team||"")+'</small><strong>'+esc(x.display)+'</strong><small class="muted">'+x.inns+' '+esc(t("an.inns"))+'</small></div>').join("");
+ const table='<table class="simple"><thead><tr><th>#</th><th>'+esc(t("an.player"))+'</th><th>'+esc(t("an.inns"))+'</th>'+cols.map(c=>'<th>'+esc(lab(c[1]))+'</th>').join("")+'</tr></thead><tbody>'+
+  d.items.map(x=>'<tr><td>'+x.rank+'</td><td><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.team||"")+'</div></td><td>'+x.inns+'</td>'+cols.map(c=>'<td>'+esc(x[c[0]]==null?"—":String(x[c[0]]))+'</td>').join("")+'</tr>').join("")+'</tbody></table>';
+ const recent=d.recent?'<table class="simple"><thead><tr><th>'+esc(t("an.player"))+'</th><th>'+esc(t("an.match"))+'</th><th>'+esc(t("an.bat"))+'</th><th>'+esc(t("an.bowl"))+'</th><th>'+esc(t("an.points"))+'</th></tr></thead><tbody>'+
+  d.recent.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td><a href="#/match/'+x.match_id+'/scorecard">vs '+esc(x.opp||"")+'</a><div class="muted">'+esc(x.date)+'</div></td><td>'+esc(x.bat||"—")+'</td><td>'+esc(x.bowl||"—")+'</td><td>'+x.fantasy+'</td></tr>').join("")+'</tbody></table>':'';
+ $("#anr").innerHTML=(d.items.length?'<div class="an-top3">'+top+'</div>':'')+
+  '<div class="dl"><b>'+esc(t("an.top_players"))+'</b><label class="muted">'+esc(t("an.recent_matches"))+' <input type="checkbox" id="anv"'+(st.view==="recent"?" checked":"")+'></label></div>'+
+  (d.items.length?(st.view==="recent"?recent:table):'<div class="state">'+esc(t("an.no_stats"))+'</div>')+
+  '<p class="muted">'+esc(d.note)+(d.qualification?' · '+esc(t("an.qualify"))+': '+esc(d.qualification):'')+'</p>';
+ $("#anv").onchange=e=>go(Object.assign({},st,{view:e.target.checked?"recent":"table"}))};
+
 /* ---------------- Fantasy: live SH points before the SH team suggestions */
 window.mcTabBefore=window.mcTabBefore||{};
-window.mcTabBefore.fantasy=async m=>{let d;try{d=await I(m,"fantasy")}catch(e){return ""}if(!d.players.length)return "";
+window.mcTabBefore.fantasy=async m=>{const ss=await seriesStatsBlock(m);let d;try{d=await I(m,"fantasy")}catch(e){return ss}if(!d.players.length)return ss;
  window._fp=d;const id="fp"+m.id;
  later(()=>{const b=document.getElementById(id);if(!b)return;b.querySelectorAll("[data-fp]").forEach(x=>x.onclick=()=>fpSheet(+x.dataset.fp,m));
   const all=b.querySelector("[data-all]");if(all)all.onclick=()=>{const s=document.createElement("div");s.className="sheet";s.innerHTML='<div><div class="dl"><b>'+esc(t("ins.top_points"))+'</b><button class="btn" data-x>'+esc(t("ins.close"))+'</button></div><div class="fp-list">'+
@@ -73,7 +114,7 @@ window.mcTabBefore.fantasy=async m=>{let d;try{d=await I(m,"fantasy")}catch(e){r
    s.innerHTML='<div><div class="dl"><b>'+esc(t("ins.leaderboard"))+'</b><button class="btn" data-x>✕</button></div><p class="muted">'+L.teams+' '+esc(t("ins.teams"))+'</p>'+(L.items.length?L.items.map(x=>'<div class="dl"><span><b>'+esc(x.name)+'</b><div class="muted">'+x.points+' pts</div></span><span>'+esc(t("ins.rank"))+' '+x.rank+'</span></div>').join(""):NA())+'</div>';
    document.body.appendChild(s);s.onclick=e=>{if(e.target===s||e.target.closest("[data-x]"))s.remove()}}});
  return '<div id="'+id+'"><div class="mcard dl"><span><b>'+d.leaderboard.teams+'</b> '+esc(t("ins.teams_playing"))+'</span><a href="javascript:void 0" data-lb>'+esc(t("ins.leaderboard"))+' ›</a></div>'+
-  sec(esc(t("ins.top_points"))+(d.live?' <span class="tag" style="color:#ff6b6b">● LIVE</span>':''),'<div class="fp-cards">'+d.players.slice(0,8).map((p,i)=>'<button class="fp-card'+(p.team===lab(m,"away")||p.team===m.away.name?" aw":"")+'" data-fp="'+i+'"><small>'+esc(p.team||"")+'</small><b>'+esc(p.name)+'</b><strong>'+p.points.toFixed(1)+'</strong> <small style="display:inline">pts</small></button>').join("")+'</div>',
+  ss+sec(esc(t("ins.top_points"))+(d.live?' <span class="tag" style="color:#ff6b6b">● LIVE</span>':''),'<div class="fp-cards">'+d.players.slice(0,8).map((p,i)=>'<button class="fp-card'+(p.team===lab(m,"away")||p.team===m.away.name?" aw":"")+'" data-fp="'+i+'"><small>'+esc(p.team||"")+'</small><b>'+esc(p.name)+'</b><strong>'+p.points.toFixed(1)+'</strong> <small style="display:inline">pts</small></button>').join("")+'</div>',
    '<a href="javascript:void 0" data-all>'+esc(t("ins.see_all"))+' ›</a>')+'<p class="muted">'+esc(d.rules_note)+' '+esc(t("ins.dots"))+': '+esc(d.dot_balls)+'. '+esc(t("ins.source"))+': '+esc(d.source)+'</p></div>'};
 const EVL={announced:"ins.ev_announced",runs:"ins.ev_runs",fours:"4's",sixes:"6's",sr:"SR",milestone:"25/50/75/100",duck:"ins.ev_duck",dots:"ins.ev_dots",wickets:"ins.ev_wickets",lbw_bowled:"LBW/Bowled",haul:"ins.ev_haul",maidens:"ins.ev_maidens",economy:"ins.ev_economy",catches:"ins.ev_catches",three_catch:"ins.ev_3catch",stumpings:"ins.ev_stumpings",run_outs:"ins.ev_runouts"};
 function fpSheet(i,m){const d=window._fp;if(!d)return;const p=d.players[i];document.querySelectorAll(".sheet").forEach(x=>x.remove());

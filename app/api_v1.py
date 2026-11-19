@@ -1910,9 +1910,15 @@ def match_insights(c, who, method, mid, what, q, body_fn):
         return 200, insights.live(c, R, pd)
     if part == "points":
         return 200, insights.points(c, R, series_detail)
+    if part == "series_stats":
+        try:
+            return 200, insights.series_stats(c, R, provider_detail, qv(q, "cat") or "fantasy", qv(q, "last"), qv(q, "venue") in ("1", "true"),
+                                              qv(q, "vs"), qv(q, "view") or "table")
+        except ValueError as e:
+            raise ApiError(400, "BAD_REQUEST", str(e))
     if part == "tipsters":
         return 200, insights.tipsters(c, R, prediction_window(c, r))
-    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points or tipsters")
+    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points, tipsters or series_stats")
 
 def need_user(who):
     if not who or not who.get("user_id"):
