@@ -854,3 +854,32 @@ for _code, _vals in _SHELL.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+# Match Center views and tabs from the owner's approved mockups (19 Nov 2026)
+KEYS4 = ["mc.discussions", "mc.history", "mc.series_stats", "mc.view", "mc.view_sh", "mc.view_crex", "mc.view_cricbuzz", "home.sports", "home.coming_soon",
+         "mc.highlights", "mc.overs", "mc.innings_progression", "mc.lead_by", "mc.trail_by", "mc.target", "mc.overs_left"]
+_MC4 = {
+ "en": ["Discussions", "History", "Series Stats", "Match view", "SH Advanced", "CREX-style", "Cricbuzz-style", "Sports", "Coming soon",
+        "Highlights", "Overs", "Innings progression", "lead by", "trail by", "Target", "Overs left"],
+ "hi": ["चर्चा", "इतिहास", "सीरीज़ आँकड़े", "मैच व्यू", "SH एडवांस्ड", "CREX-स्टाइल", "Cricbuzz-स्टाइल", "खेल", "जल्द आ रहा है",
+        "मुख्य पल", "ओवर", "पारी की प्रगति", "बढ़त", "पीछे", "लक्ष्य", "बचे ओवर"],
+ "te": ["చర్చలు", "చరిత్ర", "సిరీస్ గణాంకాలు", "మ్యాచ్ వ్యూ", "SH అడ్వాన్స్‌డ్", "CREX-స్టైల్", "Cricbuzz-స్టైల్", "క్రీడలు", "త్వరలో",
+        "ముఖ్య క్షణాలు", "ఓవర్లు", "ఇన్నింగ్స్ ప్రగతి", "ఆధిక్యం", "వెనుకబడి", "లక్ష్యం", "మిగిలిన ఓవర్లు"],
+ "ta": ["விவாதங்கள்", "வரலாறு", "தொடர் புள்ளிவிவரம்", "போட்டி பார்வை", "SH மேம்பட்ட", "CREX-பாணி", "Cricbuzz-பாணி", "விளையாட்டுகள்", "விரைவில்",
+        "முக்கிய தருணங்கள்", "ஓவர்கள்", "இன்னிங்ஸ் முன்னேற்றம்", "முன்னிலை", "பின்தங்கல்", "இலக்கு", "மீதமுள்ள ஓவர்கள்"],
+ "kn": ["ಚರ್ಚೆಗಳು", "ಇತಿಹಾಸ", "ಸರಣಿ ಅಂಕಿಅಂಶ", "ಪಂದ್ಯ ನೋಟ", "SH ಸುಧಾರಿತ", "CREX-ಶೈಲಿ", "Cricbuzz-ಶೈಲಿ", "ಕ್ರೀಡೆಗಳು", "ಶೀಘ್ರದಲ್ಲೇ",
+        "ಮುಖ್ಯ ಕ್ಷಣಗಳು", "ಓವರ್‌ಗಳು", "ಇನ್ನಿಂಗ್ಸ್ ಪ್ರಗತಿ", "ಮುನ್ನಡೆ", "ಹಿನ್ನಡೆ", "ಗುರಿ", "ಉಳಿದ ಓವರ್‌ಗಳು"],
+ "bn": ["আলোচনা", "ইতিহাস", "সিরিজ পরিসংখ্যান", "ম্যাচ ভিউ", "SH অ্যাডভান্সড", "CREX-স্টাইল", "Cricbuzz-স্টাইল", "খেলা", "শীঘ্রই আসছে",
+        "গুরুত্বপূর্ণ মুহূর্ত", "ওভার", "ইনিংসের অগ্রগতি", "এগিয়ে", "পিছিয়ে", "লক্ষ্য", "বাকি ওভার"],
+ "mr": ["चर्चा", "इतिहास", "मालिका आकडेवारी", "सामना दृश्य", "SH प्रगत", "CREX-शैली", "Cricbuzz-शैली", "खेळ", "लवकरच",
+        "महत्त्वाचे क्षण", "षटके", "डावाची प्रगती", "आघाडी", "पिछाडी", "लक्ष्य", "उरलेली षटके"],
+ "ur": ["گفتگو", "تاریخ", "سیریز کے اعداد", "میچ ویو", "SH ایڈوانسڈ", "CREX طرز", "Cricbuzz طرز", "کھیل", "جلد آ رہا ہے",
+        "اہم لمحات", "اوورز", "اننگز کی پیش رفت", "برتری", "پیچھے", "ہدف", "باقی اوورز"],
+ "es": ["Debates", "Historial", "Estadísticas de la serie", "Vista del partido", "SH Avanzada", "Estilo CREX", "Estilo Cricbuzz", "Deportes", "Próximamente",
+        "Momentos clave", "Overs", "Progresión de la entrada", "ventaja de", "detrás por", "Objetivo", "Overs restantes"],
+}
+for _code, _vals in _MC4.items():
+    _d = dict(zip(KEYS4, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)

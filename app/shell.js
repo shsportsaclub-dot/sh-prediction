@@ -36,8 +36,12 @@ const FILTERS=[["all","home.all",""],["live","home.live","status=live"],["upcomi
 async function filtered(f,q,limit){const def=FILTERS.find(x=>x[0]===f)||FILTERS[0];let p=def[2];
  if(!/status=/.test(p)){const [l,u,r]=await Promise.all(["live","upcoming","results"].map(s=>api(dq("/matches?status="+s+"&limit="+limit+(p?"&"+p:"")+(q?"&q="+encodeURIComponent(q):"")))));return [...l.items,...u.items,...r.items].slice(0,limit*2)}
  return (await api(dq("/matches?"+p+"&limit="+limit+(q?"&q="+encodeURIComponent(q):"")))).items}
+// sports in the owner's approved order; only Cricket has working data and code today
+const SPORTS=[["cricket","Cricket","🏏",true],["tennis","Tennis","🎾",false],["football","Football","⚽",false],["badminton","Badminton","🏸",false],["kabaddi","Kabaddi","🤼",false]];
 SCREENS.home=async function(el){
- el.innerHTML='<div class="sec"><div class="sec-h"><h2>'+esc(t("home.featured"))+'</h2><a href="#/matches">'+esc(t("nav.matches"))+' →</a></div><div class="hscroll" id="feat">'+loading()+'</div></div>'+
+ el.innerHTML='<div class="sports" role="tablist" aria-label="'+esc(t("home.sports"))+'">'+SPORTS.map(([k,l,i,on])=>'<button role="tab" class="sp'+(k==="cricket"?" on":"")+'"'+(on?'':' aria-disabled="true" title="'+esc(t("home.coming_soon"))+'"')+'><span>'+i+'</span>'+esc(l)+(on?'':'<small>'+esc(t("home.coming_soon"))+'</small>')+'</button>').join("")+'</div>'+
+  '<div class="qlinks">'+[["#/live-now","home.live","⏱"],["#/matches","home.upcoming","📅"],["#/series","nav.series","🏆"],["#/predictions","nav.predictions","🎯"],["#news","home.news","📰"]].map(([h,k,i])=>'<a href="'+h+'"'+(h==="#news"?' onclick="event.preventDefault();document.getElementById(\'news\').scrollIntoView({behavior:\'smooth\'})"':'')+'><span>'+i+'</span>'+esc(t(k))+'</a>').join("")+'</div>'+
+  '<div class="sec"><div class="sec-h"><h2>'+esc(t("home.featured"))+'</h2><a href="#/matches">'+esc(t("nav.matches"))+' →</a></div><div class="hscroll" id="feat">'+loading()+'</div></div>'+
   '<div class="chips fbar" id="fb" role="tablist"></div><div id="fl"></div>'+
   '<div class="sec"><div class="sec-h"><h2>'+esc(t("home.featured_predictions"))+'</h2><a href="#/predictions">'+esc(t("nav.predictions"))+' →</a></div><div id="fp">'+loading()+'</div></div>'+
   '<div class="sec"><h2>'+esc(t("home.sh_features"))+'</h2><div class="shf">'+[["#/predictions","SH AI Prediction","🎯"],["#/predictions","Toss Intelligence","🪙"],["#/matches","Pitch Analyzer","🟫"],["#/series","Venue Records","🏟️"],
@@ -75,6 +79,7 @@ SCREENS.matches=async function(el){
   const L=$("#list");L.innerHTML=loading();try{const items=await filtered(cur,$("#q").value.trim(),30);L.innerHTML=items.length?'<div class="mgrid">'+items.map(liveCard).join("")+'</div>':NA()}catch(e){errorS(L,e,go)}};
  go();let tm;$("#q").oninput=()=>{clearTimeout(tm);tm=setTimeout(go,300)}};
 SCREENS["live-now"]=async el=>{sessionStorage.setItem("shp_mf","live");location.hash="#/matches"};
+document.addEventListener("click",e=>{const b=e.target.closest(".sp[aria-disabled=true]");if(b){e.preventDefault();b.classList.add("shake");setTimeout(()=>b.classList.remove("shake"),500)}});
 
 /* ---------------- Series list and series page */
 SCREENS.series=async function(el,id){
@@ -111,6 +116,4 @@ SCREENS.search=async function(el){el.innerHTML='<h2>Search</h2><input id="gq" ty
   const [m,s,u]=await Promise.all([api("/matches?q="+encodeURIComponent(q)+"&limit=10").catch(()=>({items:[]})),api("/series?q="+encodeURIComponent(q)).catch(()=>({items:[]})),api("/social/search/users?q="+encodeURIComponent(q)).catch(()=>({items:[]}))]);
   $("#gr").innerHTML='<h3>'+esc(t("nav.series"))+'</h3>'+(s.items.slice(0,5).map(x=>'<a class="card" href="#/series/'+x.id+'">'+esc(x.name)+'</a>').join("")||'<p class="muted">—</p>')+
    '<h3>'+esc(t("nav.matches"))+'</h3>'+(m.items.map(matchCard).join("")||'<p class="muted">—</p>')+'<h3>Users</h3>'+((u.items||[]).map(x=>'<a class="card" href="#/u/'+esc(x.username)+'">'+esc(x.display_name)+' @'+esc(x.username)+'</a>').join("")||'<p class="muted">—</p>')},300)}};
-// the main script may have drawn the first screen before this file loaded: draw it again with the new screens
-if(typeof route==="function")route();
 })();

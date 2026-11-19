@@ -1,3 +1,11 @@
+# QA addendum — owner mockups (10 concept boards, 19 Nov 2026) applied to the real app
+
+`pytest`: **93 passed**. Chrome: 48 page loads (12 routes × 2 loads × phone 390 px and desktop 1366 px): no JavaScript errors, no "could not load". Startup now draws once, after all screen scripts load, which fixes an intermittent "Cannot set properties of null" on deep links.
+Built from the mockups with our own data only: sport selector (Cricket live; Tennis, Football, Badminton, Kabaddi "Coming soon", contract order), quick links (Live, Upcoming, Series, Predictions, News); Match Center view modes SH Advanced / CREX-style / Cricbuzz-style (saved per device) with CREX order Info, Fantasy, Discussions, Commentary, Live, Scorecard, History, Series Stats, Graphs; header strip CRR / Target / RRR / Overs left / Toss and lead-trail banner for multi-day matches; Commentary filters All, Highlights, Overs, W, 4s, 6s with end-of-over summaries; History (innings progression; day/session split marked unavailable: no ball times from sources); Series Stats (points table, most runs/wickets). Mockup sample players, scores and percentages were not copied. The "World" tab in one mockup was left out per the implementation contract.
+Pending: Discussions uses SH SOCIAL match posts; fantasy rankings by filters (last 5 / at venue / vs team), player analysis page, day/session history, AI recap need data or work not yet done.
+
+---
+
 # QA addendum — Blueprint v2.0, Phase 2 (core application)
 
 `pytest`: **93 passed**. Chrome at 360/390/430 px (phone), 768 px (tablet), 1366 px (desktop): Home, Matches, Series list, Series page (points table), Predictions, Match Center (default tab by status), More, Search, Social, Leaderboard: **no JavaScript errors, no horizontal overflow** (only the intended scrolling rows). The new Home is drawn on every load (3 loads per width). Screenshots: `docs/qa/v2/`.
