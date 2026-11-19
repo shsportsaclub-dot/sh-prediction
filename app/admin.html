@@ -39,7 +39,7 @@ pre{white-space:pre-wrap;font-size:12px;margin:0;max-width:520px}
 <script>
 "use strict";
 const SECTIONS=[["dashboard","Dashboard"],["bridge","Data Bridge"],["registry","Global Registry"],["social","Social Users"],["moderation","Moderation"],["media","Media & Storage"],["master","Master List"],["matches","Match Management"],["results","Result Verification"],["predictions","Predictions"],["experts","Experts"],["import","Data Import"],["providers","Data Providers"],["accuracy","Accuracy Reports"],["audit","Audit Logs"],["roles","Roles & Permissions"],["settings","Settings"]];
-let KEY=(()=>{try{return sessionStorage.getItem("shp_admin")||""}catch(e){return ""}})();
+let KEY=(()=>{try{return sessionStorage.getItem("shp_admin")||localStorage.getItem("shp_admin_keep")||""}catch(e){return ""}})();
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const when=u=>{const d=new Date(u);return isNaN(d)?"—":d.toLocaleString()};
 async function api(path,body){const o={headers:{"Content-Type":"application/json","X-Admin-Token":KEY}};if(body!==undefined){o.method="POST";o.body=JSON.stringify(body)}
@@ -186,17 +186,17 @@ async settings(el){const [s,sys,fr]=await Promise.all([api("/admin/settings"),ap
  if($("#mg"))$("#mg").onclick=()=>act(async()=>{if(!confirm("Back up the database and apply pending migrations?"))throw Error("Cancelled");const r=await api("/admin/system/migrate",{confirm:true});alert(JSON.stringify(r,null,2));V.settings(el)},"Migration finished")}
 };
 function login(){$("#nav").innerHTML="";$("#lock").hidden=true;
- $("#view").innerHTML='<div class="card" style="max-width:420px;margin:40px auto"><h2>Admin sign-in</h2><p class="muted">The admin key is kept only while this tab is open. It is never saved on the device.</p><input id="k" type="password" autocomplete="off" style="width:100%" aria-label="Admin key"><p><button class="p" id="kgo">Unlock</button></p></div>';
- $("#kgo").onclick=async()=>{KEY=$("#k").value.trim();try{await api("/admin/system/status");try{sessionStorage.setItem("shp_admin",KEY)}catch(e){}route()}catch(e){KEY="";msg(/403|401|token/i.test(e.message)?"Wrong admin key ("+esc(e.message)+")":"Server error: "+esc(e.message),false)}}}
+ $("#view").innerHTML='<div class="card" style="max-width:420px;margin:40px auto"><h2>Admin sign-in</h2><p class="muted">Enter the admin key once. Tick the box to keep this phone unlocked; use Lock to remove it.</p><input id="k" type="password" autocomplete="off" style="width:100%" aria-label="Admin key"><label class="row" style="margin-top:8px"><input type="checkbox" id="kkeep" checked> Remember on this device</label><p class="muted" style="font-size:12px">Only on your own phone: anyone holding an unlocked phone could open the admin panel.</p><p><button class="p" id="kgo">Unlock</button></p></div>';
+ $("#kgo").onclick=async()=>{KEY=$("#k").value.trim();try{await api("/admin/system/status");try{sessionStorage.setItem("shp_admin",KEY);if($("#kkeep").checked)localStorage.setItem("shp_admin_keep",KEY);else localStorage.removeItem("shp_admin_keep")}catch(e){}route()}catch(e){KEY="";msg(/403|401|token/i.test(e.message)?"Wrong admin key ("+esc(e.message)+")":"Server error: "+esc(e.message),false)}}}
 async function route(){if(!KEY)return login();$("#lock").hidden=false;
- let sys;try{sys=await api("/admin/system/status")}catch(e){KEY="";return login()}
+ let sys;try{sys=await api("/admin/system/status")}catch(e){KEY="";if(/401|403|token/i.test(e.message))try{localStorage.removeItem("shp_admin_keep");sessionStorage.removeItem("shp_admin")}catch(x){}return login()}
  let sec=(location.hash||"#dashboard").slice(1);if(sys.pending.length)sec="settings";if(!V[sec])sec="dashboard";
  $("#nav").innerHTML=SECTIONS.map(([k,l])=>'<a href="#'+k+'" class="'+(k===sec?"on":"")+'">'+esc(l)+'</a>').join("");
  const el=$("#view");el.innerHTML='<p class="muted">Loading…</p>';
  if(sys.pending.length&&sec==="settings"){el.innerHTML='<h2>Database migration needed</h2><div class="card"><p>Pending: <b>'+esc(sys.pending.join(", "))+'</b></p><p class="muted">A verified backup is taken first. Existing data (fixtures, predictions, outcomes) is kept and checked after the migration.</p><button class="p" id="mg">Back up and run migration</button><pre id="mr"></pre></div>';
   $("#mg").onclick=()=>act(async()=>{const r=await api("/admin/system/migrate",{confirm:true});$("#mr").textContent=JSON.stringify(r,null,2);setTimeout(route,1500);return r},"Migration finished");return}
  try{await V[sec](el)}catch(e){el.innerHTML='<div class="card">Could not load: '+esc(e.message)+' <button id="rt">Retry</button></div>';$("#rt").onclick=route}}
-$("#lock").onclick=()=>{KEY="";try{sessionStorage.removeItem("shp_admin")}catch(e){}login()};
+$("#lock").onclick=()=>{KEY="";try{sessionStorage.removeItem("shp_admin");localStorage.removeItem("shp_admin_keep")}catch(e){}login()};
 window.addEventListener("hashchange",route);route();
 </script>
 </body>
