@@ -774,7 +774,10 @@ def bridge_status(c):
         JOIN teams h ON h.id=m1.home_team_id JOIN teams a ON a.id=m1.away_team_id
         WHERE m1.data_origin<>'demo' AND m2.data_origin<>'demo' LIMIT 50"""))
     return {"jobs": jobs, "matches_by_source": counts,
-            "cricketdata": {"key_configured": bool(cricketdata.key()), "hits_used_today": cricketdata.hits_used(c), "day_utc": cricketdata.today()},
+            "cricketdata": dict(key_configured=bool(cricketdata.key()), hits_used_today=cricketdata.hits_used(c), day_utc=cricketdata.today(),
+                                plan_reported_limit=cricketdata.plan_limit(c), plan_override=cricketdata.plan_override(c),
+                                effective={k: v for k, v in cricketdata.auto(c, {}).items() if k != "budget"} | {"budget": (lambda b: "unlimited" if b >= 10 ** 9 else b)(cricketdata.auto(c, {})["budget"])},
+                                live_refresh_seconds=(10 if cricketdata.unlimited(c) else 60 if cricketdata.auto(c, {})["paid"] else None)),
             "possible_duplicates": suspects,
             "duplicate_rule": "Matches from different sources are never merged automatically; same day and same two teams are listed here for review.",
             "sources": rows(c.execute("SELECT key,name,adapter,permission,last_check,last_ok,last_error FROM source_registry ORDER BY adapter DESC, key"))}
@@ -1792,6 +1795,21 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
                     ("player-stats",): admin_player_stats, ("model-versions",): admin_model_version, ("import",): admin_import, ("owner-master",): admin_owner_master}
             if A in flat:
                 return (201 if A == ("model-versions",) else 200), flat[A](c, who, d)
+            if A == ("bridge", "plan"):
+                mode = d.get("mode")
+                if mode not in ("unlimited", "auto"):
+                    raise bad("mode must be unlimited or auto")
+                until = d.get("until")
+                if mode == "unlimited" and not (isinstance(until, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", until)):
+                    raise bad("until (YYYY-MM-DD) required for unlimited")
+                if mode == "auto":
+                    c.execute("DELETE FROM system_settings WHERE key='cricketdata_plan_override'")
+                else:
+                    c.execute("INSERT INTO system_settings(key,value,updated_at,updated_by) VALUES('cricketdata_plan_override',?,?,?) "
+                              "ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by",
+                              (json.dumps({"mode": "unlimited", "until": until}), now(), who["actor"]))
+                audit(c, who["actor"], "bridge.plan", "setting", "cricketdata_plan_override", d)
+                return 200, {"saved": True}
             if len(A) == 4 and A[:2] == ("bridge", "jobs"):
                 return 200, admin_bridge_job(c, who, A[2], A[3], d)
             if A == ("settings",):

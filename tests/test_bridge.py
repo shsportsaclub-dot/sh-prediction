@@ -59,6 +59,12 @@ def match_by(provider, pid):
         c.close()
 
 
+def free_plan():
+    c = T.db()
+    c.execute("DELETE FROM system_settings WHERE key IN ('cricketdata_plan_override','cricketdata_plan')")
+    c.commit(); c.close()
+
+
 class OwnerSheets(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -173,6 +179,7 @@ class CricketDataAdapter(unittest.TestCase):
 
     def setUp(self):
         os.environ["CRICKETDATA_API_KEY"] = "test-key-123"
+        free_plan()
 
     def tearDown(self):
         os.environ.pop("CRICKETDATA_API_KEY", None)
@@ -357,6 +364,7 @@ class FeaturedDetail(unittest.TestCase):
 
     def setUp(self):
         os.environ["CRICKETDATA_API_KEY"] = "test-key-123"
+        free_plan()
         c = T.db(); c.execute("DELETE FROM api_budget"); c.commit(); c.close()
 
     def tearDown(self):
@@ -380,9 +388,14 @@ class FeaturedDetail(unittest.TestCase):
         self.assertEqual(T.call("/api/v1/matches/%d" % live)[1]["data_status"], "live_scorecard")
         hits = sum(1 for u in fake.urls if "match_" in u)
         self.assertEqual(hits, 4)
-        # a second run 6 min later spends 1 hit (scorecard); squad/info refresh every 2 h, balls every 12 min
-        r2 = run("cricketdata_detail", fake)
+        # free plan: an immediate re-run spends nothing; 6 min later 1 hit (scorecard); squad/info every 2 h, balls every 12 min
+        run("cricketdata_detail", fake)
+        self.assertEqual(sum(1 for u in fake.urls if "match_" in u) - hits, 0)
+        c = T.db(); c.execute("UPDATE ext_match_detail SET scorecard_at=? WHERE match_id=?",
+                              ((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=6)).isoformat(), live)); c.commit(); c.close()
+        run("cricketdata_detail", fake)
         self.assertEqual(sum(1 for u in fake.urls if "match_" in u) - hits, 1)
+        c = T.db(); c.execute("UPDATE ext_match_detail SET scorecard_at='2000-01-01T00:00:00+00:00' WHERE match_id=?", (live,)); c.commit(); c.close()
         # provider refuses the scorecard (plan): note shown, nothing invented
         fake.routes["match_scorecard"] = json.dumps({"status": "failure", "reason": "Not on your plan"}).encode()
         r3 = run("cricketdata_detail", fake)
@@ -420,3 +433,58 @@ class TipsterRanking(unittest.TestCase):
         viewer = T.account("rank_viewer_b")
         self.assertIn("only tipsters", T.call("/api/v1/social/leaderboard", h=viewer)[1]["me"]["reason"])
         self.assertIsNone(T.call("/api/v1/social/leaderboard")[1]["me"])                  # anonymous: no pinned row
+
+
+class PlanModes(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def setUp(self):
+        os.environ["CRICKETDATA_API_KEY"] = "test-key-123"
+
+    def tearDown(self):
+        os.environ.pop("CRICKETDATA_API_KEY", None)
+        T.call("/api/v1/admin/bridge/plan", {"mode": "unlimited", "until": "2026-11-29"}, T.A)
+
+    def test_owner_unlimited_plan_until_date_then_auto(self):
+        b = T.call("/api/v1/admin/bridge", h=T.A)[1]["cricketdata"]
+        self.assertEqual(b["plan_override"], {"mode": "unlimited", "until": "2026-11-29"})          # seeded from the owner's note
+        self.assertEqual((b["effective"]["budget"], b["live_refresh_seconds"]), ("unlimited", 10))
+        self.assertEqual(T.call("/api/v1/admin/bridge/plan", {"mode": "unlimited", "until": "2020-01-01"}, T.A)[0], 200)
+        b = T.call("/api/v1/admin/bridge", h=T.A)[1]["cricketdata"]
+        self.assertIsNone(b["plan_override"])                                                       # expired: back to the reported limit
+        self.assertEqual(T.call("/api/v1/admin/bridge/plan", {"mode": "unlimited"}, T.A)[0], 400)
+        self.assertIn(T.call("/api/v1/admin/bridge/plan", {"mode": "auto"})[0], (401, 403))
+        c = T.db()
+        c.execute("INSERT INTO system_settings(key,value,updated_at,updated_by) VALUES('cricketdata_plan','{\"hitsLimit\": 2000}','x','t') ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+        c.commit()
+        A = cricketdata.auto(c, {})
+        c.close()
+        self.assertEqual((A["budget"], A["max_featured"], A["scorecard_every_min"]), (1985, 4, 2))     # paid 2,000/day plan
+
+    def test_fast_live_loop_refreshes_and_pushes_live_events(self):
+        import threading
+        T.call("/api/v1/admin/bridge/plan", {"mode": "unlimited", "until": "2099-01-01"}, T.A)
+        sc = json.loads(json.dumps(SC))
+        fake = Fake({"/v1/matches": json.dumps(CD_MATCHES).encode(), "currentMatches": json.dumps(CD_MATCHES).encode(),
+                     "match_scorecard": lambda: json.dumps(sc).encode(), "match_squad": json.dumps(SQ).encode(),
+                     "match_info": json.dumps(INFO).encode(), "match_bbb": json.dumps(BBB).encode()})
+        run("cricketdata_matches", fake)
+        live = match_by("cricketdata", "cd-222")
+        c = T.db(); before = c.execute("SELECT COUNT(*) FROM live_events WHERE match_id=?", (live,)).fetchone()[0]; c.close()
+        stop = threading.Event()
+        th = threading.Thread(target=scheduler.live_loop, args=(T.db, fake, stop), daemon=True); th.start()
+        time.sleep(1.5)
+        sc["data"]["scorecard"][0]["totals"] = {"R": 45, "W": 1, "O": 4.3}                          # next ball: provider score moves
+        c = T.db(); c.execute("UPDATE ext_match_detail SET scorecard_at='2000-01-01T00:00:00+00:00' WHERE match_id=?", (live,)); c.commit(); c.close()
+        stop.set(); th.join(5)
+        stop2 = threading.Event(); th2 = threading.Thread(target=scheduler.live_loop, args=(T.db, fake, stop2), daemon=True); th2.start()
+        time.sleep(1.5); stop2.set(); th2.join(5)
+        c = T.db()
+        ev = [json.loads(r[0]) for r in c.execute("SELECT payload FROM live_events WHERE match_id=? AND kind='ball' ORDER BY id", (live,))]
+        c.close()
+        self.assertGreaterEqual(len(ev), before + 1)
+        self.assertEqual(ev[-1]["score"], "45-1")                                                   # the app gets the new score pushed
+        hdr = T.call("/api/v1/matches/%d" % live)[1]["provider_detail"]["scorecard"][0]["total"]
+        self.assertEqual((hdr["r"], hdr["w"]), (45, 1))

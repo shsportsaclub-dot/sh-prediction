@@ -71,7 +71,7 @@ def job_cricketdata_matches(conn, cfg, opener):
     if not cricketdata.key():
         return {"skipped": "CRICKETDATA_API_KEY is not set on the server"}
     create_match, record_result = _helpers(conn)
-    k = cricketdata.sync(conn, "matches", cfg.get("daily_budget", 60), create_match, record_result, now, opener)
+    k = cricketdata.sync(conn, "matches", cfg.get("daily_budget", "auto"), create_match, record_result, now, opener)
     conn.commit()
     return k
 
@@ -86,7 +86,7 @@ def job_cricketdata_live(conn, cfg, opener):
     if not n:
         return {"skipped": "no CricketData match is live or starting within the hour; no hit spent"}
     create_match, record_result = _helpers(conn)
-    k = cricketdata.sync(conn, "currentMatches", cfg.get("daily_budget", 60), create_match, record_result, now, opener)
+    k = cricketdata.sync(conn, "currentMatches", cfg.get("daily_budget", "auto"), create_match, record_result, now, opener)
     conn.commit()
     return k
 
@@ -208,6 +208,41 @@ def loop(db_fn, tick=60):
         time.sleep(tick)
 
 
+def live_loop(db_fn, opener=None, stop=None):
+    """Fast refresh for live CricketData matches when the plan allows it (unlimited: every 10 s; other paid plans: every 60 s).
+    The 15-minute/6-minute jobs keep running for the free plan; this loop only acts when the plan is paid."""
+    import api_v1
+    import live as live_mod
+    last_list = 0.0
+    while not (stop and stop.is_set()):
+        wait = 30
+        try:
+            c = db_fn()
+            try:
+                if c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() and cricketdata.key():
+                    A = cricketdata.auto(c, {})
+                    if A["paid"]:
+                        wait = 10 if A["unlimited"] else 60
+                        create_match, record_result = _helpers(c)
+                        if time.time() - last_list >= (30 if A["unlimited"] else 120):
+                            cricketdata.sync(c, "currentMatches", A["budget"], create_match, record_result, now, opener or __import__("urllib.request").request.urlopen)
+                            c.commit()
+                            last_list = time.time()
+                        cfg = json.loads((c.execute("SELECT config_json FROM collector_jobs WHERE name='cricketdata_detail'").fetchone() or ["{}"])[0])
+                        cricketdata.sync_detail(c, cfg, now, opener) if opener else cricketdata.sync_detail(c, cfg, now)
+                        c.commit()
+                        live_mod.wake()
+            finally:
+                c.close()
+        except Exception:
+            traceback.print_exc()
+            wait = 30
+        if stop:
+            stop.wait(wait)
+        else:
+            time.sleep(wait)
+
+
 def start(db_fn):
     """Start the collector loop once per process (disabled with SH_COLLECTORS=0, e.g. in tests)."""
     global _started
@@ -216,4 +251,5 @@ def start(db_fn):
             return False
         _started = True
     threading.Thread(target=loop, args=(db_fn,), daemon=True, name="sh-collectors").start()
+    threading.Thread(target=live_loop, args=(db_fn,), daemon=True, name="sh-live-loop").start()
     return True

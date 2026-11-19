@@ -448,3 +448,19 @@ def _seed6(c):
                                                         "balls": True, "balls_every_min": 12, "priority": ["Big Bash", "Premier League", "T10", "Indian Premier", "T20I", "ODI", "Test"]}), now()))
 
 MIGRATIONS.append(("006_provider_match_detail", M006, _seed6))
+
+# ---------------------------------------------------------------- 007: CricketData settings follow the plan the key is on
+def _seed7(c):
+    for name, iv in (("cricketdata_detail", 2), ("cricketdata_live", 5), ("cricketdata_matches", 60)):
+        r = c.execute("SELECT config_json FROM collector_jobs WHERE name=?", (name,)).fetchone()
+        if r:
+            cfg = json.loads(r[0] or "{}")
+            for k in ("daily_budget", "max_featured", "balls_every_min", "scorecard_every_min"):
+                cfg.pop(k, None)          # missing = automatic from the plan limit
+            cfg["daily_budget"] = "auto"
+            c.execute("UPDATE collector_jobs SET config_json=?, interval_minutes=? WHERE name=?", (json.dumps(cfg), iv, name))
+    # owner, 19 Nov 2026: the CricketData key is on an unlimited plan valid until 29 Nov 2026 (then renew or change provider)
+    c.execute("INSERT OR IGNORE INTO system_settings(key,value,updated_at,updated_by) VALUES('cricketdata_plan_override',?,?,'owner')",
+              (json.dumps({"mode": "unlimited", "until": "2026-11-29"}), now()))
+
+MIGRATIONS.append(("007_cricketdata_auto_plan", "", _seed7))

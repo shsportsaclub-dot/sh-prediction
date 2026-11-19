@@ -31,6 +31,51 @@ def today():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
 
+def plan_limit(c):
+    """Daily hit limit the provider last reported for this key (100 = Lifetime Free). Unknown until the first call."""
+    r = c.execute("SELECT value FROM system_settings WHERE key='cricketdata_plan'").fetchone()
+    try:
+        return int(json.loads(r[0])["hitsLimit"]) if r else None
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def plan_override(c):
+    """Owner-declared plan, e.g. {"mode": "unlimited", "until": "2026-11-29"}; ignored after its end date."""
+    r = c.execute("SELECT value FROM system_settings WHERE key='cricketdata_plan_override'").fetchone()
+    if not r:
+        return None
+    try:
+        o = json.loads(r[0])
+    except ValueError:
+        return None
+    if o.get("until") and today() > o["until"]:
+        return None
+    return o
+
+
+def unlimited(c):
+    o = plan_override(c)
+    L = plan_limit(c)
+    return bool(o and o.get("mode") == "unlimited") or (L is not None and L >= 100000)
+
+
+def auto(c, cfg):
+    """Effective settings: explicit numbers in the job config win; 'auto' (default) follows the plan limit."""
+    if unlimited(c):
+        return {"limit": None, "paid": True, "unlimited": True, "budget": 10 ** 9,
+                "max_featured": cfg.get("max_featured") if isinstance(cfg.get("max_featured"), int) else 20,
+                "scorecard_every_min": 0, "balls_every_min": 0}
+    L = plan_limit(c) or 100
+    paid = L > 100
+    b = cfg.get("daily_budget", "auto")
+    return {"limit": L, "paid": paid, "unlimited": False,
+            "budget": (L - RESERVE if paid else 60) if b in (None, "auto") else int(b),
+            "max_featured": cfg.get("max_featured") if isinstance(cfg.get("max_featured"), int) else (min(8, max(1, L // 500)) if paid else 1),
+            "scorecard_every_min": cfg.get("scorecard_every_min") if isinstance(cfg.get("scorecard_every_min"), (int, float)) else (2 if paid else 6),
+            "balls_every_min": cfg.get("balls_every_min") if isinstance(cfg.get("balls_every_min"), (int, float)) else (2 if paid else 12)}
+
+
 def hits_used(c):
     r = c.execute("SELECT hits FROM api_budget WHERE provider='cricketdata' AND day=?", (today(),)).fetchone()
     return r[0] if r else 0
@@ -53,6 +98,10 @@ def call(c, endpoint, params, budget, opener=urllib.request.urlopen):
     if j.get("status") != "success":
         raise CDError("provider error: %s" % (j.get("reason") or j.get("status")))
     info = j.get("info") or {}
+    if info.get("hitsLimit"):
+        c.execute("INSERT INTO system_settings(key,value,updated_at,updated_by) VALUES('cricketdata_plan',?,?,'cricketdata') "
+                  "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                  (json.dumps({"hitsLimit": info["hitsLimit"], "hitsToday": info.get("hitsToday")}), datetime.datetime.now(datetime.timezone.utc).isoformat()))
     if info.get("hitsLimit") and info.get("hitsToday") is not None and info["hitsLimit"] - info["hitsToday"] < RESERVE:
         c.execute("UPDATE api_budget SET hits=? WHERE provider='cricketdata' AND day=?", (budget, today()))   # stop for today: key shared
     return j, info
@@ -122,6 +171,8 @@ def upsert(c, m, create_match, record_result, now_fn):
 
 
 def sync(c, endpoint, budget, create_match, record_result, now_fn, opener=urllib.request.urlopen, pages=1):
+    if budget in (None, "auto"):
+        budget = auto(c, {})["budget"]
     k = {"fetched": 0, "created": 0, "updated": 0, "hits_used_today": None, "provider_hits_today": None}
     for page in range(pages):
         j, info = call(c, endpoint, {"offset": page * 25}, budget, opener)
@@ -223,9 +274,10 @@ def _detail_call(c, endpoint, pid, budget, opener):
 
 
 def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
-    budget = cfg.get("daily_budget", 60)
+    A = auto(c, cfg)
+    budget = A["budget"]
     done, notes = [], []
-    targets = _detail_targets(c, cfg)
+    targets = _detail_targets(c, dict(cfg, max_featured=A["max_featured"]))
     c.execute("UPDATE ext_match_detail SET featured=0")
     for t in targets:
         mid, pid = t["id"], t["provider_id"]
@@ -236,10 +288,20 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
         c.execute("UPDATE ext_match_detail SET featured=1 WHERE match_id=?", (mid,))
         age = lambda at: 10 ** 9 if not at else (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(at)).total_seconds() / 60
         mnotes = []
-        data, err = _detail_call(c, "match_scorecard", pid, budget, opener)
-        if data is not None:
+        data, err = (None, None) if age(row["scorecard_at"]) < A["scorecard_every_min"] - 0.2 else _detail_call(c, "match_scorecard", pid, budget, opener)
+        if data is None and err is None:
+            pass
+        elif data is not None:
+            new_sc = norm_scorecard(data)
+            old_sc = json.loads(row["scorecard_json"]) if row["scorecard_json"] else None
             _store_raw(c, pid, "scorecard", data, now_fn)
-            c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(norm_scorecard(data)), now_fn(), mid))
+            c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(new_sc), now_fn(), mid))
+            last = new_sc[-1]["total"] if new_sc and new_sc[-1].get("total") else None
+            prev = old_sc[-1]["total"] if old_sc and old_sc[-1].get("total") else None
+            if last and last != prev:
+                import live
+                live.publish(c, mid, "ball", {"score": "%s-%s" % (last["r"], last["w"]), "overs": last["o"], "source": "CricketData",
+                                              "commentary": "Score update from CricketData"})
         else:
             mnotes.append(err)
         if age(row["squad_at"]) >= cfg.get("squad_every_min", 120):
@@ -257,7 +319,7 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
             else:
                 mnotes.append(err)
         info = json.loads(c.execute("SELECT info_json FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()[0] or "{}")
-        if cfg.get("balls", True) and info.get("bbbEnabled") is not False and age(row["balls_at"]) >= cfg.get("balls_every_min", 12):
+        if cfg.get("balls", True) and info.get("bbbEnabled") is not False and age(row["balls_at"]) >= A["balls_every_min"] - 0.2:
             data, err = _detail_call(c, "match_bbb", pid, budget, opener)
             if data is not None:
                 c.execute("UPDATE ext_match_detail SET balls_json=?, balls_at=? WHERE match_id=?", (json.dumps(norm_balls(data)), now_fn(), mid))
@@ -269,4 +331,5 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
         c.commit()
         done.append({"match_id": mid, "provider_id": pid, "notes": mnotes})
         notes += mnotes
-    return {"featured": done, "hits_used_today": hits_used(c), "note": None if targets else "no live CricketData match right now; no hit spent"}
+    return {"featured": done, "hits_used_today": hits_used(c), "plan_limit": A["limit"], "budget": budget, "max_featured": A["max_featured"],
+            "note": None if targets else "no live CricketData match right now; no hit spent"}
