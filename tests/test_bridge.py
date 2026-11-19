@@ -222,6 +222,16 @@ class CricketDataAdapter(unittest.TestCase):
         finally:
             os.environ.pop("CRIC_API_KEY", None)
 
+    def test_any_cric_key_variable_is_found(self):
+        os.environ.pop("CRICKETDATA_API_KEY", None); os.environ["CRICDATA_APIKEY"] = "odd-name-key"
+        try:
+            self.assertEqual((cricketdata.key(), cricketdata.key_name()), ("odd-name-key", "CRICDATA_APIKEY"))
+            b = T.call("/api/v1/admin/bridge", h=T.A)[1]["cricketdata"]
+            self.assertEqual((b["key_configured"], b["key_variable"]), (True, "CRICDATA_APIKEY"))
+            self.assertNotIn("odd-name-key", json.dumps(b))                                          # value never shown
+        finally:
+            os.environ.pop("CRICDATA_APIKEY", None)
+
     def test_reserve_protects_shared_key(self):
         near = dict(CD_MATCHES, info={"hitsToday": 90, "hitsLimit": 100})
         c = T.db()
@@ -516,3 +526,20 @@ class LiveDiscovery(unittest.TestCase):
         self.assertIn(m["id"], [x["id"] for x in T.call("/api/v1/matches?status=live&limit=100")[1]["items"]])   # shows on Home -> Live
         again = run("cricketdata_live", Fake({"currentMatches": json.dumps(cur).encode()}))
         self.assertEqual(again["status"], "ok")   # a live match is now known, so it keeps refreshing it
+
+
+class AutoPrepare(unittest.TestCase):
+    def test_empty_db_prepared_at_startup_but_never_a_db_with_data(self):
+        import tempfile, main, schema
+        old = main.DB
+        try:
+            main.DB = os.path.join(tempfile.mkdtemp(), "fresh.sqlite3")
+            self.assertEqual(main.auto_prepare_empty_db(), "prepared")
+            c = main.db(); self.assertEqual(schema.pending(c), []); c.close()
+            self.assertEqual(main.auto_prepare_empty_db(), "up_to_date")
+            main.DB = os.path.join(tempfile.mkdtemp(), "old.sqlite3")
+            c = main.db(); c.execute("INSERT INTO fixtures(competition,season,home,away,start_utc,source) VALUES('x','1','A','B','2030-01-01T00:00:00Z','s')"); c.commit(); c.close()
+            self.assertEqual(main.auto_prepare_empty_db(), "has_data")                  # real data: waits for the admin's backup + migrate
+            c = main.db(); self.assertTrue(schema.pending(c)); c.close()
+        finally:
+            main.DB = old

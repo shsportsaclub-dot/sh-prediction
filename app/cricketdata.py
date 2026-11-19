@@ -22,9 +22,24 @@ class CDError(Exception):
     pass
 
 
+KEY_NAMES = ("CRICKETDATA_API_KEY", "CRIC_API_KEY", "CRICAPI_KEY", "CRICKET_API_KEY", "CRICKETDATA_KEY")
+
+
+def key_name():
+    """Name of the environment variable holding the CricketData key: a known name first, otherwise any
+    variable named CRIC...KEY (the owner may have copied the name from another service)."""
+    for n in KEY_NAMES:
+        if os.getenv(n, "").strip():
+            return n
+    for n in sorted(os.environ):
+        if re.fullmatch(r"CRIC[A-Z0-9_]*(KEY|TOKEN)", n) and os.environ[n].strip():
+            return n
+    return None
+
+
 def key():
-    """CRICKETDATA_API_KEY, or CRIC_API_KEY (the name the SH live-line bot uses for the same key)."""
-    return (os.getenv("CRICKETDATA_API_KEY", "") or os.getenv("CRIC_API_KEY", "")).strip()
+    n = key_name()
+    return os.environ[n].strip() if n else ""
 
 
 def today():

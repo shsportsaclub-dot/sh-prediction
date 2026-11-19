@@ -774,7 +774,8 @@ def bridge_status(c):
         JOIN teams h ON h.id=m1.home_team_id JOIN teams a ON a.id=m1.away_team_id
         WHERE m1.data_origin<>'demo' AND m2.data_origin<>'demo' LIMIT 50"""))
     return {"jobs": jobs, "matches_by_source": counts,
-            "cricketdata": dict(key_configured=bool(cricketdata.key()), hits_used_today=cricketdata.hits_used(c), day_utc=cricketdata.today(),
+            "cricketdata": dict(key_configured=bool(cricketdata.key()), key_variable=cricketdata.key_name(),
+                                cric_variables_seen=sorted(n for n in os.environ if n.startswith("CRIC")), hits_used_today=cricketdata.hits_used(c), day_utc=cricketdata.today(),
                                 plan_reported_limit=cricketdata.plan_limit(c), plan_override=cricketdata.plan_override(c),
                                 effective={k: v for k, v in cricketdata.auto(c, {}).items() if k != "budget"} | {"budget": (lambda b: "unlimited" if b >= 10 ** 9 else b)(cricketdata.auto(c, {})["budget"])},
                                 live_refresh_seconds=(10 if cricketdata.unlimited(c) else 60 if cricketdata.auto(c, {})["paid"] else None)),

@@ -308,8 +308,25 @@ def start_worker():
  global WORKER
  if WORKER is None and os.getenv("SH_WORKER_INLINE","1")=="1":WORKER=media.Worker(db,social.on_media_ready).start()
  return WORKER
+def auto_prepare_empty_db():
+ """A brand-new, empty database (e.g. after a restart on a host without a persistent disk) is prepared at startup:
+ there is nothing to back up or lose. A database that holds any data still waits for the admin's
+ 'Back up and run migration' action. SH_AUTO_PREPARE_EMPTY=0 turns this off."""
+ if os.getenv("SH_AUTO_PREPARE_EMPTY","1")=="0":return "disabled"
+ import schema
+ c=db()
+ try:
+  if not schema.pending(c):return "up_to_date"
+  if sqlite3.Connection.execute(c,"SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone():return "has_data"
+  tables=[r[0] for r in sqlite3.Connection.execute(c,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+  if any(sqlite3.Connection.execute(c,'SELECT 1 FROM "%s" LIMIT 1'%t).fetchone() for t in tables):return "has_data"
+  schema.migrate(c);c.commit()
+  print("SH PREDICTION: empty database prepared at startup (migrations applied)",flush=True)
+  return "prepared"
+ finally:c.close()
 if __name__=="__main__":
  with db():pass
  start_worker()
+ auto_prepare_empty_db()
  import scheduler;scheduler.start(db)  # 24/7 data collectors (SH_COLLECTORS=0 disables)
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()
