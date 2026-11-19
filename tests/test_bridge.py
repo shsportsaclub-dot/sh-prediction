@@ -328,3 +328,88 @@ class RestartPersistence(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+SC = {"status": "success", "info": {"hitsToday": 20, "hitsLimit": 100}, "data": {"scorecard": [{"inning": "QY Lions Inning 1",
+      "batting": [{"batsman": {"id": "p1", "name": "GM Harris"}, "r": 20, "b": 13, "4s": 1, "6s": 2, "sr": 153.85, "dismissal-text": "not out"},
+                  {"batsman": {"id": "p2", "name": "C Knott"}, "r": 16, "b": 12, "4s": 2, "6s": 1, "sr": 133.33, "dismissal-text": "not out"}],
+      "bowling": [{"bowler": {"id": "p9", "name": "S Bates"}, "o": 2, "m": 0, "r": 16, "w": 0, "nb": 0, "wd": 1, "eco": 8}],
+      "extras": {"b": 0, "lb": 0, "w": 2, "nb": 1, "p": 0}, "totals": {"R": 39, "W": 0, "O": 4}}]}}
+SQ = {"status": "success", "info": {}, "data": [{"teamName": "QY Lions", "players": [{"id": "p1", "name": "GM Harris", "role": "Batting Allrounder"}]},
+                                              {"teamName": "QY Tigers", "players": [{"id": "p9", "name": "S Bates", "role": "Bowler"}]}]}
+INFO = {"status": "success", "info": {}, "data": {"name": "x", "bbbEnabled": True, "tossWinner": "QY Tigers", "tossChoice": "bowl", "secret": "drop"}}
+BBB = {"status": "success", "info": {}, "data": {"bbb": [{"n": 1, "inning": 0, "over": 0, "ball": 1, "runs": 4, "batsman": {"name": "GM Harris"}, "bowler": {"name": "S Bates"}},
+                                                      {"n": 2, "inning": 0, "over": 0, "ball": 2, "runs": 0, "batsman": {"name": "GM Harris"}, "bowler": {"name": "S Bates"}},
+                                                      {"n": 7, "inning": 0, "over": 1, "ball": 1, "runs": 6, "batsman": {"name": "C Knott"}, "bowler": {"name": "X"}}]}}
+
+
+class FeaturedDetail(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def setUp(self):
+        os.environ["CRICKETDATA_API_KEY"] = "test-key-123"
+        c = T.db(); c.execute("DELETE FROM api_budget"); c.commit(); c.close()
+
+    def tearDown(self):
+        os.environ.pop("CRICKETDATA_API_KEY", None)
+
+    def test_featured_live_match_gets_scorecard_squads_balls(self):
+        fake = Fake({"/v1/matches": json.dumps(CD_MATCHES).encode(), "match_scorecard": json.dumps(SC).encode(), "match_squad": json.dumps(SQ).encode(),
+                     "match_info": json.dumps(INFO).encode(), "match_bbb": json.dumps(BBB).encode()})
+        run("cricketdata_matches", fake)
+        r = run("cricketdata_detail", fake)
+        self.assertEqual(r["status"], "ok", r)
+        live = match_by("cricketdata", "cd-222")
+        self.assertEqual([x["match_id"] for x in r["summary"]["featured"]], [live])          # only the live match, max 1 on the free plan
+        pd = T.call("/api/v1/matches/%d" % live)[1]["provider_detail"]
+        inn = pd["scorecard"][0]
+        self.assertEqual((inn["batting"][0]["name"], inn["batting"][0]["fours"], inn["batting"][0]["sixes"], inn["total"]["r"]), ("GM Harris", 1, 2, 39))
+        self.assertEqual((inn["bowling"][0]["name"], inn["bowling"][0]["eco"], inn["extras"]["nb"]), ("S Bates", 8, 1))
+        self.assertEqual([s["team"] for s in pd["squads"]], ["QY Lions", "QY Tigers"])
+        self.assertEqual(pd["runs_per_over"], [{"inning": "0", "over": 1, "runs": 4}, {"inning": "0", "over": 2, "runs": 6}])
+        self.assertNotIn("secret", pd["info"])
+        self.assertEqual(T.call("/api/v1/matches/%d" % live)[1]["data_status"], "live_scorecard")
+        hits = sum(1 for u in fake.urls if "match_" in u)
+        self.assertEqual(hits, 4)
+        # a second run 6 min later spends 1 hit (scorecard); squad/info refresh every 2 h, balls every 12 min
+        r2 = run("cricketdata_detail", fake)
+        self.assertEqual(sum(1 for u in fake.urls if "match_" in u) - hits, 1)
+        # provider refuses the scorecard (plan): note shown, nothing invented
+        fake.routes["match_scorecard"] = json.dumps({"status": "failure", "reason": "Not on your plan"}).encode()
+        r3 = run("cricketdata_detail", fake)
+        self.assertIn("Not on your plan", json.dumps(r3["summary"]))
+        self.assertTrue(any("Not on your plan" in n for n in T.call("/api/v1/matches/%d" % live)[1]["provider_detail"]["notes"]))
+
+    def test_history_venue_form_h2h(self):
+        mid = match_by("cricsheet", "990002")
+        if not mid:
+            self.skipTest("depends on CricsheetBridge import")
+        h = T.call("/api/v1/matches/%d" % mid)[1]["history"]
+        self.assertIn("head_to_head", h)
+        self.assertIn("SH database", h["note"])
+
+
+class TipsterRanking(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def test_overall_world_rank_and_pinned_me(self):
+        H = T.account("rank_tipster_a")
+        c = T.db()
+        uid = c.execute("SELECT user_id FROM accounts WHERE username='rank_tipster_a'").fetchone()[0]
+        c.close()
+        T.call("/api/v1/me/tipster-application", {}, H)
+        T.call("/api/v1/admin/social/moderate", {"action": "approve_tipster", "target_type": "user", "target_id": uid, "reason": "test"}, T.A)
+        j = T.call("/api/v1/social/leaderboard", h=H)[1]
+        self.assertEqual(j["board"], "overall")
+        self.assertEqual((j["me"]["username"], j["me"]["rank"] >= 1, j["me"]["out_of"]), ("rank_tipster_a", True, j["total_ranked"]))
+        self.assertIn("Shrunk accuracy", j["rule"])
+        self.assertTrue(all("user_id" not in x for x in j["items"]))
+        acc = T.call("/api/v1/social/leaderboard?board=accuracy", h=H)[1]["me"]          # no settled picks yet: not ranked, told why
+        self.assertIsNone(acc["rank"]); self.assertIn("settled picks", acc["reason"])
+        viewer = T.account("rank_viewer_b")
+        self.assertIn("only tipsters", T.call("/api/v1/social/leaderboard", h=viewer)[1]["me"]["reason"])
+        self.assertIsNone(T.call("/api/v1/social/leaderboard")[1]["me"])                  # anonymous: no pinned row

@@ -91,6 +91,12 @@ def job_cricketdata_live(conn, cfg, opener):
     return k
 
 
+def job_cricketdata_detail(conn, cfg, opener):
+    if not cricketdata.key():
+        return {"skipped": "CRICKETDATA_API_KEY is not set on the server"}
+    return cricketdata.sync_detail(conn, cfg, now, opener) if opener else cricketdata.sync_detail(conn, cfg, now)
+
+
 def _cricsheet_file(db_fn, fname, opener):
     import api_v1
     factory = lambda c: (lambda row: api_v1.admin_match(c, {"actor": "cricsheet-import", "role": "admin", "user_id": None}, row))
@@ -134,7 +140,7 @@ def job_cricsheet_backfill(conn, cfg, opener, db_fn):
 
 
 JOBS = {"owner_sheets_sync": job_owner_sheets_sync, "registry_index_sync": job_registry_index_sync,
-        "cricketdata_matches": job_cricketdata_matches, "cricketdata_live": job_cricketdata_live,
+        "cricketdata_matches": job_cricketdata_matches, "cricketdata_live": job_cricketdata_live, "cricketdata_detail": job_cricketdata_detail,
         "cricsheet_recent": job_cricsheet_recent, "cricsheet_backfill": job_cricsheet_backfill}
 NEEDS_DB_FN = {"cricsheet_recent", "cricsheet_backfill"}
 

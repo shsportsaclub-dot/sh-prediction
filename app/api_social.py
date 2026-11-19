@@ -140,7 +140,8 @@ def dispatch(c, h, who, method, P, q, body_fn, helpers):
                 return 200, {"items": social.trending_hashtags(c)}
             if P == ["social", "leaderboard"]:
                 cid = _qv(q, "competition_id")
-                return 200, social.leaderboard(c, _qv(q, "board") or "accuracy", int(cid) if cid else None, int(_qv(q, "min_settled") or 5))
+                return 200, social.leaderboard(c, _qv(q, "board") or "overall", int(cid) if cid else None, int(_qv(q, "min_settled") or 5),
+                                               me_user_id=vid)
             if P == ["social", "search", "users"]:
                 qq = _qv(q, "q") or ""
                 if len(qq) < 2:

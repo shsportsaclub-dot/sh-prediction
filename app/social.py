@@ -532,9 +532,21 @@ def prediction_history(c, username, limit=50, offset=0):
     return {"items": [dict(r) for r in rows], "limit": limit, "offset": offset,
             "note": "Every published pick is listed, including losing and deleted-post picks; picks cannot be removed."}
 
-LEADERBOARDS = ("accuracy", "volume", "recent", "followers", "engagement", "competition")
+LEADERBOARDS = ("overall", "accuracy", "volume", "recent", "followers", "engagement", "competition")
+OVERALL_RULE = ("World ranking score (0-100): 60 x shrunk accuracy x track-record factor + 15 x activity in picks + 10 x posting activity (30 days) "
+                "+ 10 x engagement + 5 x followers. Shrunk accuracy = (correct+1)/(settled+2), so 1 lucky pick is not 100%; "
+                "track-record factor = settled picks / 20 (max 1). Activity parts use log scale so spam does not win. "
+                "Only locked, pre-match, published picks count; nothing is entered by hand.")
 
-def leaderboard(c, kind, competition_id=None, min_settled=5, limit=50):
+def _overall_score(x):
+    import math
+    acc = (x["correct"] + 1) / (x["settled"] + 2)
+    trust = min(1.0, x["settled"] / 20.0)
+    lg = lambda v, cap: min(1.0, math.log10(1 + v) / math.log10(1 + cap))
+    return round(60 * acc * trust + 15 * lg(x["eligible"], 200) + 10 * lg(x["posts_30d"], 60) + 10 * lg(x["engagement"], 2000) + 5 * lg(x["followers"], 5000), 2)
+
+
+def leaderboard(c, kind, competition_id=None, min_settled=5, limit=50, me_user_id=None):
     if kind not in LEADERBOARDS:
         raise bad("leaderboard must be one of " + ", ".join(LEADERBOARDS))
     out = []
@@ -545,10 +557,18 @@ def leaderboard(c, kind, competition_id=None, min_settled=5, limit=50):
         eng = c.execute("""SELECT (SELECT COUNT(*) FROM reactions r JOIN posts p ON p.id=r.post_id WHERE p.author_id=:u)
                            + (SELECT COUNT(*) FROM comments cm JOIN posts p ON p.id=cm.post_id WHERE p.author_id=:u AND cm.status='visible')
                            + (SELECT COUNT(*) FROM shares s JOIN posts p ON p.id=s.post_id WHERE p.author_id=:u)""", {"u": a["user_id"]}).fetchone()[0]
-        out.append({"username": a["username"], "display_name": a["display_name"], "account_type": a["account_type"],
+        posts_30d = c.execute("SELECT COUNT(*) FROM posts WHERE author_id=? AND status='published' AND created_at>=?",
+                              (a["user_id"], (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)).isoformat())).fetchone()[0]
+        out.append({"user_id": a["user_id"], "username": a["username"], "display_name": a["display_name"], "account_type": a["account_type"], "posts_30d": posts_30d,
                     "accuracy": st["accuracy"], "settled": st["settled"], "correct": st["correct"], "incorrect": st["incorrect"],
                     "eligible": st["settled"] + st["pending"], "recent_form": st["recent_form"], "followers": followers, "engagement": eng})
-    if kind in ("accuracy", "recent", "competition"):
+    for x in out:
+        x["score"] = _overall_score(x)
+    excluded = []
+    if kind == "overall":
+        out.sort(key=lambda x: (-x["score"], -x["settled"], x["username"]))
+    elif kind in ("accuracy", "recent", "competition"):
+        excluded = [x for x in out if x["settled"] < min_settled]
         out = [x for x in out if x["settled"] >= min_settled]
         out.sort(key=lambda x: (-(x["accuracy"] or 0), -x["settled"]))
     elif kind == "volume":
@@ -559,8 +579,24 @@ def leaderboard(c, kind, competition_id=None, min_settled=5, limit=50):
         out.sort(key=lambda x: -x["engagement"])
     for i, x in enumerate(out, 1):
         x["rank"] = i
+    me = None
+    if me_user_id:
+        mine = next((x for x in out if x["user_id"] == me_user_id), None)
+        if mine:
+            me = dict(mine, out_of=len(out))
+        else:
+            ex = next((x for x in excluded if x["user_id"] == me_user_id), None)
+            if ex:
+                me = dict(ex, rank=None, out_of=len(out), reason="needs %d settled picks to be ranked here (has %d)" % (min_settled, ex["settled"]))
+            else:
+                me = {"rank": None, "reason": "only tipsters are ranked; apply to become a tipster from your account page"}
+    for x in out + excluded:
+        x.pop("user_id", None)
+    if me:
+        me.pop("user_id", None)
+    rule = OVERALL_RULE if kind == "overall" else "Accuracy = correct / (correct + incorrect) from locked, published, pre-match picks; pending, void and late picks excluded."
     return {"board": kind, "min_settled": min_settled if kind in ("accuracy", "recent", "competition") else None, "items": out[:limit],
-            "rule": "Accuracy = correct / (correct + incorrect) from locked, published, pre-match picks; pending, void and late picks excluded."}
+            "total_ranked": len(out), "me": me, "rule": rule}
 
 def dashboard(c, acct):
     uid = acct["user_id"]

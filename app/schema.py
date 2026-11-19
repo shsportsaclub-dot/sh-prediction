@@ -434,3 +434,17 @@ def _seed5(c):
     registry.seed(c)
 
 MIGRATIONS.append(("005_data_bridge_registry", M005, _seed5))
+
+# ---------------------------------------------------------------- 006: provider match detail (scorecard/squad/info/balls) kept apart from our own ball_events
+M006 = """
+CREATE TABLE IF NOT EXISTS ext_match_detail(match_id INTEGER PRIMARY KEY REFERENCES matches(id), source TEXT NOT NULL,
+  scorecard_json TEXT, squad_json TEXT, info_json TEXT, balls_json TEXT, notes_json TEXT NOT NULL DEFAULT '[]',
+  scorecard_at TEXT, squad_at TEXT, info_at TEXT, balls_at TEXT, featured INTEGER NOT NULL DEFAULT 0);
+"""
+
+def _seed6(c):
+    c.execute("INSERT OR IGNORE INTO collector_jobs(name,enabled,interval_minutes,config_json,next_run_at) VALUES(?,?,?,?,?)",
+              ("cricketdata_detail", 1, 6, json.dumps({"daily_budget": 60, "max_featured": 1, "squad_every_min": 120, "info_every_min": 120,
+                                                        "balls": True, "balls_every_min": 12, "priority": ["Big Bash", "Premier League", "T10", "Indian Premier", "T20I", "ODI", "Test"]}), now()))
+
+MIGRATIONS.append(("006_provider_match_detail", M006, _seed6))

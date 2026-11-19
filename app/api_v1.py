@@ -129,6 +129,8 @@ def annotate(c, items):
     for r in c.execute("SELECT local_id, provider FROM data_provider_syncs WHERE provider_entity='match' AND local_id IN (%s)" % qm, ids):
         prov.setdefault(r[0], []).append(r[1])
     cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=STALE_MIN)).isoformat()
+    ext_fresh = {r[0] for r in c.execute("SELECT match_id FROM ext_match_detail WHERE match_id IN (%s) AND scorecard_json IS NOT NULL AND scorecard_at>=?" % qm,
+                                         ids + [cutoff])} if c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() else set()
     for d in items:
         n, bsrc = balls.get(d["id"], (0, None))
         ls = live.get(d["id"])
@@ -139,6 +141,8 @@ def annotate(c, items):
         elif d["status"] == "live":
             if n and bsrc not in ("cricsheet",):
                 st = ("live_ball_by_ball", "Live · ball-by-ball (SH scoring)")
+            elif d["id"] in ext_fresh:
+                st = ("live_scorecard", "Live · scorecard (%s)" % ls["source"] if ls else "Live · scorecard")
             elif ls and ls["fetched_at"] >= cutoff:
                 st = ("live_score_only", "Live · score only (%s)" % ls["source"])
             elif ls:
@@ -265,7 +269,95 @@ def match_detail(c, mid):
     d["playing_xi"] = rows(c.execute("""SELECT x.team_id,x.player_id,p.name,p.role,x.batting_order,x.is_captain,x.is_keeper,x.is_impact_sub
                                          FROM playing_xi x JOIN players p ON p.id=x.player_id WHERE x.match_id=? ORDER BY x.team_id,x.batting_order""", (mid,)))
     d["squads"] = rows(c.execute("SELECT s.team_id,p.id AS player_id,p.name,p.role FROM match_squads s JOIN players p ON p.id=s.player_id WHERE s.match_id=?", (mid,)))
+    d["provider_detail"] = provider_detail(c, mid)
+    d["history"] = match_history(c, r)
     return d
+
+def provider_detail(c, mid):
+    """Scorecard / squads / balls from an outside provider (CricketData), shown as such and never mixed into our own ball_events."""
+    r = c.execute("SELECT * FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone() if \
+        c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() else None
+    if not r:
+        return None
+    load = lambda k: json.loads(r[k]) if r[k] else None
+    balls = load("balls_json") or []
+    overs = {}
+    for b in balls:
+        if b.get("over") is not None:
+            key = (str(b.get("inning")), int(b["over"]))
+            overs[key] = overs.get(key, 0) + (b.get("runs") or 0)
+    return {"source": "CricketData.org", "featured": bool(r["featured"]), "scorecard": load("scorecard_json"), "scorecard_at": r["scorecard_at"],
+            "squads": load("squad_json"), "squads_at": r["squad_at"], "info": load("info_json"), "balls": balls[-36:], "balls_at": r["balls_at"],
+            "runs_per_over": [{"inning": k[0], "over": k[1] + 1, "runs": v} for k, v in sorted(overs.items(), key=lambda kv: (kv[0][0], kv[0][1]))],
+            "notes": json.loads(r["notes_json"] or "[]"),
+            "rule": "Provider figures shown as received. Ball rows show only runs, over and wicket marks the provider sends."}
+
+def _norm_team(n):
+    n = re.sub(r"\s*\((women|men)\)\s*$", "", (n or "").strip(), flags=re.I)
+    women = bool(re.search(r"\bwomen\b", n, re.I))
+    return re.sub(r"\s+", " ", re.sub(r"\bwomen\b|\bmen\b", "", n, flags=re.I)).strip().lower(), women
+
+def _team_family(c, tid):
+    """Same club under its exact name in other sources (e.g. 'Brisbane Heat Women' and 'Brisbane Heat' in a women's competition)."""
+    row = c.execute("SELECT name, gender FROM teams WHERE id=?", (tid,)).fetchone()
+    base, women = _norm_team(row["name"])
+    women = women or row["gender"] == "women"
+    ids = []
+    for t in c.execute("SELECT id, name, gender FROM teams"):
+        b, w = _norm_team(t["name"])
+        if b == base and (w or t["gender"] == "women") == women:
+            ids.append(t["id"])
+    return ids or [tid]
+
+def match_history(c, r):
+    """Head-to-head list, last-5 form and venue figures from completed, non-demo matches in our database (no outside data)."""
+    H, A = _team_family(c, r["home_team_id"]), _team_family(c, r["away_team_id"])
+    qh, qa = ",".join("?" * len(H)), ",".join("?" * len(A))
+    fmt = r["format"]
+    h2h = []
+    for m in c.execute("""SELECT m.id, substr(m.start_utc,1,10) AS day, m.home_team_id, m.away_team_id, th.name AS home, ta.name AS away,
+            mr.result_type, mr.winner_team_id, mr.margin, tw.name AS winner FROM matches m JOIN match_results mr ON mr.match_id=m.id
+            JOIN teams th ON th.id=m.home_team_id JOIN teams ta ON ta.id=m.away_team_id LEFT JOIN teams tw ON tw.id=mr.winner_team_id
+            WHERE m.id<>? AND m.data_origin<>'demo' AND m.format=? AND ((m.home_team_id IN (%s) AND m.away_team_id IN (%s)) OR (m.home_team_id IN (%s) AND m.away_team_id IN (%s)))
+            ORDER BY m.start_utc DESC LIMIT 10""" % (qh, qa, qa, qh), [r["id"], fmt] + H + A + A + H):
+        d = dict(m)
+        d["innings"] = rows(c.execute("SELECT i.innings_no, t.name AS team, i.runs, i.wickets, i.legal_balls FROM innings i JOIN teams t ON t.id=i.batting_team_id WHERE i.match_id=? AND i.is_super_over=0 ORDER BY i.innings_no", (m["id"],)))
+        d["side_won"] = "home" if m["winner_team_id"] in H else "away" if m["winner_team_id"] in A else None
+        h2h.append(d)
+    def form(ids):
+        q = ",".join("?" * len(ids))
+        out = []
+        for m in c.execute("""SELECT mr.result_type, mr.winner_team_id FROM matches m JOIN match_results mr ON mr.match_id=m.id
+                WHERE m.start_utc < ? AND m.data_origin<>'demo' AND m.format=? AND (m.home_team_id IN (%s) OR m.away_team_id IN (%s))
+                ORDER BY m.start_utc DESC LIMIT 5""" % (q, q), [r["start_utc"], fmt] + ids + ids):
+            out.append("W" if m["winner_team_id"] in ids else "L" if m["winner_team_id"] else "-")
+        return out
+    venue = None
+    if r["venue_id"]:
+        vname = c.execute("SELECT name FROM venues WHERE id=?", (r["venue_id"],)).fetchone()[0]
+        key = vname.split(",")[0].strip()
+        vids = [x[0] for x in c.execute("SELECT id FROM venues WHERE name=? OR name LIKE ?", (vname, key + ",%"))] or [r["venue_id"]]
+        qv_ = ",".join("?" * len(vids))
+        ms = c.execute("""SELECT m.id, mr.winner_team_id FROM matches m JOIN match_results mr ON mr.match_id=m.id
+                          WHERE m.venue_id IN (%s) AND m.format=? AND m.data_origin<>'demo' AND m.id<>? AND mr.result_type IN ('win','awarded')""" % qv_,
+                       vids + [fmt, r["id"]]).fetchall()
+        first, second, bat_first_won, tot = [], [], 0, []
+        for m in ms:
+            inn = c.execute("""SELECT i.innings_no, i.runs, i.wickets, i.legal_balls, i.batting_team_id, t.name FROM innings i JOIN teams t ON t.id=i.batting_team_id
+                               WHERE i.match_id=? AND i.is_super_over=0 ORDER BY i.innings_no""", (m["id"],)).fetchall()
+            if len(inn) >= 2:
+                first.append(inn[0]["runs"]); second.append(inn[1]["runs"])
+                bat_first_won += m["winner_team_id"] == inn[0]["batting_team_id"]
+            tot += [(x["runs"], x["wickets"], x["legal_balls"], x["name"]) for x in inn]
+        n = len(first)
+        fmt_t = lambda x: {"runs": x[0], "wickets": x[1], "overs": "%d.%d" % divmod(x[2], 6), "team": x[3]} if x else None
+        venue = {"name": vname, "matches": n, "avg_first_innings": round(sum(first) / n) if n else None,
+                 "avg_second_innings": round(sum(second) / n) if n else None,
+                 "bat_first_win_pct": round(100 * bat_first_won / n) if n else None,
+                 "chase_win_pct": round(100 * (n - bat_first_won) / n) if n else None,
+                 "highest": fmt_t(max(tot) if tot else None), "lowest_all_out": fmt_t(min([x for x in tot if x[1] == 10], default=None))}
+    return {"head_to_head": h2h, "home_form": form(H), "away_form": form(A), "venue": venue,
+            "note": "From completed %s matches in the SH database (Cricsheet, owner sheets, SH scoring, provider results). Demo data excluded." % fmt}
 
 def match_predictions(c, mid, who=None):
     get_match(c, mid)

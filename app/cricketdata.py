@@ -136,3 +136,136 @@ def sync(c, endpoint, budget, create_match, record_result, now_fn, opener=urllib
             break
     k["hits_used_today"] = hits_used(c)
     return k
+
+
+# ------------------------------------------------------------------ featured match detail (scorecard, squad, info, balls)
+# Field names follow CricketData's live replies as used by the SH live-line server:
+# scorecard[] {inning, batting[{batsman{id,name}, r, b, 4s, 6s, sr, dismissal-text}], bowling[{bowler{id,name}, o, m, r, w, nb, wd, eco}],
+#              extras, totals{R, W, O}}; match_squad -> [{teamName, players[{id,name,role,...}]}]; match_bbb -> {bbb[...]}.
+# Anything else in a reply is kept raw and ignored by the screens.
+
+def _num(v):
+    try:
+        f = float(v)
+        return int(f) if f.is_integer() else f
+    except (TypeError, ValueError):
+        return None
+
+
+def norm_scorecard(data):
+    out = []
+    for inn in (data or {}).get("scorecard") or []:
+        bat = []
+        for b in inn.get("batting") or []:
+            p = b.get("batsman") or {}
+            bat.append({"name": p.get("name") if isinstance(p, dict) else str(p), "id": p.get("id") if isinstance(p, dict) else None,
+                        "r": _num(b.get("r")), "b": _num(b.get("b")), "fours": _num(b.get("4s")), "sixes": _num(b.get("6s")),
+                        "sr": _num(b.get("sr")), "dismissal": b.get("dismissal-text") or b.get("dismissal") or None})
+        bowl = []
+        for w in inn.get("bowling") or []:
+            p = w.get("bowler") or {}
+            bowl.append({"name": p.get("name") if isinstance(p, dict) else str(p), "id": p.get("id") if isinstance(p, dict) else None,
+                         "o": w.get("o"), "m": _num(w.get("m")), "r": _num(w.get("r")), "w": _num(w.get("w")),
+                         "nb": _num(w.get("nb")), "wd": _num(w.get("wd")), "eco": _num(w.get("eco"))})
+        t = inn.get("totals") or {}
+        ex = inn.get("extras") or {}
+        out.append({"inning": inn.get("inning"), "batting": bat, "bowling": bowl,
+                    "total": {"r": _num(t.get("R")), "w": _num(t.get("W")), "o": t.get("O"), "rr": _num(t.get("Rr"))} if t else None,
+                    "extras": ex if isinstance(ex, dict) else {"total": _num(ex)}})
+    return out
+
+
+def norm_squad(data):
+    teams = data if isinstance(data, list) else (data or {}).get("squads") or (data or {}).get("teams") or []
+    out = []
+    for t in teams if isinstance(teams, list) else []:
+        out.append({"team": t.get("teamName") or t.get("name"), "players": [{"name": p.get("name"), "id": p.get("id"), "role": p.get("role")}
+                                                                          for p in t.get("players") or [] if isinstance(p, dict)]})
+    if not out and isinstance(data, dict) and isinstance(data.get("players"), list):   # flat list with a team field
+        byt = {}
+        for p in data["players"]:
+            byt.setdefault(p.get("team") or "Squad", []).append({"name": p.get("name"), "id": p.get("id"), "role": p.get("role")})
+        out = [{"team": k, "players": v} for k, v in byt.items()]
+    return out
+
+
+def norm_balls(data):
+    rows = (data or {}).get("bbb") if isinstance(data, dict) else data
+    out = []
+    for x in rows or []:
+        if not isinstance(x, dict):
+            continue
+        name = lambda v: (v.get("name") if isinstance(v, dict) else v) or None
+        out.append({"n": x.get("n"), "inning": x.get("inning"), "over": _num(x.get("over")), "ball": _num(x.get("ball")), "runs": _num(x.get("runs")) or 0,
+                    "batter": name(x.get("batsman")), "bowler": name(x.get("bowler")),
+                    "wicket": bool(x.get("wicket") or x.get("dismissal") or x.get("out")),
+                    "extra": x.get("extras") or x.get("extra") or (("wd" if x.get("wide") else "nb" if x.get("noball") else None))})
+    return out
+
+
+def _detail_targets(c, cfg):
+    """Live CricketData matches, best first: owner/priority competitions, then most recently started."""
+    rows = c.execute("""SELECT m.id, s.provider_id, cp.name AS comp, m.start_utc FROM matches m
+                        JOIN data_provider_syncs s ON s.local_id=m.id AND s.provider='cricketdata' AND s.provider_entity='match'
+                        JOIN competitions cp ON cp.id=m.competition_id WHERE m.status='live' ORDER BY m.start_utc DESC""").fetchall()
+    pri = [p.lower() for p in cfg.get("priority", [])]
+    rank = lambda r: next((i for i, p in enumerate(pri) if p in (r["comp"] or "").lower()), len(pri))
+    return sorted(rows, key=rank)[: max(0, int(cfg.get("max_featured", 1)))]
+
+
+def _detail_call(c, endpoint, pid, budget, opener):
+    try:
+        j, _ = call(c, endpoint, {"id": pid}, budget, opener)
+        return j.get("data"), None
+    except CDError as e:
+        return None, "%s: %s" % (endpoint, e)
+
+
+def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
+    budget = cfg.get("daily_budget", 60)
+    done, notes = [], []
+    targets = _detail_targets(c, cfg)
+    c.execute("UPDATE ext_match_detail SET featured=0")
+    for t in targets:
+        mid, pid = t["id"], t["provider_id"]
+        row = c.execute("SELECT * FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()
+        if not row:
+            c.execute("INSERT INTO ext_match_detail(match_id,source) VALUES(?,'cricketdata')", (mid,))
+            row = c.execute("SELECT * FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()
+        c.execute("UPDATE ext_match_detail SET featured=1 WHERE match_id=?", (mid,))
+        age = lambda at: 10 ** 9 if not at else (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(at)).total_seconds() / 60
+        mnotes = []
+        data, err = _detail_call(c, "match_scorecard", pid, budget, opener)
+        if data is not None:
+            _store_raw(c, pid, "scorecard", data, now_fn)
+            c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(norm_scorecard(data)), now_fn(), mid))
+        else:
+            mnotes.append(err)
+        if age(row["squad_at"]) >= cfg.get("squad_every_min", 120):
+            data, err = _detail_call(c, "match_squad", pid, budget, opener)
+            if data is not None:
+                c.execute("UPDATE ext_match_detail SET squad_json=?, squad_at=? WHERE match_id=?", (json.dumps(norm_squad(data)), now_fn(), mid))
+            else:
+                mnotes.append(err)
+        if age(row["info_at"]) >= cfg.get("info_every_min", 120):
+            data, err = _detail_call(c, "match_info", pid, budget, opener)
+            if data is not None:
+                keep = {k: data.get(k) for k in ("name", "matchType", "status", "venue", "date", "dateTimeGMT", "teams", "tossWinner", "tossChoice",
+                                                 "matchWinner", "series_id", "fantasyEnabled", "bbbEnabled") if k in data}
+                c.execute("UPDATE ext_match_detail SET info_json=?, info_at=? WHERE match_id=?", (json.dumps(keep), now_fn(), mid))
+            else:
+                mnotes.append(err)
+        info = json.loads(c.execute("SELECT info_json FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()[0] or "{}")
+        if cfg.get("balls", True) and info.get("bbbEnabled") is not False and age(row["balls_at"]) >= cfg.get("balls_every_min", 12):
+            data, err = _detail_call(c, "match_bbb", pid, budget, opener)
+            if data is not None:
+                c.execute("UPDATE ext_match_detail SET balls_json=?, balls_at=? WHERE match_id=?", (json.dumps(norm_balls(data)), now_fn(), mid))
+            else:
+                mnotes.append(err)
+        elif info.get("bbbEnabled") is False:
+            mnotes.append("match_bbb: provider lists this match with ball-by-ball switched off")
+        c.execute("UPDATE ext_match_detail SET notes_json=? WHERE match_id=?", (json.dumps([n for n in mnotes if n]), mid))
+        c.commit()
+        done.append({"match_id": mid, "provider_id": pid, "notes": mnotes})
+        notes += mnotes
+    return {"featured": done, "hits_used_today": hits_used(c), "note": None if targets else "no live CricketData match right now; no hit spent"}

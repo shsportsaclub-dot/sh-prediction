@@ -1,3 +1,11 @@
+# QA addendum — Batch 05b (AllCric-style Match Center on the free plan, tipster world ranking)
+
+`pytest`: **85 passed** (2 runs). SH SOCIAL E2E: **21/21**. Chrome 390×844: Live (score header with last-ball flash, over strip, batters, bowler, opening-stand partnership), Scorecard (batting, extras breakdown, total, bowling), Playing XI (squads with roles, initials instead of photos), Graphs (Manhattan from provider ball rows), Head-to-head (last-5 form, H2H list), Info (venue stats), Tipster leaderboard (pinned "#1 You" row + world rank): `docs/qa/match-center/*.png`. No JavaScript errors.
+Field names for CricketData scorecard/squad replies come from the owner's working live-line server (`mename-shs-backend`), which reads them live; tests use replies in that shape. **The real CricketData calls still have to be proven on the server** (blocked here). If the free plan refuses `match_scorecard`/`match_bbb` (CricketData marks these fantasy endpoints as plan-dependent), the tabs show the provider's refusal and fall back to the score line; nothing is invented.
+Not built, by decision: betting odds (Back/Lay, session YES/NO), "Watch Live" (no broadcast rights), player photos (copyright).
+
+---
+
 # QA report — Batch 05 (Automatic cricket data: Google Sheets, Cricsheet, CricketData, worldwide registry)
 
 Run date: 2026-11-19 (UTC). `python -m pytest -q tests` → **82 passed**, three runs in a row. The SH SOCIAL end-to-end proof was rerun: **21/21 steps passed**.

@@ -141,3 +141,13 @@ Every match object now carries `data_status` (`upcoming`, `live_ball_by_ball`, `
 | GET | `/admin/registry/countries`, `/admin/registry/competitions?q=`, `/admin/registry/sources` | admin |
 
 Jobs: `owner_sheets_sync`, `registry_index_sync`, `cricketdata_matches`, `cricketdata_live`, `cricsheet_recent`, `cricsheet_backfill`.
+
+### Match Center data (Batch 05b)
+`GET /matches/{id}` adds:
+* `provider_detail` — for a featured live CricketData match: `scorecard[]` (`inning`, `batting[{name,r,b,fours,sixes,sr,dismissal}]`, `bowling[{name,o,m,r,w,nb,wd,eco}]`, `extras`, `total{r,w,o}`), `squads[{team,players[{name,role}]}]`, last 36 `balls`, `runs_per_over`, `notes` (what the provider refused), timestamps. Never written into our own ball_events.
+* `history` — `head_to_head[]` (last 10, with innings scores), `home_form`/`away_form` (last 5 W/L), `venue` (matches, avg 1st/2nd innings, bat-first and chase win %, highest total, lowest all-out), from completed non-demo matches of the same format in our database.
+* New status `live_scorecard`.
+
+Job `cricketdata_detail` (every 6 min): follows `max_featured` live matches (1 on the free plan): scorecard each run, ball rows every 12 min, squad and info every 2 h. About 57 hits per T20.
+
+`GET /social/leaderboard` default board is now `overall` (world ranking score; formula in `rule`), and returns `me` (your rank, `out_of`, or the reason you are not ranked) and `total_ranked`.

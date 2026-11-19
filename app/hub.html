@@ -60,7 +60,19 @@ table.simple{width:100%;border-collapse:collapse;font-size:13px}table.simple td,
 canvas{width:100%;height:190px;display:block}
 .msg{padding:10px 12px;border-radius:12px;margin:8px 0;max-width:92%;white-space:pre-wrap}
 .msg.q{background:var(--brand-blue);color:#fff;margin-left:auto}.msg.a{background:var(--surface2)}
-.ds-live_ball_by_ball,.ds-live_score_only{background:#0b5d2a;color:#fff}.ds-delayed{background:#7a5400;color:#fff}.ds-unavailable{background:#5b1420;color:#fff}.ds-historical_ball_by_ball{background:#13325c;color:#fff}
+.mc-head{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;background:#0d1424;color:#fff;border-radius:14px 14px 0 0;padding:12px 14px;margin-top:8px}
+.mc-lines{flex:1}.mc-line{font-size:15px;opacity:.75}.mc-line.cur{font-size:22px;opacity:1}.mc-score{color:#4fb3ff;font-weight:800}
+.mc-ev{font-weight:900;font-size:22px;letter-spacing:1px;padding:4px 10px;border-radius:10px;animation:mcpop .5s ease-out}.ev-four{color:#2fd27a}.ev-six{color:#ff4fd8}.ev-wicket{color:#ff4d4d}
+@keyframes mcpop{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.mc-strip{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:#151f36;color:#cfe;padding:6px 14px;border-radius:0 0 14px 14px;font-size:13px}.mc-fresh{font-size:12px;margin:4px 2px 8px}
+.ov-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.bl{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--surface2);font-weight:700;font-size:13px}
+.bl.b4{background:#13a058;color:#fff}.bl.b6{background:#c22fc0;color:#fff}.bl.bw{background:#d83131;color:#fff}.bl.b1{background:#2c3d5f;color:#fff}
+.sc td .dis{font-size:12px}.sq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.sq-p{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.fm{display:inline-flex;width:24px;height:24px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-left:4px;background:var(--surface2)}.fm.fW{background:#13a058;color:#fff}.fm.fL{background:#5b1420;color:#fff}
+.h2h-row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.me-row td{background:rgba(255,200,0,.12)}.me-card{border-color:#e0b000}
+.ds-live_ball_by_ball,.ds-live_scorecard,.ds-live_score_only{background:#0b5d2a;color:#fff}.ds-delayed{background:#7a5400;color:#fff}.ds-unavailable{background:#5b1420;color:#fff}.ds-historical_ball_by_ball{background:#13325c;color:#fff}
 .gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin:8px 0}.gal img,.gal video{width:100%;border-radius:10px;display:block;max-height:520px;object-fit:cover;background:#000;cursor:zoom-in}
 .act{padding:5px 10px;font-size:13px}.lightbox{position:fixed;inset:0;background:#000d;z-index:20;display:flex;align-items:center;justify-content:center}.lightbox img{max-width:96vw;max-height:92vh}
 .reels{height:calc(100vh - 150px);overflow-y:auto;scroll-snap-type:y mandatory;border-radius:14px;background:#000}
@@ -148,7 +160,7 @@ async match(el,id,tab){
  tab=tab||"info";el.innerHTML=loading();
  let m;try{m=await api("/matches/"+id)}catch(e){return errorS(el,e,()=>SCREENS.match(el,id,tab))}
  const tabs=["info","weather","toss","pitch","h2h","prediction","community","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","result"];
- el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p><div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
+ el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p>'+(window.mcHeader?mcHeader(m):'')+'<div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
   '<div class="sub" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t("mc."+k))+'</a>').join("")+'</div><div id="tb">'+loading()+'</div>';
  const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});
  const tb=$("#tb");const nm=tid=>tid===m.home.id?teamTxt(m.home,"c-home"):(tid===m.away.id?teamTxt(m.away,"c-away"):"—");
@@ -187,7 +199,7 @@ async match(el,id,tab){
    return '<div class="card"><h3>Worm</h3><canvas id="worm" width="700" height="200" aria-label="Cumulative runs by over"></canvas></div>'+g.innings.map(i=>'<div class="card"><h3>Manhattan · innings '+i.innings_no+'</h3><canvas id="man'+i.innings_no+'" width="700" height="160" aria-label="Runs per over, red bars had a wicket"></canvas></div>').join("")},
   result:async()=>{const r=await api("/matches/"+id+"/result");return r.available?'<div class="card"><h3>'+esc(r.summary)+'</h3>'+(r.margin?'<div>'+esc(r.margin)+(r.method?' ('+esc(r.method)+')':'')+'</div>':'')+'</div>':emptyS(t("mc.not_reported"))}
  };
- try{tb.innerHTML=await (T[tab]||T.info)()}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
+ try{const ext=window.mcTab&&mcTab[tab]?await mcTab[tab](m,nm):null;tb.innerHTML=(ext==null?await (T[tab]||T.info)():ext)+(window.mcTabAfter&&mcTabAfter[tab]?mcTabAfter[tab](m):"")}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
 },
 async experts(el,id){
  if(id){el.innerHTML=loading();try{const j=await api("/experts/"+id+"/history");const x=j.expert,s=j.summary;
@@ -251,5 +263,6 @@ window.addEventListener("online",route);window.addEventListener("offline",()=>{$
  route()})();
 </script>
 <script src="/hub_social.js"></script>
+<script src="/match_center.js"></script>
 </body>
 </html>

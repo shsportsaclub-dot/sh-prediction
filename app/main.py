@@ -178,6 +178,8 @@ class H(BaseHTTPRequestHandler):
   if p in ("/","/app","/hub","/admin-panel"):
    f={"/admin-panel":"admin.html"}.get(p,"hub.html")
    b=(Path(__file__).parent/f).read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("X-Frame-Options","DENY");self.send_header("Referrer-Policy","no-referrer");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p=="/match_center.js":
+   b=(Path(__file__).parent/"match_center.js").read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/hub_social.js":
    b=(Path(__file__).parent/"hub_social.js").read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/classic":
