@@ -1,4 +1,4 @@
-/* SH PREDICTION shell (Blueprint v2.0): global header, Cricbuzz-style Home, Matches with filters, Series pages, Predictions.
+/* SH PREDICTION shell (Blueprint v2.0): global header, news-style Home, Matches with filters, Series pages, Predictions.
    Original SH design; all data from our own API. Missing data says so ("Data not available from the current source"). */
 "use strict";
 (function(){
@@ -29,7 +29,7 @@ function header(){const H=document.getElementById("hdr");if(!H)return;
  api("/matches?status=live&limit=1").then(j=>{const b=document.getElementById("hlive");if(b)b.hidden=!j.total}).catch(()=>{})}
 window.addEventListener("hashchange",header);setTimeout(header,0);
 
-/* ---------------- Home (Cricbuzz-style hierarchy) */
+/* ---------------- Home (headline hierarchy) */
 const FILTERS=[["all","home.all",""],["live","home.live","status=live"],["upcoming","home.upcoming","status=upcoming"],["results","home.results","status=results"],
  ["intl","home.international","scope=international"],["dom","home.domestic","scope=domestic"],["women","home.women","gender=women"],
  ["T20","T20","format=T20"],["ODI","ODI","format=ODI"],["Test","Test","format=Test"],["T10","T10","format=T10"]];

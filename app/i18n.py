@@ -902,3 +902,11 @@ for _code, _vals in _UPD.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+# match views renamed to our own names (owner, 19 Nov 2026): no other app's name on screen
+for _code in list(STRINGS) + ["en"]:
+    _t = EN if _code == "en" else STRINGS[_code]
+    _t.update({"mc.view_pulse": "SH Pulse", "mc.view_classic": "SH Classic", "mc.view_pro": "SH Pro"})
+    for _k in ("mc.view_sh", "mc.view_crex", "mc.view_cricbuzz"):
+        _t.pop(_k, None)
+STRINGS.setdefault("en", {}).update({"mc.view_pulse": "SH Pulse", "mc.view_classic": "SH Classic", "mc.view_pro": "SH Pro"})

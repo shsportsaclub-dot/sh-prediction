@@ -77,6 +77,14 @@ header.top{display:flex;align-items:center;gap:10px}.hdr{display:flex;gap:2px;al
 .sp span{font-size:22px}.sp small{font-size:9px;color:var(--muted)}.sp.on{background:linear-gradient(135deg,#b3122e,#e0262f);color:#fff;border-color:transparent}.sp[aria-disabled=true]{opacity:.55}.shake{animation:sk .4s}@keyframes sk{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 .qlinks{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px}.qlinks a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--text);text-decoration:none;font-size:11px;text-align:center}.qlinks span{font-size:18px}
 .upd{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:99;background:#0f9d58;color:#fff;padding:10px 14px;border-radius:12px;font-size:13px;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px #0006}.upd button{background:#fff;color:#0f9d58;border:0;border-radius:8px;padding:5px 10px;font-weight:600}
+/* view layouts: each one looks different */
+body[data-mcview=pulse] .mc-head{background:linear-gradient(135deg,#7a0d22,#1d3fa8);padding:18px 16px}body[data-mcview=pulse] .mc-line.cur{font-size:30px}body[data-mcview=pulse] .mc-score{color:#fff}
+body[data-mcview=pulse] .mc-tabs .btn{border-radius:999px}
+body[data-mcview=classic] .mc-head{position:static;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:12px 12px 0 0;padding:10px 12px}body[data-mcview=classic] .mc-line.cur{font-size:18px}body[data-mcview=classic] .mc-score{color:var(--text)}
+body[data-mcview=classic] .mc-strip4 div{background:var(--surface);color:var(--muted)}body[data-mcview=classic] .mc-strip4 b{color:var(--text)}
+body[data-mcview=classic] .mc-tabs .btn{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;padding:8px 10px}body[data-mcview=classic] .mc-tabs .btn.on{border-bottom-color:#e0262f;background:none;color:var(--text);font-weight:700}
+body[data-mcview=pro] .mc-head{background:#05070d;border:1px solid #2d7ff9;box-shadow:0 0 0 1px #2d7ff955,0 8px 24px #2d7ff933}body[data-mcview=pro] .mc-score{color:#38e8a0}
+body[data-mcview=pro] .mc-tabs .btn{border-radius:8px;text-transform:uppercase;letter-spacing:.04em;font-size:12px}
 .sec{margin:14px 0}.sec-h{display:flex;align-items:baseline;justify-content:space-between}.sec h2{font-size:18px;margin:6px 0 8px}
 .hscroll{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.hscroll .lcard{flex:0 0 82%;max-width:330px;scroll-snap-align:start}
 .lcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);text-decoration:none}.lcard.is-live{border-color:#e0262f}
@@ -180,15 +188,18 @@ async matches(el){
 async match(el,id,tab){
  el.innerHTML=loading();
  let m;try{m=await api("/matches/"+id)}catch(e){return errorS(el,e,()=>SCREENS.match(el,id,tab))}
- const VIEWS={crex:["info","fantasy","community","commentary","live","scorecard","history","seriesstats","graphs"],
-  cricbuzz:["info","live","scorecard","commentary","seriesstats","xi"],sh:["info","prediction","graphs","fantasy","h2h","live","scorecard"]};
+ // three SH layouts with our own names; old saved keys from the first build are mapped across
+ const VIEWS={pulse:["live","commentary","scorecard","info","fantasy","community","history","seriesstats","graphs"],
+  classic:["scorecard","info","live","commentary","seriesstats","xi"],pro:["prediction","graphs","fantasy","h2h","live","scorecard","info"]};
+ const DEF={pulse:m=>m.status==="live"?"live":m.status==="completed"?"scorecard":"info",classic:m=>m.status==="scheduled"?"info":"scorecard",pro:()=>"prediction"};
  const LBL={community:"mc.discussions",history:"mc.history",seriesstats:"mc.series_stats"};
- const view=ls.get("shp_view")||"crex",tabs=VIEWS[view]||VIEWS.crex;
+ const OLD={crex:"pulse",cricbuzz:"classic",sh:"pro"};let view=ls.get("shp_view")||"pulse";view=OLD[view]||view;if(!VIEWS[view])view="pulse";
+ const tabs=VIEWS[view];document.body.dataset.mcview=view;
  const ALL=["info","weather","toss","pitch","h2h","prediction","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","history","seriesstats","community","result"];
  const more=ALL.filter(k=>!tabs.includes(k)).map(k=>[k,LBL[k]||"mc."+k]);
- tab=tab||(m.status==="live"?"live":"info");
+ tab=tab||DEF[view](m);
  el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p>'+(window.mcHeader?mcHeader(m):'')+'<div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
-  '<div class="mc-views" role="group" aria-label="'+esc(t("mc.view"))+'">'+[["sh","mc.view_sh"],["crex","mc.view_crex"],["cricbuzz","mc.view_cricbuzz"]].map(([k,l])=>'<button class="'+(k===view?"on":"")+'" onclick="ls.set(\'shp_view\',\''+k+'\');route()">'+esc(t(l))+'</button>').join("")+'</div>'+
+  '<div class="mc-views" role="group" aria-label="'+esc(t("mc.view"))+'">'+[["pulse","mc.view_pulse","⚡"],["classic","mc.view_classic","📋"],["pro","mc.view_pro","🎯"]].map(([k,l,i])=>'<button type="button" aria-pressed="'+(k===view)+'" class="'+(k===view?"on":"")+'" onclick="ls.set(\'shp_view\',\''+k+'\');(location.hash===\'#/match/'+id+'\'?route():location.hash=\'#/match/'+id+'\')">'+i+' '+esc(t(l))+'</button>').join("")+'</div>'+
   '<div class="sub mc-tabs" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t(LBL[k]||"mc."+k))+'</a>').join("")+
   '<select class="btn mc-more'+(tabs.includes(tab)?'':' on')+'" aria-label="'+esc(t("mc.more"))+'" onchange="if(this.value)location.hash=\'#/match/'+id+'/\'+this.value"><option value="">'+esc(t("mc.more"))+' ▾</option>'+more.map(([k,l])=>'<option value="'+k+'"'+(k===tab&&!tabs.includes(tab)?' selected':'')+'>'+esc(t(l))+'</option>').join("")+'</select></div><div id="tb">'+loading()+'</div>';
  const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});

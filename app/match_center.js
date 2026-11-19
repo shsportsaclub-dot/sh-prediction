@@ -8,7 +8,8 @@ const oversToBalls=o=>{if(o==null)return 0;const s=String(o).split(".");return (
 const crr=(r,o)=>{const b=oversToBalls(o);return b?(r*6/b).toFixed(2):"—"};
 const lastInn=sc=>sc&&sc.length?sc[sc.length-1]:null;
 const ago=at=>{if(!at)return "";const s=(Date.now()-new Date(at))/1000;return s<90?"just now":s<3600?Math.round(s/60)+" min ago":Math.round(s/3600)+" h ago"};
-const teamShort=(m,name)=>{if(!name)return "";const n=String(name).replace(/ Inning \d+$/,"");if(n===m.home.name)return m.home.short_code||m.home.name;if(n===m.away.name)return m.away.short_code||m.away.name;return n};
+const titleCase=s=>String(s).replace(/\b([a-z])/g,c=>c.toUpperCase());
+const teamShort=(m,name)=>{if(!name)return "";const n=String(name).replace(/ inning \d+$/i,"").trim(),l=n.toLowerCase();if(l===String(m.home.name).toLowerCase())return m.home.short_code||m.home.name;if(l===String(m.away.name).toLowerCase())return m.away.short_code||m.away.name;return n===l?titleCase(n):n};
 const ball=b=>{const v=b.wicket?"W":String(b.runs||0);const cls=b.wicket?"bw":b.runs>=6?"b6":b.runs===4?"b4":b.runs>0?"b1":"b0";return '<span class="bl '+cls+'" title="'+esc((b.over+1)+"."+(b.ball||"")+" "+(b.batter||"")+" ← "+(b.bowler||""))+'">'+esc(v)+'</span>'};
 
 window.mcHeader=function(m){
@@ -40,7 +41,7 @@ const srcNote=pd=>'<p class="muted">Source: '+esc(pd.source)+' · '+esc(pd.rule)
 
 const localTime=u=>{try{return new Date(u).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return u}};
 function scoreOnly(m){const L=m.live_score;if(!L||!L.innings||!L.innings.length)return null;
- return '<div class="card"><h3>Score</h3>'+L.innings.map(i=>'<div class="row"><b class="grow">'+esc(String(i.inning||"").replace(/ Inning \d+$/,""))+'</b><span class="mc-score">'+i.r+'-'+i.w+'</span> <span class="muted">('+esc(String(i.o))+' ov)</span></div>').join("")+
+ return '<div class="card"><h3>Score</h3>'+L.innings.map(i=>'<div class="row"><b class="grow">'+esc(teamShort(m,i.inning))+'</b><span class="mc-score">'+i.r+'-'+i.w+'</span> <span class="muted">('+esc(String(i.o))+' ov)</span></div>').join("")+
   (L.status_text?'<p><b>'+esc(L.status_text)+'</b></p>':'')+'<p class="muted">Score line from '+esc(L.source)+', updated '+ago(L.fetched_at)+'. Batter-by-batter detail appears when the full scorecard for this match is received.</p></div>'}
 window.mcTab={
  live:async m=>{const pd=PD(m);if(!pd||m.status!=="live"&&!pd.featured){if((m.data_status||"").indexOf("ball_by_ball")<0&&m.live_score)return scoreOnly(m);return null}   // our own ball-by-ball keeps the original Live tab
@@ -51,7 +52,7 @@ window.mcTab={
    '<div class="card"><h3>'+esc(teamShort(m,li.inning))+' batting</h3>'+batTable({batting:notOut.length?notOut:li.batting.slice(-2)})+(pship!=null?'<p class="muted">Partnership: '+pship+' (opening stand)</p>':'')+'</div>'+
    (cur.length?'<div class="card"><h3>Bowling</h3>'+bowlTable({bowling:cur})+'</div>':'')+srcNote(pd)},
  scorecard:async m=>{const pd=PD(m);if(!pd)return null;
-  return pd.scorecard.map(i=>'<div class="card"><h3>'+esc(i.inning||"")+(i.total?' <span class="muted">'+i.total.r+'-'+i.total.w+' ('+esc(String(i.total.o))+' ov)</span>':'')+'</h3>'+batTable(i)+
+  return pd.scorecard.map(i=>'<div class="card"><h3>'+esc(teamShort(m,i.inning)+(/inning \d+$/i.test(i.inning||"")?" · "+String(i.inning).match(/inning \d+$/i)[0].replace(/^i/,"I"):""))+(i.total?' <span class="muted">'+i.total.r+'-'+i.total.w+' ('+esc(String(i.total.o))+' ov)</span>':'')+'</h3>'+batTable(i)+
    '<dl class="kv"><dt>Extras</dt><dd>'+esc(extrasTxt(i.extras))+'</dd><dt>Total</dt><dd>'+(i.total?i.total.r+'-'+i.total.w+' ('+esc(String(i.total.o))+' ov)':'—')+'</dd></dl>'+(i.bowling.length?bowlTable(i):'')+'</div>').join("")+srcNote(pd)},
  xi:async m=>{const pd=m.provider_detail;if(!pd||!pd.squads||!pd.squads.length)return null;
   return '<div class="sq-grid">'+pd.squads.map(t=>'<div class="card"><h3>'+esc(t.team||"")+'</h3>'+t.players.map(p=>'<div class="sq-p"><span class="av">'+esc((p.name||"?").split(" ").map(x=>x[0]).join("").slice(0,2))+'</span><span><b>'+esc(p.name||"")+'</b><div class="muted">'+esc(p.role||"")+'</div></span></div>').join("")+'</div>').join("")+'</div>'+
@@ -75,9 +76,9 @@ function matchDetails(m){const info=(m.provider_detail&&m.provider_detail.info)|
  if(res)rows.push(["Result",'<b>'+esc(res)+'</b>']);
  rows.push(["Data",'<span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span>']);
  return '<div class="card"><h3>Match details</h3><dl class="kv">'+rows.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+b+'</dd>').join("")+'</dl></div>'}
-function inningsList(m,sc){const pd=PD(m);if(pd)return pd.scorecard.filter(i=>i.total).map(i=>({team:String(i.inning||"").replace(/ Inning \d+$/,""),r:i.total.r,w:i.total.w,o:i.total.o}));
+function inningsList(m,sc){const pd=PD(m);if(pd)return pd.scorecard.filter(i=>i.total).map(i=>({team:teamShort(m,i.inning),r:i.total.r,w:i.total.w,o:i.total.o}));
  if(sc&&sc.innings&&sc.innings.length)return sc.innings.map(i=>({team:i.team||(i.batting_team_id===m.home.id?m.home.name:i.batting_team_id===m.away.id?m.away.name:""),r:i.runs,w:i.wickets,o:i.overs}));const L=m.live_score;
- return L&&L.innings?L.innings.map(i=>({team:String(i.inning||"").replace(/ Inning \d+$/,""),r:i.r,w:i.w,o:i.o})):[]}
+ return L&&L.innings?L.innings.map(i=>({team:teamShort(m,i.inning),r:i.r,w:i.w,o:i.o})):[]}
 window.mcTab.history=async m=>{let sc=null;try{sc=await api("/matches/"+m.id+"/scorecard")}catch(e){}
  const I=inningsList(m,sc);if(!I.length)return '<div class="state">'+esc(t("data.na"))+'</div>';
  return '<div class="card"><h3>'+esc(t("mc.innings_progression"))+'</h3>'+I.map((x,i)=>'<div class="dl"><span><b>'+esc(x.team)+'</b> <span class="muted">innings '+(i+1)+'</span></span><span><b>'+x.r+'/'+x.w+'</b> <span class="muted">('+esc(String(x.o))+' ov · RR '+crr(x.r,x.o)+')</span></span></div>').join("")+'</div>'+
