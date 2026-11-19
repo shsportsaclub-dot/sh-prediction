@@ -3,23 +3,27 @@ from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlparse,parse_qs
 from pathlib import Path
 from screen_login import generate,verify,authorized,logout
+import api_v1
 DB=os.getenv("SH_PREDICTION_DB","data/prediction.sqlite3")
 TOKEN=os.getenv("SH_PREDICTION_ADMIN_TOKEN","")
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def db():
  os.makedirs(os.path.dirname(os.path.abspath(DB)),exist_ok=True)
  c=sqlite3.connect(DB);c.row_factory=sqlite3.Row
+ # v1 owns the "predictions" table name (master script section 5); the v0 table becomes legacy_predictions
+ if "fixture_id" in {r[1] for r in c.execute("PRAGMA table_info(predictions)")}:c.execute("ALTER TABLE predictions RENAME TO legacy_predictions");c.commit()
  c.executescript("""CREATE TABLE IF NOT EXISTS fixtures(id INTEGER PRIMARY KEY,competition TEXT NOT NULL,season TEXT NOT NULL,home TEXT NOT NULL,away TEXT NOT NULL,start_utc TEXT NOT NULL,source TEXT NOT NULL,UNIQUE(competition,season,home,away,start_utc));
- CREATE TABLE IF NOT EXISTS predictions(id INTEGER PRIMARY KEY,fixture_id INTEGER UNIQUE NOT NULL,toss_pick TEXT,winner_pick TEXT,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',approved_at TEXT);
+ CREATE TABLE IF NOT EXISTS legacy_predictions(id INTEGER PRIMARY KEY,fixture_id INTEGER UNIQUE NOT NULL,toss_pick TEXT,winner_pick TEXT,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',approved_at TEXT);
  CREATE TABLE IF NOT EXISTS outcomes(fixture_id INTEGER PRIMARY KEY,toss_winner TEXT,match_winner TEXT,source TEXT NOT NULL,verified_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS archive(id INTEGER PRIMARY KEY,fixture_id INTEGER,section TEXT NOT NULL,payload TEXT NOT NULL,source TEXT NOT NULL,reviewed INTEGER DEFAULT 0,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS odds(id INTEGER PRIMARY KEY,fixture_id INTEGER NOT NULL,team TEXT NOT NULL,price REAL NOT NULL CHECK(price>=1.01 AND price<=1000),observed_at TEXT NOT NULL,source TEXT NOT NULL,reviewed INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,UNIQUE(fixture_id,team,observed_at,source));""")
  for t,col,ddl in (("fixtures","venue","TEXT"),("fixtures","match_no","TEXT"),("outcomes","status","TEXT NOT NULL DEFAULT 'completed'"),("outcomes","toss_decision","TEXT"),("outcomes","remarks","TEXT")):
   if col not in {r[1] for r in c.execute("PRAGMA table_info("+t+")")}:c.execute("ALTER TABLE "+t+" ADD COLUMN "+col+" "+ddl)
  c.executescript("""CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY,action TEXT NOT NULL,payload TEXT,old_value TEXT,created_at TEXT NOT NULL);
- CREATE TRIGGER IF NOT EXISTS predictions_immutable BEFORE UPDATE OF fixture_id,toss_pick,winner_pick,created_at ON predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction is immutable'); END;
- CREATE TRIGGER IF NOT EXISTS predictions_nodelete BEFORE DELETE ON predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction cannot be deleted'); END;""")
+ CREATE TRIGGER IF NOT EXISTS predictions_immutable BEFORE UPDATE OF fixture_id,toss_pick,winner_pick,created_at ON legacy_predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction is immutable'); END;
+ CREATE TRIGGER IF NOT EXISTS predictions_nodelete BEFORE DELETE ON legacy_predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction cannot be deleted'); END;""")
  return c
+api_v1.DB_FN=db
 def pdt(x):
  d=datetime.datetime.fromisoformat(str(x).replace("Z","+00:00"))
  return d.astimezone(datetime.timezone.utc) if d.tzinfo else d.replace(tzinfo=datetime.timezone.utc)
@@ -43,7 +47,7 @@ def tally(rows,k):
  return {"correct":c["Correct"],"wrong":c["Wrong"],"pending":c["Pending"],"void":c["Void"],"excluded":c["Excluded"],"total":n,"percent":round(100*c["Correct"]/n,1) if n else None,"formula":"Correct / (Correct + Wrong) x 100; Pending, Void and Excluded are not in the denominator"}
 def compute(c):
  rows=[]
- q=c.execute("SELECT f.*,p.id pid,p.toss_pick,p.winner_pick,p.created_at pcreated,p.approved_at,o.toss_winner,o.match_winner,o.status ostatus,o.toss_decision,o.remarks,o.source osource,o.verified_at FROM fixtures f LEFT JOIN predictions p ON p.fixture_id=f.id AND p.status='approved' LEFT JOIN outcomes o ON o.fixture_id=f.id ORDER BY f.start_utc DESC LIMIT 1000").fetchall()
+ q=c.execute("SELECT f.*,p.id pid,p.toss_pick,p.winner_pick,p.created_at pcreated,p.approved_at,o.toss_winner,o.match_winner,o.status ostatus,o.toss_decision,o.remarks,o.source osource,o.verified_at FROM fixtures f LEFT JOIN legacy_predictions p ON p.fixture_id=f.id AND p.status='approved' LEFT JOIN outcomes o ON o.fixture_id=f.id ORDER BY f.start_utc DESC LIMIT 1000").fetchall()
  for i,r in enumerate(q,1):
   o={"status":r["ostatus"]} if r["toss_winner"] is not None or r["match_winner"] is not None or r["ostatus"] else None
   has=r["pid"] is not None
@@ -71,8 +75,18 @@ class H(BaseHTTPRequestHandler):
   n=int(self.headers.get("Content-Length","0"))
   if n<1 or n>1000000:raise ValueError("invalid payload size")
   return json.loads(self.rfile.read(n))
+ def v1(self,method):
+  u=urlparse(self.path)
+  code,obj=api_v1.route(self,method,u.path,parse_qs(u.query),self.body)
+  return self.sendj(code,obj)
+ def do_PUT(self):
+  if urlparse(self.path).path.startswith("/api/v1/"):return self.v1("PUT")
+  return self.sendj(405,{"error":"method not allowed"})
  def do_GET(self):
   p=urlparse(self.path).path
+  if p.startswith("/api/v1/"):return self.v1("GET")
+  if p=="/hub":
+   b=(Path(__file__).parent/"hub.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p in ("/","/app"):
    b=(Path(__file__).parent/"index.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-original-blueprint.html":
@@ -90,9 +104,9 @@ class H(BaseHTTPRequestHandler):
   with db() as c:
    if p=="/fixtures": rows=c.execute("SELECT * FROM fixtures ORDER BY start_utc DESC LIMIT 200")
    elif p=="/results": rows=c.execute("SELECT f.*,o.toss_winner,o.match_winner FROM fixtures f JOIN outcomes o ON f.id=o.fixture_id ORDER BY f.start_utc DESC LIMIT 200")
-   elif p=="/predictions": rows=c.execute("SELECT * FROM predictions WHERE status='approved' ORDER BY id DESC LIMIT 200")
+   elif p=="/predictions": rows=c.execute("SELECT * FROM legacy_predictions WHERE status='approved' ORDER BY id DESC LIMIT 200")
    elif p=="/archive": rows=c.execute("SELECT * FROM archive WHERE reviewed=1 ORDER BY id DESC LIMIT 200")
-   elif p=="/admin/drafts": rows=c.execute("SELECT * FROM predictions WHERE status='draft'")
+   elif p=="/admin/drafts": rows=c.execute("SELECT * FROM legacy_predictions WHERE status='draft'")
    elif p=="/admin/odds_pending": rows=c.execute("SELECT * FROM odds WHERE reviewed=0 ORDER BY id DESC LIMIT 200")
    elif p=="/odds":
     try: fid=int(parse_qs(urlparse(self.path).query).get("fixture_id",["0"])[0])
@@ -106,6 +120,7 @@ class H(BaseHTTPRequestHandler):
    else:return self.sendj(404,{"error":"not found"})
    return self.sendj(200,[dict(x) for x in rows])
  def do_POST(self):
+  if urlparse(self.path).path.startswith("/api/v1/"):return self.v1("POST")
   try:
    p=urlparse(self.path).path;d=self.body();old=None
    if p=="/auth/generate":return self.sendj(200,generate(d.get("phone","")))
@@ -131,13 +146,13 @@ class H(BaseHTTPRequestHandler):
      if now()>=datetime.datetime.fromisoformat(f["start_utc"].replace("Z","+00:00")).astimezone(datetime.timezone.utc).isoformat():raise ValueError("match already started")
      for k in ("toss_pick","winner_pick"):
       if d.get(k) and d[k] not in (f["home"],f["away"]):raise ValueError("invalid "+k)
-     c.execute("INSERT INTO predictions(fixture_id,toss_pick,winner_pick,created_at) VALUES(?,?,?,?)",(d["fixture_id"],d.get("toss_pick"),d.get("winner_pick"),now()))
+     c.execute("INSERT INTO legacy_predictions(fixture_id,toss_pick,winner_pick,created_at) VALUES(?,?,?,?)",(d["fixture_id"],d.get("toss_pick"),d.get("winner_pick"),now()))
      result={"status":"draft"}
     elif p=="/admin/approve":
-     r=c.execute("SELECT p.*,f.start_utc FROM predictions p JOIN fixtures f ON f.id=p.fixture_id WHERE p.id=?",(d["prediction_id"],)).fetchone()
+     r=c.execute("SELECT p.*,f.start_utc FROM legacy_predictions p JOIN fixtures f ON f.id=p.fixture_id WHERE p.id=?",(d["prediction_id"],)).fetchone()
      if not r or r["status"]!="draft":raise ValueError("draft not found")
      if now()>=datetime.datetime.fromisoformat(r["start_utc"].replace("Z","+00:00")).astimezone(datetime.timezone.utc).isoformat():raise ValueError("match already started")
-     c.execute("UPDATE predictions SET status='approved',approved_at=? WHERE id=?",(now(),d["prediction_id"]));result={"status":"approved"}
+     c.execute("UPDATE legacy_predictions SET status='approved',approved_at=? WHERE id=?",(now(),d["prediction_id"]));result={"status":"approved"}
     elif p=="/admin/outcomes":
      f=c.execute("SELECT * FROM fixtures WHERE id=?",(d["fixture_id"],)).fetchone()
      if not f:raise ValueError("unknown fixture")

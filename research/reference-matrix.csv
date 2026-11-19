@@ -1,0 +1,24 @@
+screen,tab,button_or_control,user_action,result,required_data,backend_endpoint,test_case,evidence_class
+Home,Status chips,Live / Upcoming / Completed,Tap a chip,List filtered by match status,matches.status,GET /api/v1/matches?status=,test_validation_and_pagination; QA screenshot dark-home,Inferred behavior
+Home,Search,Search box,Type team or competition,List narrows after 300 ms,teams.name; competitions.name; teams.short_code,GET /api/v1/matches?q=,QA manual,Inferred behavior
+Home,Accuracy card,—,Open Home,Overall accuracy with correct/incorrect/pending,prediction_evaluations,GET /api/v1/analytics/accuracy,test_correct_wrong_void_pending_and_formula,Original SH enhancement
+Home,Competitions,Competition chip,Tap,Adds/removes favourite; saved to profile,user_preferences.favorite_competition_ids,PUT /api/v1/me/preferences,test_language_persistence (same endpoint),Original SH enhancement
+Master List,—,Competition select,Choose competition,Rows for that competition,matches; teams.short_code,GET /api/v1/master-list?competition_id=,test_toss_winner_mapping_and_codes,Original SH enhancement (owner-approved format)
+Master List,—,Predictions / Results,Switch view,Locked picks coloured by outcome / verified winners,predictions; prediction_evaluations; toss_results; match_results,GET /api/v1/master-list,test_toss_winner_mapping_and_codes; QA colour probe,Original SH enhancement (owner-approved format)
+Master List,—,Match cell,Tap,Opens Match Center,matches.id,GET /api/v1/matches/{id},QA screenshot dark-match_5_info,Original SH enhancement
+Match Center,Info,—,Open,Venue toss result weather pitch H2H form source,matches; toss_results; match_results,GET /api/v1/matches/{id},QA screenshot,Inferred behavior
+Match Center,Playing XI,—,Open,XI with (c)/(wk) or squad,playing_xi; match_squads; players,GET /api/v1/matches/{id},QA screenshot (empty state),Inferred behavior
+Match Center,Predictions,—,Open,Every locked prediction with created/locked time and evaluation,predictions; prediction_versions; prediction_evaluations,GET /api/v1/matches/{id}/predictions,test_prediction_locking_and_immutability,Inferred behavior
+Match Center,AI,—,Open,Home/away probability bar + factor table + toss note + innings projection,matches history; venues,GET /api/v1/matches/{id}/signals,test_model_prediction_explainable,Original SH enhancement
+Match Center,Live,—,Open,Score CRR RRR partnership momentum probability line turning points,innings; ball_events; prediction_versions,GET /api/v1/matches/{id}/signals,test_score_update_sync; test_live_versions_append_only,Inferred behavior
+Match Center,Scorecard,—,Open,Innings totals overs target player figures wickets,innings; scorecards; ball_events,GET /api/v1/matches/{id}/scorecard,test_score_update_sync,Inferred behavior
+Match Center,Commentary,—,Open,Newest balls first,ball_events,GET /api/v1/matches/{id}/commentary,test_score_update_sync,Inferred behavior
+Expert Tips,List,Follow,Tap,Follow saved; button shows Following,expert_follows,POST /api/v1/experts/{id}/follow,QA manual,Inferred behavior
+Expert Tips,List,Tip history,Tap,Profile with accuracy and every tip result,expert_profiles; predictions,GET /api/v1/experts/{id}/history,test_unverified_expert_blocked_verified_allowed,Inferred behavior
+AI Prediction,—,Match card,Tap,Opens Match Center AI tab,matches,GET /api/v1/matches/{id}/signals,QA screenshot dark-ai,Original SH enhancement
+Accuracy,—,Include demo data,Toggle,Totals include or exclude DEMO rows,data_origin,GET /api/v1/analytics/accuracy?include_demo=1,test_demo_excluded_from_headline,Original SH enhancement
+Accuracy,—,—,Open,Toss/bat-first/home-away/day/venue analytics,match_results; toss_results,GET /api/v1/analytics/toss|home-away|venue,test_correct_wrong_void_pending_and_formula,Original SH enhancement
+Settings,—,Language,Choose,Whole UI switches; saved for every device,user_preferences.language_code; languages,PUT /api/v1/me/preferences; GET /api/v1/i18n/{code},test_language_persistence; QA Telugu headers,Original SH enhancement
+Settings,—,Theme,Choose,Dark/light applied and saved,user_preferences.theme,PUT /api/v1/me/preferences,QA screenshot light-*,Original SH enhancement
+Admin (API),—,Record result,POST,Result stored; predictions re-evaluated; audit row,match_results,POST /api/v1/admin/results,test_tie_without_super_over_is_void_and_revision_supersedes,Confirmed by public documentation (ICC Men's T20I clause 16)
+Admin (API),—,Ball event,POST,Innings totals + live version update,ball_events; innings,POST /api/v1/admin/ball-events,test_score_update_sync,Confirmed by public documentation (Laws 21-22 wide/no-ball extras)

@@ -45,7 +45,7 @@ def fx(h,a,comp="Eng Cup",start="2031-01-01T10:00:00Z"):
  return q1("select id from fixtures where home=? and away=?",(h,a))
 def predict(fid,toss,win):
  call("/admin/predictions",{"fixture_id":fid,"toss_pick":toss,"winner_pick":win},A)
- pid=q1("select id from predictions where fixture_id=?",(fid,))
+ pid=q1("select id from legacy_predictions where fixture_id=?",(fid,))
  call("/admin/approve",{"prediction_id":pid},A);return pid
 class Acc(unittest.TestCase):
  def test_settlement_rules(self):
@@ -63,7 +63,7 @@ class Acc(unittest.TestCase):
   self.assertEqual((row["toss_result"],row["winner_result"],row["toss_decision"],row["venue"]),("Correct","Wrong","Bat","Test Ground"))
  def test_late_prediction_excluded(self):
   f=fx("L1","L2")
-  c=sqlite3.connect(os.environ["SH_PREDICTION_DB"],timeout=10);c.execute("INSERT INTO predictions(fixture_id,toss_pick,winner_pick,created_at,status,approved_at) VALUES(?,?,?,?,?,?)",(f,"L1","L1","2031-01-02T00:00:00+00:00","approved","2031-01-02T00:00:00+00:00"));c.commit();c.close()
+  c=sqlite3.connect(os.environ["SH_PREDICTION_DB"],timeout=10);c.execute("INSERT INTO legacy_predictions(fixture_id,toss_pick,winner_pick,created_at,status,approved_at) VALUES(?,?,?,?,?,?)",(f,"L1","L1","2031-01-02T00:00:00+00:00","approved","2031-01-02T00:00:00+00:00"));c.commit();c.close()
   call("/admin/outcomes",{"fixture_id":f,"toss_winner":"L1","match_winner":"L1","source":"m"},A)
   s,reg=call("/register",h={"Authorization":"Bearer "+login("9000000003")});r=[x for x in reg if x["match_id"]==f][0]
   self.assertEqual((r["toss_result"],r["winner_result"]),("Ineligible","Ineligible"))
@@ -71,8 +71,8 @@ class Acc(unittest.TestCase):
   f=fx("I1","I2");pid=predict(f,"I1","I1")
   c=main.db()
   try:
-   with self.assertRaises(sqlite3.DatabaseError):c.execute("UPDATE predictions SET winner_pick='I2' WHERE id=?",(pid,))
-   with self.assertRaises(sqlite3.DatabaseError):c.execute("DELETE FROM predictions WHERE id=?",(pid,))
+   with self.assertRaises(sqlite3.DatabaseError):c.execute("UPDATE legacy_predictions SET winner_pick='I2' WHERE id=?",(pid,))
+   with self.assertRaises(sqlite3.DatabaseError):c.execute("DELETE FROM legacy_predictions WHERE id=?",(pid,))
   finally:c.close()
  def test_revision_audited_and_admin_only(self):
   f=fx("R1","R2");call("/admin/outcomes",{"fixture_id":f,"toss_winner":"R1","match_winner":"R1","source":"m"},A)

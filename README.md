@@ -1,20 +1,25 @@
-# SH PREDICTION — Viewer Match Center prototype
+# SH PREDICTION
 
-Open `index.html` in a browser to view the original SH PREDICTION Match Center, Tips and Analytics screens.
+Independent cricket research and prediction application. Separate from Scoring Heroes.
 
-## Security / status
-This is a **static, offline, viewer-only prototype**. No server API, authentication, AI prediction engine, actual Android APK or live cricket feed is connected. Admin UI intentionally does **not** expose match master records, private predictions, or editing. Do not interpret the static viewer display as a secured production backend.
+## Status
+Batch 02 (Master Script V1.0 foundation): normalized database, versioned `/api/v1`, settlement + accuracy engine,
+explainable baseline model, ball-by-ball live probability, and the SH PREDICTION Hub (`/hub`: Home, Master List,
+Match Center, Expert Tips, AI, Accuracy, Settings; dark/light; English/Hindi/Telugu + 21 fallback languages).
+See `docs/INVENTORY.md`, `docs/API.md`, `docs/DEPLOYMENT.md`, `docs/qa/QA-REPORT.md`, `research/reference-matrix.csv`.
 
-The first 25 results are user-supplied historical records, not independently verified. Matches 26–30 are deliberately marked pending until verified. All unpublished tips remain hidden; no fabricated win probabilities are shown.
+## Planned functionality
+Fixtures, archived results, pre-match toss and match winner predictions, decimal odds price observations, review workflow and prediction accuracy.
 
-## Architecture for next production phase
-- Secure admin-only match master: Match, Home, Away, Toss, Winner
-- Role-checked backend endpoints for prediction create, lock, publish, result review and audit
-- Public read-only match center shows published predictions only
-- Original prediction immutable after lock; result verification and corrections auditable
-- Data provider licensing, verified scorecards, prediction engine, localization and mobile QA before release
-- Never expose admin tokens in client JavaScript
-- No external code/assets from ALLCRIC are copied
+## Security
+Never commit credentials, API keys, SQLite data or private research records. Public GitHub repositories are visible to everyone even without sharing a link.
 
-## Color contract
-Home blue, Away orange, H blue, A orange, winner green, loser red, unknown gray; no dots or bulbs. Public Match Center uses the same colors.
+## Prediction accuracy rules
+Toss and winner are tracked independently. Accuracy = Correct / (Correct + Wrong) x 100, always shown with the settled sample size.
+Pending, Void (abandoned / no-result / void match), No Prediction and Ineligible (approved after the match start) are excluded from the denominator.
+Approved predictions are immutable (database triggers). Outcome corrections go through /admin/outcomes_revise (reason and source required) and every admin write is stored in audit_logs.
+Colour mapping to the original Google Sheets is NOT VERIFIED; labels and symbols always carry the meaning.
+
+## Run
+Set `SH_PREDICTION_ADMIN_TOKEN` to a strong secret and run `python app/main.py`.
+Tests: `python -m unittest discover -s tests -v`. Screens: `python tools/qa_screens.py docs/qa`.
