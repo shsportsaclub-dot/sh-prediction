@@ -76,6 +76,7 @@ header.top{display:flex;align-items:center;gap:10px}.hdr{display:flex;gap:2px;al
 @keyframes lp{50%{opacity:.6}}.sports{display:flex;gap:8px;overflow-x:auto;margin:6px 0 10px}.sp{flex:1 0 64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:14px;background:var(--surface);border:1px solid var(--line);color:var(--text);font-size:12px}
 .sp span{font-size:22px}.sp small{font-size:9px;color:var(--muted)}.sp.on{background:linear-gradient(135deg,#b3122e,#e0262f);color:#fff;border-color:transparent}.sp[aria-disabled=true]{opacity:.55}.shake{animation:sk .4s}@keyframes sk{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 .qlinks{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px}.qlinks a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--text);text-decoration:none;font-size:11px;text-align:center}.qlinks span{font-size:18px}
+.upd{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:99;background:#0f9d58;color:#fff;padding:10px 14px;border-radius:12px;font-size:13px;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px #0006}.upd button{background:#fff;color:#0f9d58;border:0;border-radius:8px;padding:5px 10px;font-weight:600}
 .sec{margin:14px 0}.sec-h{display:flex;align-items:baseline;justify-content:space-between}.sec h2{font-size:18px;margin:6px 0 8px}
 .hscroll{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.hscroll .lcard{flex:0 0 82%;max-width:330px;scroll-snap-align:start}
 .lcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);text-decoration:none}.lcard.is-live{border-color:#e0262f}
@@ -285,14 +286,24 @@ async function route(){
  const fn=SCREENS[page]||SCREENS.home;try{await fn(el,h[1],h[2])}catch(e){errorS(el,e,route)}
 }
 window.addEventListener("hashchange",route);
+// auto-update: after every Render deploy the build id changes; open apps notice it and reload themselves
+(()=>{const MINE="__SH_BUILD__";let shown=false;
+ const typing=()=>{const a=document.activeElement;return a&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&!/button|checkbox|radio/.test(a.type))||a.isContentEditable)&&a.value!==""};
+ const reload=()=>location.reload();
+ async function check(){if(shown||MINE.startsWith("__"))return;try{const r=await fetch("/version",{cache:"no-store"});if(!r.ok)return;const j=await r.json();
+  if(j.build&&j.build!==MINE){shown=true;const d=document.createElement("div");d.className="upd";d.setAttribute("role","status");
+   d.innerHTML='<span>'+esc(t("app.updated"))+'</span><button type="button">'+esc(t("app.update_now"))+'</button>';d.querySelector("button").onclick=reload;document.body.appendChild(d);
+   // reload by itself unless the user is in the middle of typing (then they tap the button)
+   const go=()=>{if(!typing())reload();else setTimeout(go,4000)};setTimeout(go,2500)}}catch(e){}}
+ setInterval(check,60000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)check()});window.addEventListener("online",check)})();
 window.addEventListener("online",route);window.addEventListener("offline",()=>{$("#main").insertAdjacentHTML("afterbegin",'<div class="offline" role="status">'+esc(t("state.offline"))+'</div>')});
 (async()=>{setTheme(ls.get("shp_theme")||"dark");await loadLang(LANG);
  if(TOKEN){try{PREF=await api("/me/preferences");if(PREF.language_code!==LANG)await loadLang(PREF.language_code);setTheme(PREF.theme)}catch(e){if(e.status===401){TOKEN="";ls.del("shp_session")}}}
  // draw once, after every screen script (hub_social, match_center, shell) has loaded
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",route,{once:true});else route()})();
 </script>
-<script src="/hub_social.js"></script>
-<script src="/match_center.js"></script>
-<script src="/shell.js"></script>
+<script src="/hub_social.js?v=__SH_BUILD__"></script>
+<script src="/match_center.js?v=__SH_BUILD__"></script>
+<script src="/shell.js?v=__SH_BUILD__"></script>
 </body>
 </html>

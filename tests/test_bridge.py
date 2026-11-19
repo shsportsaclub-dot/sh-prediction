@@ -5,6 +5,7 @@ External services are replaced by local fakes that return the exact formats the 
 (xlsx export, CricketData JSON, Cricsheet zip + downloads page). These are MOCKED INTEGRATION tests:
 the real Google, CricketData and Cricsheet calls run only on the server (see docs/qa/QA-REPORT.md).
 """
+from pathlib import Path
 import datetime, io, json, os, sqlite3, subprocess, sys, time, unittest, urllib.request, zipfile
 sys.path.insert(0, os.path.dirname(__file__))
 import test_v1 as T
@@ -591,3 +592,17 @@ class SeriesHomeFilters(unittest.TestCase):
         h = T.call("/api/v1/home/dashboard")[1]
         self.assertIn("Data not available from the current source", h["news_note"])
         self.assertIsNone(h["news"])
+
+
+class AutoUpdate(unittest.TestCase):
+    def test_build_id_and_versioned_scripts(self):
+        import os, importlib, sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
+        os.environ["RENDER_GIT_COMMIT"] = "abc123def4567890"
+        import main; importlib.reload(main)
+        self.assertEqual(main.BUILD, "abc123def456")
+        hub = (Path(main.__file__).parent / "hub.html").read_text()
+        for s in ("hub_social", "match_center", "shell"):
+            self.assertIn(f"/{s}.js?v=__SH_BUILD__", hub)
+        self.assertIn('fetch("/version"', hub)
+        del os.environ["RENDER_GIT_COMMIT"]

@@ -883,3 +883,22 @@ for _code, _vals in _MC4.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+# auto-update notice shown after a new deploy
+KEYS5 = ["app.updated", "app.update_now"]
+_UPD = {
+ "en": ["New version available — updating…", "Update now"],
+ "hi": ["नया वर्ज़न उपलब्ध — अपडेट हो रहा है…", "अभी अपडेट करें"],
+ "te": ["కొత్త వెర్షన్ వచ్చింది — అప్‌డేట్ అవుతోంది…", "ఇప్పుడే అప్‌డేట్ చేయండి"],
+ "ta": ["புதிய பதிப்பு கிடைக்கிறது — புதுப்பிக்கப்படுகிறது…", "இப்போது புதுப்பி"],
+ "kn": ["ಹೊಸ ಆವೃತ್ತಿ ಲಭ್ಯ — ಅಪ್‌ಡೇಟ್ ಆಗುತ್ತಿದೆ…", "ಈಗ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ"],
+ "bn": ["নতুন সংস্করণ এসেছে — আপডেট হচ্ছে…", "এখনই আপডেট করুন"],
+ "mr": ["नवीन आवृत्ती उपलब्ध — अपडेट होत आहे…", "आता अपडेट करा"],
+ "ur": ["نیا ورژن دستیاب ہے — اپ ڈیٹ ہو رہا ہے…", "ابھی اپ ڈیٹ کریں"],
+ "es": ["Nueva versión disponible — actualizando…", "Actualizar ahora"],
+}
+for _code, _vals in _UPD.items():
+    _d = dict(zip(KEYS5, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)
