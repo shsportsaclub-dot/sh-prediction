@@ -1,3 +1,26 @@
+# QA report — Batch 05 (Automatic cricket data: Google Sheets, Cricsheet, CricketData, worldwide registry)
+
+Run date: 2026-11-19 (UTC). `python -m pytest -q tests` → **82 passed**, three runs in a row. The SH SOCIAL end-to-end proof was rerun: **21/21 steps passed**.
+
+## Test types (kept separate on purpose)
+| Kind | What | Result |
+|---|---|---|
+| Unit | header detection, H-/A- code resolution, Excel date/time cells, built-in .xlsx reader = openpyxl output | pass |
+| Mocked integration (local stand-ins in the real formats) | owner sheet sync incl. corrections, blanks, unshared sheet; League Index → registry using the **real index rows**; CricketData JSON (finished, live, upcoming), budget stop and shared-key reserve, key never logged; Cricsheet Test draw, corrected file (no duplicate balls), catalogue discovery from a downloads page, players not merged by name; scheduler backoff + log; admin-only controls; public status | pass (`tests/test_bridge.py`) |
+| Real process | server stopped and started twice on the imported data; every imported match still served | pass |
+| **Real external services** | Google Sheets export, CricketData API, Cricsheet download (real IPL import of 20 matches) | **NOT RUN: blocked here.** This workspace cannot reach docs.google.com, api.cricapi.com or cricsheet.org. They run on the server once deployed; the owner's league sheets are also not shared yet. |
+
+## Screens checked in Chrome (390×844 @2x, no JavaScript errors)
+`docs/qa/bridge-matches.png`: Matches list with honest labels ("Live · score only (cricketdata)" with the score line, "Upcoming", "Result only · no ball-by-ball", "Historical · ball-by-ball") and the home/away note. `docs/qa/admin-bridge.png`, `docs/qa/admin-registry.png`: the Data Bridge and Global Registry admin screens.
+
+## Pending acceptance (needs your approval to deploy, then runs on the server)
+1. Share the 6 league sheets → Admin → Data Bridge → owner_sheets_sync → Run now → matches appear in Matches.
+2. Add `CRICKETDATA_API_KEY` → cricketdata_matches → Run now.
+3. cricsheet_backfill → Run now (imports ipl_json.zip first) → open an IPL match: scorecard, commentary, graphs; run again → 0 created / all duplicates.
+4. Restart the service → data still there (only with a persistent disk; the free plan erases it).
+
+---
+
 # QA report — Batch 04 (Final Integration & Security, Tipster Social Network, SH SOCIAL photos/videos/Reels)
 
 Run date: 2026-11-19T03:58:32Z (UTC). Python 3.13, SQLite (WAL), FFmpeg 6.1, Pillow 12, Google Chrome (Playwright).

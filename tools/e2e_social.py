@@ -61,7 +61,7 @@ threading.Thread(target=smtp.serve_forever, daemon=True).start()
 
 ENV = dict(os.environ, SH_PREDICTION_DB=DB, SH_MEDIA_DIR=MEDIA_DIR, SH_PREDICTION_ADMIN_TOKEN="e2e-admin-key", PORT=str(PORT), HOST="127.0.0.1",
            SH_SMTP_HOST="127.0.0.1", SH_SMTP_PORT=str(SMTP_PORT), SH_SMTP_FROM="no-reply@sh-prediction.test", SH_SMTP_STARTTLS="0",
-           SH_DEV_EXPOSE_CODES="0", SH_DEV_PHONE_LOGIN="0", SH_MEDIA_SIGNING_KEY="e2e-signing-key-stable-across-restart")
+           SH_DEV_EXPOSE_CODES="0", SH_DEV_PHONE_LOGIN="0", SH_COLLECTORS="0", SH_MEDIA_SIGNING_KEY="e2e-signing-key-stable-across-restart")
 ENV.pop("SH_DEV_EXPOSE_CODES", None); ENV["SH_DEV_EXPOSE_CODES"] = "0"
 SERVER_LOG = open(os.path.join(OUT, "server.log"), "w")
 

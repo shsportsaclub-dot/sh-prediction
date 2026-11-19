@@ -125,3 +125,19 @@ Limits: image 15 MB, video 200 MB, post video 180 s, reel 90 s (admin settings).
 | GET | `/admin/media/jobs`, `/admin/media/storage` (includes which server tools are installed), `/admin/mail/outbox` (no message bodies) | |
 | POST | `/admin/media/cleanup`, `/admin/media/retry` | |
 | POST | `/admin/owner-master` | loads the owner's Abu Dhabi T10 results master (30 rows) as user-supplied; `start_utc` required, `dry_run` |
+
+## Cricket data (SH Universal Cricket Data Bridge) — Batch 05
+Every match object now carries `data_status` (`upcoming`, `live_ball_by_ball`, `live_score_only`, `delayed`, `unavailable`, `historical_ball_by_ball`, `result_only`, `demo`), `data_status_label`, `sources`, `listed_order`, `home_away_verified`, `home_away_note` and, when a score-only source covers it, `live_score {source, status_text, innings[{r,w,o,inning}], fetched_at, ball_by_ball:false}`. `match_results.result_type` adds `draw`.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/cricket/matches`, `/cricket/matches/{id}`, `/cricket/matches/{id}/scorecard`, `/commentary`, `/predictions` | same as `/matches/...` |
+| GET | `/cricket/matches/{id}/deliveries` | paged ball events with batter/bowler names and source |
+| GET | `/cricket/matches/{id}/statistics` | per innings: runs, wickets, legal balls, extras, wides, no-balls, 4s, 6s, run rate, `deliveries_match_total` cross-check |
+| GET | `/cricket/matches/{id}/playing-xi`, `/cricket/matches/{id}/squads` | recorded XI with player identity status |
+| GET | `/cricket/sources/status` | public: implemented sources, licence, last run, match counts; no keys |
+| GET | `/admin/bridge` | admin: jobs, last 5 results each, CricketData budget, matches per source, duplicate suspects |
+| POST | `/admin/bridge/jobs/{job}/run`, `/enable`, `/disable`, `/config` (`interval_minutes` 5–43200, `daily_budget`) | admin; audited |
+| GET | `/admin/registry/countries`, `/admin/registry/competitions?q=`, `/admin/registry/sources` | admin |
+
+Jobs: `owner_sheets_sync`, `registry_index_sync`, `cricketdata_matches`, `cricketdata_live`, `cricsheet_recent`, `cricsheet_backfill`.

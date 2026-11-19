@@ -6,6 +6,7 @@ Logged-in users (Bearer session) manage their preferences and follows; verified 
 predictions, which stay private until an admin publishes them. Every write is audited.
 Errors: {"error": {"code", "message"}} with HTTP 400/401/403/404/409/429.
 """
+import datetime
 import hashlib
 import json
 import re
@@ -114,6 +115,50 @@ def match_out(r):
         d.pop(k)
     return d
 
+STALE_MIN = 30
+
+def annotate(c, items):
+    """Add an honest data_status to each match: what we actually have for it, and from where."""
+    if not items:
+        return items
+    ids = [d["id"] for d in items]
+    qm = ",".join("?" * len(ids))
+    balls = {r[0]: (r[1], r[2]) for r in c.execute("SELECT match_id, COUNT(*), MAX(source) FROM ball_events WHERE match_id IN (%s) GROUP BY match_id" % qm, ids)}
+    live = {r["match_id"]: r for r in c.execute("SELECT * FROM live_scores WHERE match_id IN (%s)" % qm, ids)}
+    prov = {}
+    for r in c.execute("SELECT local_id, provider FROM data_provider_syncs WHERE provider_entity='match' AND local_id IN (%s)" % qm, ids):
+        prov.setdefault(r[0], []).append(r[1])
+    cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=STALE_MIN)).isoformat()
+    for d in items:
+        n, bsrc = balls.get(d["id"], (0, None))
+        ls = live.get(d["id"])
+        if d.get("data_origin") == "demo":
+            st = ("demo", "Demo data")
+        elif d["status"] == "scheduled":
+            st = ("upcoming", "Upcoming")
+        elif d["status"] == "live":
+            if n and bsrc not in ("cricsheet",):
+                st = ("live_ball_by_ball", "Live · ball-by-ball (SH scoring)")
+            elif ls and ls["fetched_at"] >= cutoff:
+                st = ("live_score_only", "Live · score only (%s)" % ls["source"])
+            elif ls:
+                st = ("delayed", "Delayed · last update %s UTC" % ls["fetched_at"][11:16])
+            else:
+                st = ("unavailable", "Live data unavailable")
+        elif n:
+            st = ("historical_ball_by_ball", "Historical · ball-by-ball")
+        elif d.get("result_type"):
+            st = ("result_only", "Result only · no ball-by-ball")
+        else:
+            st = ("unavailable", "Data unavailable")
+        d["data_status"], d["data_status_label"] = st
+        d["sources"] = prov.get(d["id"], ["sh_entry"])
+        if ls:
+            d["live_score"] = {"source": ls["source"], "status_text": ls["status_text"], "innings": json.loads(ls["innings_json"]),
+                               "fetched_at": ls["fetched_at"], "ball_by_ball": bool(ls["ball_by_ball"])}
+        d["home_away_note"] = None if d.get("home_away_verified", 1) else "Team order as listed by the source; home/away not verified"
+    return items
+
 def get_match(c, mid):
     r = c.execute(MATCH_SQL + " WHERE m.id=?", (mid,)).fetchone()
     if not r:
@@ -195,7 +240,7 @@ def list_matches(c, q):
     sql = MATCH_SQL + (" WHERE " + " AND ".join(where) if where else "")
     total = c.execute("SELECT COUNT(*) FROM (" + sql + ")", args).fetchone()[0]
     order = " ORDER BY m.start_utc DESC" if st == "completed" else " ORDER BY m.start_utc ASC"
-    items = [match_out(r) for r in c.execute(sql + order + " LIMIT ? OFFSET ?", args + [limit, offset])]
+    items = annotate(c, [match_out(r) for r in c.execute(sql + order + " LIMIT ? OFFSET ?", args + [limit, offset])])
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 def form_of(c, team_id, before, n=5):
@@ -209,7 +254,7 @@ def attribution_for(source):
 
 def match_detail(c, mid):
     r = get_match(c, mid)
-    d = match_out(r)
+    d = annotate(c, [match_out(r)])[0]
     d["attribution"] = attribution_for(r["source"])
     h, a = r["home_team_id"], r["away_team_id"]
     h2h = c.execute("""SELECT r.winner_team_id FROM matches m JOIN match_results r ON r.match_id=m.id
@@ -619,6 +664,104 @@ def admin_match(c, who, d):
                   (d["provider"], "match", str(d["provider_id"]), "matches", mid, now()))
     return {"match_id": mid, "status": status}
 
+# ------------------------------------------------------------------ SH Universal Cricket Data Bridge
+def bridge_status(c):
+    import cricketdata
+    jobs = []
+    for j in c.execute("SELECT * FROM collector_jobs ORDER BY name"):
+        d = dict(j)
+        d["config"] = json.loads(d.pop("config_json") or "{}")
+        d["config"].pop("catalogue", None) if len(d["config"].get("catalogue", [])) > 40 else None
+        d["recent"] = rows(c.execute("SELECT started_at,finished_at,status,summary,error FROM collector_log WHERE job=? ORDER BY id DESC LIMIT 5", (j["name"],)))
+        jobs.append(d)
+    counts = {p: c.execute("SELECT COUNT(*) FROM data_provider_syncs WHERE provider=? AND provider_entity='match'", (p,)).fetchone()[0]
+              for p in ("cricsheet", "owner_sheets", "cricketdata")}
+    suspects = rows(c.execute("""SELECT m1.id AS match_a, m2.id AS match_b, substr(m1.start_utc,1,10) AS day, h.name AS team_1, a.name AS team_2
+        FROM matches m1 JOIN matches m2 ON m2.id>m1.id AND substr(m2.start_utc,1,10)=substr(m1.start_utc,1,10)
+         AND ((m2.home_team_id=m1.home_team_id AND m2.away_team_id=m1.away_team_id) OR (m2.home_team_id=m1.away_team_id AND m2.away_team_id=m1.home_team_id))
+        JOIN teams h ON h.id=m1.home_team_id JOIN teams a ON a.id=m1.away_team_id
+        WHERE m1.data_origin<>'demo' AND m2.data_origin<>'demo' LIMIT 50"""))
+    return {"jobs": jobs, "matches_by_source": counts,
+            "cricketdata": {"key_configured": bool(cricketdata.key()), "hits_used_today": cricketdata.hits_used(c), "day_utc": cricketdata.today()},
+            "possible_duplicates": suspects,
+            "duplicate_rule": "Matches from different sources are never merged automatically; same day and same two teams are listed here for review.",
+            "sources": rows(c.execute("SELECT key,name,adapter,permission,last_check,last_ok,last_error FROM source_registry ORDER BY adapter DESC, key"))}
+
+def bridge_public_status(c):
+    out = []
+    for r in c.execute("SELECT key,name,url,historical,live,ball_by_ball,license,adapter,permission FROM source_registry WHERE adapter='implemented' ORDER BY key"):
+        d = dict(r)
+        j = c.execute("SELECT last_run_at,last_status FROM collector_jobs WHERE name LIKE ? ORDER BY last_run_at DESC LIMIT 1", (r["key"].split("_")[0] + "%",)).fetchone()
+        d["last_run_at"], d["last_status"] = (j[0], j[1]) if j else (None, None)
+        d["matches"] = c.execute("SELECT COUNT(*) FROM data_provider_syncs WHERE provider=? AND provider_entity='match'", (r["key"],)).fetchone()[0]
+        out.append(d)
+    return {"items": out, "coverage_note": "Coverage is limited to the sources listed. Worldwide live coverage is not claimed."}
+
+def cricket_extra(c, mid, what, q):
+    if what == "deliveries":
+        limit, offset = page(q)
+        return {"items": rows(c.execute("""SELECT b.innings_no,b.over_no,b.ball_in_over,b.seq,bt.name AS batter,bw.name AS bowler,b.runs_bat,b.extras,
+                  b.extra_type,b.is_wicket,b.wicket_kind,b.source FROM ball_events b LEFT JOIN players bt ON bt.id=b.batter_id
+                  LEFT JOIN players bw ON bw.id=b.bowler_id WHERE b.match_id=? ORDER BY b.innings_no,b.seq LIMIT ? OFFSET ?""", (mid, limit, offset))),
+                "total": c.execute("SELECT COUNT(*) FROM ball_events WHERE match_id=?", (mid,)).fetchone()[0]}
+    if what in ("xi", "squads"):
+        return {"items": rows(c.execute("""SELECT x.team_id,t.name AS team,p.id AS player_id,p.name,x.batting_order,p.identity_status FROM playing_xi x
+                  JOIN players p ON p.id=x.player_id JOIN teams t ON t.id=x.team_id WHERE x.match_id=? ORDER BY x.team_id,x.batting_order""", (mid,))),
+                "note": "Squads are the announced/recorded playing XI where the source provides it."}
+    inn = rows(c.execute("SELECT innings_no,batting_team_id,runs,wickets,legal_balls,target,is_super_over FROM innings WHERE match_id=? ORDER BY innings_no", (mid,)))
+    for i in inn:
+        b = c.execute("""SELECT COALESCE(SUM(runs_bat),0), COALESCE(SUM(extras),0), SUM(extra_type='wide'), SUM(extra_type='no_ball'),
+                         SUM(runs_bat=4), SUM(runs_bat=6) FROM ball_events WHERE match_id=? AND innings_no=?""", (mid, i["innings_no"])).fetchone()
+        i.update(bat_runs=b[0], extras=b[1], wides=b[2] or 0, no_balls=b[3] or 0, fours=b[4] or 0, sixes=b[5] or 0,
+                 run_rate=round(i["runs"] * 6 / i["legal_balls"], 2) if i["legal_balls"] else None,
+                 deliveries_match_total=(b[0] + b[1] == i["runs"]) if b[0] + b[1] else None)
+    return {"innings": inn}
+
+def registry_list(c, what, q):
+    limit, offset = page(q)
+    like = "%" + (qv(q, "q") or "")[:60] + "%"
+    if what == "sources":
+        return {"items": rows(c.execute("SELECT * FROM source_registry ORDER BY adapter DESC, permission, key"))}
+    if what == "countries":
+        items = rows(c.execute("""SELECT co.*, (SELECT COUNT(*) FROM competitions WHERE country_id=co.id) AS competitions,
+                     (SELECT COUNT(*) FROM competitions WHERE country_id=co.id AND verification='verified') AS verified_competitions
+                     FROM countries co WHERE co.name LIKE ? ORDER BY (co.icc_status='full') DESC, co.icc_status, co.name LIMIT ? OFFSET ?""", (like, limit, offset)))
+        return {"items": items, "total": c.execute("SELECT COUNT(*) FROM countries").fetchone()[0],
+                "icc_note": "ICC: 111 members (12 Full, 99 Associate) as of July 2026. Countries not yet researched are marked so."}
+    items = rows(c.execute("""SELECT cp.id,cp.name,cp.category,cp.division,cp.format,cp.level,cp.region,co.name AS country,cp.verification,cp.activity,
+                 cp.registry_source,cp.source,(SELECT COUNT(*) FROM matches WHERE competition_id=cp.id) AS matches,
+                 (SELECT COUNT(*) FROM seasons WHERE competition_id=cp.id) AS seasons FROM competitions cp LEFT JOIN countries co ON co.id=cp.country_id
+                 WHERE cp.name LIKE ? ORDER BY matches DESC, cp.name LIMIT ? OFFSET ?""", (like, limit, offset)))
+    return {"items": items, "total": c.execute("SELECT COUNT(*) FROM competitions").fetchone()[0]}
+
+def admin_bridge_job(c, who, name, action, d):
+    import scheduler
+    if not c.execute("SELECT 1 FROM collector_jobs WHERE name=?", (name,)).fetchone():
+        raise ApiError(404, "NOT_FOUND", "unknown job")
+    if action in ("enable", "disable"):
+        c.execute("UPDATE collector_jobs SET enabled=? WHERE name=?", (1 if action == "enable" else 0, name))
+    elif action == "config":
+        cfg = json.loads(c.execute("SELECT config_json FROM collector_jobs WHERE name=?", (name,)).fetchone()[0])
+        if "daily_budget" in d:
+            b = d["daily_budget"]
+            if not isinstance(b, int) or not 0 <= b <= 100000:
+                raise bad("daily_budget must be a whole number")
+            cfg["daily_budget"] = b
+        if "interval_minutes" in d:
+            iv = d["interval_minutes"]
+            if not isinstance(iv, int) or not 5 <= iv <= 43200:
+                raise bad("interval_minutes must be between 5 and 43200")
+            c.execute("UPDATE collector_jobs SET interval_minutes=? WHERE name=?", (iv, name))
+        c.execute("UPDATE collector_jobs SET config_json=? WHERE name=?", (json.dumps(cfg), name))
+    elif action == "run":
+        c.execute("UPDATE collector_jobs SET next_run_at=? WHERE name=?", (now(), name))
+        c.commit()
+        threading.Thread(target=scheduler.run_job, args=(DB_FN, name), daemon=True).start()
+    else:
+        raise bad("action must be run, enable, disable or config")
+    audit(c, who["actor"], "bridge.job." + action, "collector_job", name, d)
+    return {"job": name, "action": action, "status": "started" if action == "run" else "saved"}
+
 OWNER_MASTER = Path(__file__).parent / "data" / "owner_master_abu_dhabi_t10.json"
 
 def admin_owner_master(c, who, d):
@@ -695,7 +838,7 @@ def admin_toss(c, who, d):
     audit(c, who["actor"], "toss.revise" if old else "toss.record", "match", mid, d, dict(old) if old else None)
     return {"status": "revised" if old else "recorded"}
 
-RESULT_TYPES = ("win", "tie_super_over", "tie", "no_result", "abandoned", "canceled", "awarded")
+RESULT_TYPES = ("win", "tie_super_over", "tie", "draw", "no_result", "abandoned", "canceled", "awarded")
 
 def admin_result(c, who, d):
     mid = int_id(d.get("match_id"), "match_id")
@@ -719,7 +862,7 @@ def admin_result(c, who, d):
                  ON CONFLICT(match_id) DO UPDATE SET result_type=excluded.result_type,winner_team_id=excluded.winner_team_id,margin=excluded.margin,
                  method=excluded.method,source=excluded.source,verified_at=excluded.verified_at""",
               (mid, rt, winner, d.get("margin"), d.get("method"), d["source"], now()))
-    status = {"win": "completed", "tie_super_over": "completed", "tie": "completed", "awarded": "completed",
+    status = {"win": "completed", "tie_super_over": "completed", "tie": "completed", "draw": "completed", "awarded": "completed",
               "no_result": "no_result", "abandoned": "abandoned", "canceled": "canceled"}[rt]
     c.execute("UPDATE matches SET status=?,updated_at=? WHERE id=?", (status, now(), mid))
     n = engine.reevaluate_match(c, mid)
@@ -1411,6 +1554,15 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
                 cov = i18n.coverage(code)
                 items.append({"code": code, "name": name, "native_name": native, "rtl": bool(rtl), "coverage_percent": cov, "ui_complete": cov == 100})
             return 200, {"items": sorted(items, key=lambda x: (-x["coverage_percent"], x["name"]))}
+        if P and P[0] == "cricket" and len(P) >= 2:
+            if P[1:] == ["sources", "status"]:
+                return 200, bridge_public_status(c)
+            alias = {"playing-xi": "xi"}
+            P = P[1:] if P[1] != "matches" or len(P) < 4 else ["matches", P[2], alias.get(P[3], P[3])] + P[4:]
+            if len(P) == 3 and P[0] == "matches" and P[2] in ("deliveries", "statistics", "squads", "xi"):
+                mid = int_id(P[1], "match id")
+                get_match(c, mid)
+                return 200, cricket_extra(c, mid, P[2], q)
         if P == ["matches"]:
             return 200, list_matches(c, q)
         if len(P) >= 2 and P[0] == "matches":
@@ -1495,6 +1647,10 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
                                                      if c.execute("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone() else []}}
             if A in simple:
                 return 200, simple[A]()
+            if A == ("bridge",):
+                return 200, bridge_status(c)
+            if A[:1] == ("registry",) and len(A) == 2 and A[1] in ("countries", "competitions", "sources"):
+                return 200, registry_list(c, A[1], q)
             if A == ("cricsheet",):
                 return 200, {"files": [{"key": k, "file": v[0], "label": v[1]} for k, v in cricsheet.ZIPS.items()],
                              "attribution": cricsheet.ATTRIBUTION, "licence_url": cricsheet.LICENSE_URL,
@@ -1544,6 +1700,8 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
                     ("player-stats",): admin_player_stats, ("model-versions",): admin_model_version, ("import",): admin_import, ("owner-master",): admin_owner_master}
             if A in flat:
                 return (201 if A == ("model-versions",) else 200), flat[A](c, who, d)
+            if len(A) == 4 and A[:2] == ("bridge", "jobs"):
+                return 200, admin_bridge_job(c, who, A[2], A[3], d)
             if A == ("settings",):
                 return 200, admin_settings(c, who, d)
             if A == ("cricsheet", "import") or A == ("providers", "cricsheet", "sync"):

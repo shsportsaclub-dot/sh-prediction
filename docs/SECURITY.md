@@ -31,3 +31,10 @@ Proof: `tests/test_social.py::AdminSweep` calls **22 GET + 33 POST admin paths**
 
 ## Secrets
 Never in the repo: admin key, media signing key, SMTP password, GitHub tokens. Set them as Render secret environment variables. A scan of the working tree for keys/tokens/phone numbers found only synthetic test values.
+
+## Data bridge (Batch 05)
+* `CRICKETDATA_API_KEY` is read from the server environment only. It is never stored in the database, logged (errors mask `apikey=***`), or returned by any API; tests check this.
+* Collector controls (`/admin/bridge/...`) and the registry are admin-only (checked: no credentials and normal accounts get 401/403). Every change is audited.
+* Only sources with a recorded permission are collected: Cricsheet (ODC-By), CricketData (owner's API key), the owner's own sheets and SH scoring. Cricbuzz, ESPNcricinfo and CREX are marked `not_permitted` and are never fetched. No APK is used as a data source.
+* Google Sheets shared as "Anyone with the link" can be opened by anyone who has the link. Don't put private data in them.
+* Cricsheet downloads accept only `*_json.zip` names found on cricsheet.org's own downloads page, from cricsheet.org only (fixed base URL), with a 400 MB size limit.

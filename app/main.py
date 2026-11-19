@@ -309,4 +309,5 @@ def start_worker():
 if __name__=="__main__":
  with db():pass
  start_worker()
+ import scheduler;scheduler.start(db)  # 24/7 data collectors (SH_COLLECTORS=0 disables)
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()

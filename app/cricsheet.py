@@ -5,16 +5,18 @@
 * Historical only: Cricsheet publishes a match after it has finished. It is not a live feed.
 * Every imported match keeps its Cricsheet match id (data_provider_syncs) so re-imports never duplicate.
 * Attribution is stored on every match (matches.source) and shown to viewers.
-* Limited-overs matches (T20, IT20, ODI, ODM) are imported; multi-day matches (Test, MDM) are skipped
-  for now because draws are not yet part of the SH result model.
-* Home / away: Cricsheet lists the two teams without a home flag. The first listed team is stored as
-  "home" and the source note says so; an admin can correct it.
+* All formats are imported: T20/IT20, ODI/ODM, Test and other multi-day (MDM) matches, including draws.
+* Home / away: Cricsheet lists the two teams without a home flag. The listed order is kept in
+  matches.listed_order and home_away_verified=0, so the first team is never presented as a verified home side.
+* Corrections: each file's SHA-256 is stored; a changed file replaces that match's imported records
+  (no duplicate statistics). Innings totals are cross-checked against the deliveries.
 """
 import hashlib
 import io
 import json
 import sqlite3
 import os
+import re
 import tempfile
 import threading
 import time
@@ -40,14 +42,29 @@ ZIPS = {  # key -> (file, label); verified on cricsheet.org/downloads (19 Nov 20
     "all": ("all_json.zip", "All matches (very large)"),
 }
 MAX_BYTES = 400 * 1024 * 1024
+MISMATCHES = []   # scorecard cross-check failures found during the current import (reported in the job log)
+DOWNLOADS_PAGE = "https://cricsheet.org/downloads/"
+
+def discover(opener=urllib.request.urlopen):
+    """Read Cricsheet's official downloads page and return the JSON zip names it offers (e.g. ipl_json.zip)."""
+    html = opener(urllib.request.Request(DOWNLOADS_PAGE, headers={"User-Agent": "SH-PREDICTION/1.0 (+cricsheet attribution)"}), timeout=60).read().decode("utf-8", "replace")
+    names = []
+    for z in re.findall(r'([a-z0-9_]+_json\.zip)', html):
+        if z not in names:
+            names.append(z)
+    return names
 LIMITED = {"T20", "IT20", "ODI", "ODM"}
 BOWLER_KINDS = {"bowled", "caught", "caught and bowled", "lbw", "stumped", "hit wicket"}
 NOT_A_WICKET = {"retired hurt", "retired not out"}
 
 def download(key, opener=urllib.request.urlopen, retries=3):
-    if key not in ZIPS:
+    if key in ZIPS:
+        fname = ZIPS[key][0]
+    elif re.fullmatch(r"[a-z0-9_]+_json\.zip", key or ""):   # a file name found on the official downloads page
+        fname = key
+    else:
         raise ValueError("unknown Cricsheet file")
-    url = BASE + ZIPS[key][0]
+    url = BASE + fname
     last = None
     for attempt in range(1, retries + 1):
         try:
@@ -80,6 +97,10 @@ def _format(info):
         return "ODI"
     if mt == "ODM":
         return "List A"
+    if mt == "Test":
+        return "Test"
+    if mt == "MDM":
+        return "First-class"
     return None
 
 def _result(info, team_ids):
@@ -106,6 +127,8 @@ def _result(info, team_ids):
         return "tie", None, None, method
     if res == "no result":
         return "no_result", None, None, method
+    if res == "draw":
+        return "draw", None, None, method
     return None
 
 def parse_innings(inn):
@@ -155,14 +178,23 @@ def parse_innings(inn):
                           "wicket_kind": w[0]["kind"] if w else None, "commentary": text})
     return {"runs": runs, "wickets": wkts, "legal_balls": legal, "balls": balls, "batting": bat, "batting_order": order, "bowling": bowl}
 
-def import_match(c, match_key, doc, create_match):
-    """Import one Cricsheet JSON document. Returns 'created', 'duplicate' or 'skipped:<reason>'."""
-    if c.execute("SELECT 1 FROM data_provider_syncs WHERE provider='cricsheet' AND provider_entity='match' AND provider_id=?", (match_key,)).fetchone():
+def _clear_match(c, mid):
+    """Remove the imported records of one match before re-importing a corrected Cricsheet file."""
+    for t in ("ball_events", "scorecards", "innings", "playing_xi", "toss_results", "match_results"):
+        c.execute("DELETE FROM %s WHERE match_id=?" % t, (mid,))
+
+def import_match(c, match_key, doc, create_match, content_hash=None):
+    """Import one Cricsheet JSON document. Returns 'created', 'corrected', 'duplicate' or 'skipped:<reason>'."""
+    known = c.execute("SELECT local_id, payload_hash FROM data_provider_syncs WHERE provider='cricsheet' AND provider_entity='match' AND provider_id=?",
+                      (match_key,)).fetchone()
+    if known and (content_hash is None or known[1] in (None, content_hash)):
+        if known[1] is None and content_hash:
+            c.execute("UPDATE data_provider_syncs SET payload_hash=? WHERE provider='cricsheet' AND provider_entity='match' AND provider_id=?", (content_hash, match_key))
         return "duplicate"
     info = doc.get("info") or {}
     fmt = _format(info)
-    if info.get("match_type") not in LIMITED or not fmt:
-        return "skipped:multi-day or unsupported format"
+    if not fmt:
+        return "skipped:unsupported format %s" % info.get("match_type")
     teams = info.get("teams") or []
     if len(teams) != 2 or not info.get("dates"):
         return "skipped:missing teams or date"
@@ -177,8 +209,16 @@ def import_match(c, match_key, doc, create_match):
                         "format": fmt, "match_no": str(ev["match_number"]) if ev.get("match_number") else (ev.get("stage") or None),
                         "source": src, "data_origin": "imported", "provider": "cricsheet", "provider_id": match_key})
     mid = res["match_id"]
+    outcome = "created"
     if res["status"] != "created":
-        return "duplicate"
+        if not known:
+            return "duplicate"
+        _clear_match(c, mid)          # corrected source file: replace this match's imported records
+        outcome = "corrected"
+    c.execute("UPDATE matches SET listed_order=?, home_away_verified=0 WHERE id=?", (json.dumps(teams), mid))
+    if content_hash:
+        c.execute("UPDATE data_provider_syncs SET payload_hash=?, synced_at=? WHERE provider='cricsheet' AND provider_entity='match' AND provider_id=?",
+                  (content_hash, now(), match_key))
     m = c.execute("SELECT home_team_id, away_team_id FROM matches WHERE id=?", (mid,)).fetchone()
     tid = {teams[0]: m[0], teams[1]: m[1]}
     c.execute("UPDATE teams SET gender=COALESCE(gender,?) WHERE id IN (?,?)", (gender, m[0], m[1]))
@@ -193,7 +233,8 @@ def import_match(c, match_key, doc, create_match):
         if row:
             pids[name] = row[0]
         else:
-            c.execute("INSERT INTO players(name) VALUES(?)", (name,))
+            # never merge players by name: a name without a Cricsheet registry ID gets its own unverified record
+            c.execute("INSERT INTO players(name, identity_status) VALUES(?,?)", (name, "cricsheet_registry" if reg else "unverified"))
             pids[name] = c.execute("SELECT last_insert_rowid()").fetchone()[0]
             if reg:
                 c.execute("INSERT INTO data_provider_syncs(provider,provider_entity,provider_id,local_table,local_id,synced_at) VALUES('cricsheet','player',?,'players',?,?)",
@@ -213,6 +254,9 @@ def import_match(c, match_key, doc, create_match):
         if inn.get("team") not in tid or inn.get("forfeited"):
             continue
         p = parse_innings(inn)
+        bat_sum = sum(b["runs_bat"] + b["extras"] for b in p["balls"])
+        if bat_sum != p["runs"]:
+            MISMATCHES.append("%s innings %d: deliveries %d vs total %d" % (match_key, n, bat_sum, p["runs"]))
         target = (inn.get("target") or {}).get("runs")
         max_balls = int(((inn.get("target") or {}).get("overs") or info.get("overs") or 0) * bpo) or None
         c.execute("""INSERT INTO innings(match_id,innings_no,batting_team_id,runs,wickets,legal_balls,target,max_balls,is_super_over,completed)
@@ -243,11 +287,12 @@ def import_match(c, match_key, doc, create_match):
         c.execute("UPDATE matches SET status=? WHERE id=?", ({"no_result": "no_result"}.get(rtype, "completed"), mid))
     else:
         c.execute("UPDATE matches SET status='completed' WHERE id=?", (mid,))
-    return "created"
+    return outcome
 
 def import_zip(c, path, create_match, limit=None, progress=None, commit_every=50):
     """Import every JSON match file in a Cricsheet zip. Each match is atomic (savepoint)."""
-    counts = {"created": 0, "duplicate": 0, "skipped": 0, "errors": 0, "error_samples": []}
+    counts = {"created": 0, "corrected": 0, "duplicate": 0, "skipped": 0, "errors": 0, "error_samples": []}
+    del MISMATCHES[:]
     with zipfile.ZipFile(path) as z:
         names = sorted(n for n in z.namelist() if n.endswith(".json"))
         c.commit()
@@ -263,10 +308,11 @@ def import_zip(c, path, create_match, limit=None, progress=None, commit_every=50
                         time.sleep(0.5 * (attempt + 1)); continue
                     raise
                 try:
-                    doc = json.loads(z.read(n))
-                    out = import_match(c, key, doc, create_match)
+                    raw = z.read(n)
+                    doc = json.loads(raw)
+                    out = import_match(c, key, doc, create_match, hashlib.sha256(raw).hexdigest())
                     c.commit()
-                    counts["created" if out == "created" else "duplicate" if out == "duplicate" else "skipped"] += 1
+                    counts[out if out in ("created", "corrected", "duplicate") else "skipped"] += 1
                 except sqlite3.OperationalError as e:
                     c.rollback()
                     if "locked" in str(e) and attempt < 4:
@@ -283,6 +329,7 @@ def import_zip(c, path, create_match, limit=None, progress=None, commit_every=50
             if progress and i % commit_every == 0:
                 progress(i, len(names), counts)
     c.commit()
+    counts["scorecard_mismatches"] = list(MISMATCHES[:20])
     return counts
 
 def rebuild_player_statistics(c):
@@ -349,4 +396,4 @@ def start_job(db_fn, key, create_match_factory, limit=None, opener=None):
 
     t = threading.Thread(target=work, daemon=True, name="cricsheet-import")
     t.start()
-    return {"run_id": run_id, "status": "running", "file": ZIPS[key][0], "attribution": ATTRIBUTION}, t
+    return {"run_id": run_id, "status": "running", "file": ZIPS[key][0] if key in ZIPS else key, "attribution": ATTRIBUTION}, t

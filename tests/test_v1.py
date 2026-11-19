@@ -806,9 +806,9 @@ class CricsheetImport(unittest.TestCase):
         self.assertEqual(call("/api/v1/admin/cricsheet/import", {"file": "https://evil.example/x.zip"}, A)[0], 400)  # fixed allow-list only
         self.assertEqual(call("/api/v1/admin/cricsheet/import", {"file": "ipl"})[0], 403)
         run = self._run({"file": "ipl"})
-        self.assertEqual((run["status"], run["created"], run["rejected"]), ("ok", 4, 1), run)   # the Test match is skipped
+        self.assertEqual((run["status"], run["created"], run["rejected"]), ("ok", 5, 0), run)   # Test matches are imported too
         again = self._run({"file": "ipl"})
-        self.assertEqual((again["created"], again["duplicates"]), (0, 4))
+        self.assertEqual((again["created"], again["duplicates"]), (0, 5))
         c = db()
         mid = lambda k: c.execute("SELECT local_id FROM data_provider_syncs WHERE provider='cricsheet' AND provider_entity='match' AND provider_id=?", (k,)).fetchone()[0]
         res = lambda k: tuple(c.execute("SELECT r.result_type, t.name, r.margin, r.method FROM match_results r LEFT JOIN teams t ON t.id=r.winner_team_id WHERE r.match_id=?", (mid(k),)).fetchone())
@@ -828,13 +828,16 @@ class CricsheetImport(unittest.TestCase):
         m = call("/api/v1/matches/%d" % mid("900001"))[1]
         self.assertIn("Open Data Commons Attribution License", m["attribution"]["text"])
         self.assertEqual(m["data_origin"], "imported")
+        self.assertEqual((m["home_away_verified"], m["data_status"]), (0, "historical_ball_by_ball"))   # listed order is not a verified home side
+        self.assertIn("not verified", m["home_away_note"])
+        self.assertEqual(call("/api/v1/matches/%d" % mid("900005"))[1]["format"], "Test")
         self.assertEqual(len(m["playing_xi"]), 5)
         src = call("/api/v1/sources")[1]["items"][0]
         self.assertEqual((src["name"], src["matches_imported"] >= 4), ("Cricsheet", True))
         # results master and statistics use the imported data; it is never treated as demo
         cid = c.execute("SELECT competition_id FROM matches WHERE id=?", (mid("900001"),)).fetchone()[0]
         ml = call("/api/v1/admin/master-list?competition_id=%d" % cid, h=A)[1]["items"]
-        self.assertEqual([(r["toss"]["outcome"] if r["toss"] else None) for r in ml], ["won", "lost", "unknown", "lost"])  # 900004: CsLions won the toss, CsTigers won (D/L)
+        self.assertEqual([(r["toss"]["outcome"] if r["toss"] else None) for r in ml], ["won", "lost", "unknown", "lost", "won"])  # 5th: the Test match, now imported  # 900004: CsLions won the toss, CsTigers won (D/L)
         st = c.execute("SELECT matches, runs FROM player_statistics ps JOIN players p ON p.id=ps.player_id WHERE p.name='CsLions1' AND format='T20'").fetchone()
         self.assertEqual(st[0], 4)
         # same Cricsheet person id -> one player row across matches

@@ -19,6 +19,12 @@ Stack: our own Python server (standard library + Pillow), SQLite, FFmpeg for vid
 
 Media sizes for planning: a 60-second reel ≈ 6–12 MB after processing (MP4 + two HLS sizes + thumbnail); 1 GB holds roughly 100 reels.
 
+## Data bridge settings (Batch 05)
+* `CRICKETDATA_API_KEY`: your CricketData.org key (the same one the Telegram bot uses is fine; SH PREDICTION spends at most 60 of the 100 free hits a day and stops when fewer than 15 remain).
+* Share each league sheet: open it → **Share** → General access **Anyone with the link → Viewer**. Without this the sheet sync reports "not shared publicly" for that league and the others carry on.
+* Collectors start automatically with the server. Admin → **Data Bridge** shows every job; "Run now" starts one immediately.
+* On the **free** Render plan collectors stop while the service sleeps (after 15 min without visitors), and data is erased on restart. Keeping data and collecting 24/7 needs Starter ($7/mo) plus a disk. Nothing paid is switched on without your approval.
+
 ## 1. Staging first
 1. Render → New → Web Service → this repo, branch with the approved commit → name `sh-prediction-staging`, **Runtime: Docker**.
 2. Env: `SH_PREDICTION_ADMIN_TOKEN` (generate), `SH_MEDIA_SIGNING_KEY` (generate), `SH_PREDICTION_DB=/tmp/staging.sqlite3` (staging may reset).

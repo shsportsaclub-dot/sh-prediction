@@ -1,5 +1,5 @@
 {
- "ran_at": "2026-11-19T03:58:32Z",
+ "ran_at": "2026-11-19T08:10:38Z",
  "steps": [
   {
    "step": "database migration with verified backup",
@@ -8,7 +8,8 @@
     "001_normalized_core",
     "002_publishing_admin_gateway",
     "003_cricsheet_history",
-    "004_accounts_social_media_live_game"
+    "004_accounts_social_media_live_game",
+    "005_data_bridge_registry"
    ],
    "backup": "ok"
   },
@@ -78,12 +79,12 @@
   {
    "step": "5. Background worker processed the video automatically",
    "ok": true,
-   "processing_seconds": 2.8,
+   "processing_seconds": 3.0,
    "job": {
     "id": 2,
     "status": "done",
     "attempts": 1,
-    "log": "2.4s video 1280x720 6.0s -> mp4 720x1280, thumb, hls 360p/720p\nffmpeg -i -vf scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1 -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -> 0 \nffmpeg -ss 1.00 -i -frames:v 1 -q:v 3 -> 0 \nffmpeg -i -vf scale=360:640 -c:v libx264 -preset veryfast -crf 28 -g 48 -sc_threshold 0 -c:a aac -b:a 96k -f hls -hls_time 4 -hls_playlist_type vod -hls_segment_filename -> 0 \nffmpeg -i -vf scale=720:1280 -c:v libx264 -preset veryfast -crf 28 -g 48 -sc_threshold 0 -c:a aac -b:a 96k -f hls -hls_time 4 -hls_playlist_type vod -hls_segment_filename -> 0 "
+    "log": "2.7s video 1280x720 6.0s -> mp4 720x1280, thumb, hls 360p/720p\nffmpeg -i -vf scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1 -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -> 0 \nffmpeg -ss 1.00 -i -frames:v 1 -q:v 3 -> 0 \nffmpeg -i -vf scale=360:640 -c:v libx264 -preset veryfast -crf 28 -g 48 -sc_threshold 0 -c:a aac -b:a 96k -f hls -hls_time 4 -hls_playlist_type vod -hls_segment_filename -> 0 \nffmpeg -i -vf scale=720:1280 -c:v libx264 -preset veryfast -crf 28 -g 48 -sc_threshold 0 -c:a aac -b:a 96k -f hls -hls_time 4 -hls_playlist_type vod -hls_segment_filename -> 0 "
    }
   },
   {
@@ -137,11 +138,11 @@
    "ok": true,
    "playback": {
     "readyState": 4,
-    "t0": 2.432185,
-    "t1": 3.932364,
+    "t0": 2.3783,
+    "t1": 3.878487,
     "advanced": true,
     "paused": true,
-    "src": "http://127.0.0.1:49773/media/3/video.mp4",
+    "src": "http://127.0.0.1:60657/media/3/video.mp4",
     "videoWidth": 720,
     "videoHeight": 1280,
     "duration": 6.013991
@@ -182,7 +183,7 @@
    "ok": true,
    "database": {
     "sessions": 3,
-    "watch_ms": 13055,
+    "watch_ms": 13012,
     "rate": 33.3,
     "views": 2
    },
@@ -194,7 +195,7 @@
     "shares": 1,
     "saves": 1,
     "followers": 1,
-    "watch_time_ms": 13055,
+    "watch_time_ms": 13012,
     "watch_sessions": 3,
     "reel_completion_rate": 33.3
    }

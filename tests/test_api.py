@@ -23,7 +23,7 @@ class T(unittest.TestCase):
   self.assertEqual(call("/admin/drafts",h=h)[0],403)
  def test_admin_flow(self):
   a={"X-Admin-Token":"adm-test-token"}
-  self.assertEqual(call("/admin/fixtures",{"competition":"x","season":"1","home":"A","away":"B","start_utc":"2030-01-01T00:00:00Z","source":"s"},a)[0],200)
+  r=call("/admin/fixtures",{"competition":"x","season":"1","home":"A","away":"B","start_utc":"2030-01-01T00:00:00Z","source":"s"},a);self.assertEqual(r[0],200,r)
   self.assertEqual(call("/admin/fixtures",{"competition":"x","season":"1","home":"A","away":"A","start_utc":"2030-01-01T00:00:00Z","source":"s"},a)[0],400)
   self.assertEqual(call("/admin/fixtures",{},{"X-Admin-Token":"wrong"})[0],403)
  def test_outcome_once(self):

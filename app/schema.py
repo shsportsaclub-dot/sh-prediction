@@ -378,3 +378,59 @@ def bridge_legacy(c):
                      source=excluded.source,verified_at=excluded.verified_at WHERE match_results.verified_at<>excluded.verified_at""",
                   (m, rtype, winner, o["source"], o["verified_at"]))
         c.execute("UPDATE matches SET status=? WHERE id=? AND status<>?", (st if st != "void" else "canceled", m, st if st != "void" else "canceled"))
+
+# ---------------------------------------------------------------- 005: data bridge, registry, collectors
+M005 = """
+CREATE TABLE match_results_v5(match_id INTEGER PRIMARY KEY REFERENCES matches(id),
+  result_type TEXT NOT NULL CHECK(result_type IN ('win','tie_super_over','tie','draw','no_result','abandoned','canceled','awarded')),
+  winner_team_id INTEGER REFERENCES teams(id), margin TEXT, method TEXT, source TEXT NOT NULL, verified_at TEXT NOT NULL,
+  CHECK((result_type IN ('win','tie_super_over','awarded')) = (winner_team_id IS NOT NULL)));
+INSERT INTO match_results_v5 SELECT match_id,result_type,winner_team_id,margin,method,source,verified_at FROM match_results;
+DROP TABLE match_results;
+ALTER TABLE match_results_v5 RENAME TO match_results;
+ALTER TABLE matches ADD COLUMN listed_order TEXT;
+ALTER TABLE matches ADD COLUMN home_away_verified INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE countries ADD COLUMN icc_status TEXT;
+ALTER TABLE countries ADD COLUMN icc_region TEXT;
+ALTER TABLE countries ADD COLUMN board_name TEXT;
+ALTER TABLE countries ADD COLUMN board_url TEXT;
+ALTER TABLE countries ADD COLUMN research_status TEXT NOT NULL DEFAULT 'Not Researched';
+ALTER TABLE countries ADD COLUMN research_note TEXT;
+ALTER TABLE countries ADD COLUMN last_verified TEXT;
+ALTER TABLE competitions ADD COLUMN level TEXT;
+ALTER TABLE competitions ADD COLUMN age_group TEXT;
+ALTER TABLE competitions ADD COLUMN region TEXT;
+ALTER TABLE competitions ADD COLUMN governing_body TEXT;
+ALTER TABLE competitions ADD COLUMN official_url TEXT;
+ALTER TABLE competitions ADD COLUMN alt_names TEXT;
+ALTER TABLE competitions ADD COLUMN first_season TEXT;
+ALTER TABLE competitions ADD COLUMN last_season TEXT;
+ALTER TABLE competitions ADD COLUMN activity TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE competitions ADD COLUMN verification TEXT NOT NULL DEFAULT 'unverified';
+ALTER TABLE competitions ADD COLUMN registry_source TEXT;
+ALTER TABLE competitions ADD COLUMN last_verified TEXT;
+ALTER TABLE players ADD COLUMN identity_status TEXT NOT NULL DEFAULT 'unverified';
+CREATE TABLE IF NOT EXISTS source_registry(key TEXT PRIMARY KEY, name TEXT NOT NULL, organization TEXT, url TEXT,
+  coverage TEXT, historical INTEGER, live INTEGER, ball_by_ball INTEGER, scorecard INTEGER, commentary INTEGER,
+  update_frequency TEXT, data_format TEXT, access_method TEXT, terms_url TEXT, license TEXT, redistribution TEXT,
+  reliability TEXT, adapter TEXT NOT NULL DEFAULT 'none', permission TEXT NOT NULL DEFAULT 'unverified',
+  last_check TEXT, last_ok TEXT, last_error TEXT, note TEXT);
+CREATE TABLE IF NOT EXISTS live_scores(match_id INTEGER PRIMARY KEY REFERENCES matches(id), source TEXT NOT NULL,
+  status_text TEXT, innings_json TEXT NOT NULL DEFAULT '[]', fetched_at TEXT NOT NULL, ball_by_ball INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS collector_jobs(name TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, interval_minutes INTEGER NOT NULL,
+  config_json TEXT NOT NULL DEFAULT '{}', last_run_at TEXT, next_run_at TEXT, last_status TEXT, last_error TEXT,
+  runs INTEGER NOT NULL DEFAULT 0, failures INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, running INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS collector_log(id INTEGER PRIMARY KEY, job TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+  status TEXT NOT NULL, summary TEXT, error TEXT);
+CREATE TABLE IF NOT EXISTS api_budget(provider TEXT NOT NULL, day TEXT NOT NULL, hits INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(provider,day));
+CREATE TABLE IF NOT EXISTS source_records(id INTEGER PRIMARY KEY, provider TEXT NOT NULL, provider_id TEXT NOT NULL, kind TEXT NOT NULL,
+  payload TEXT NOT NULL, payload_hash TEXT NOT NULL, fetched_at TEXT NOT NULL, UNIQUE(provider,provider_id,kind,payload_hash));
+CREATE INDEX IF NOT EXISTS ix_matches_status_start ON matches(status, start_utc);
+CREATE INDEX IF NOT EXISTS ix_collector_log_job ON collector_log(job, id);
+"""
+
+def _seed5(c):
+    import registry
+    registry.seed(c)
+
+MIGRATIONS.append(("005_data_bridge_registry", M005, _seed5))

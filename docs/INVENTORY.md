@@ -68,3 +68,18 @@ Legend: ✅ done and tested · 🟡 works, limited by data or not fully tested �
 | `tests/test_social.py`, `tests/test_owner_master.py` (new), `tests/test_v1.py`, `tests/test_api.py` | Account-based helpers; social, media, live, game, admin sweep, owner master |
 | `tools/e2e_social.py` (new) | Mandatory end-to-end acceptance proof |
 | `docs/*` | API, SECURITY, DEPLOYMENT, CRICKET-DATA-ENGINE, GAME-ENGINE, QA report, this inventory |
+
+## Batch 05 — automatic cricket data (local, not pushed)
+| Feature | Status | Notes |
+|---|---|---|
+| Owner Google Sheets auto-sync (6 leagues, every 30 min) | ✅ built, tested with stand-ins | Sheets must be shared "Anyone with the link: Viewer" |
+| League Index → competition registry | ✅ | Loaded as unverified |
+| Cricsheet: Tests/first-class, draws, listed order, corrections, scorecard check, catalogue discovery, scheduled backfill | ✅ built, tested with Cricsheet-format files | Real IPL download runs on the server |
+| CricketData.org adapter (fixtures, live score, toss, result) | ✅ built, tested with provider-format JSON | Needs `CRICKETDATA_API_KEY`; free 100 hits/day shared |
+| Scheduler (24/7, retries, log, admin controls) | ✅ | Stops while a free Render instance sleeps |
+| Honest data status on every match | ✅ | |
+| Global registry: countries (12 Full + 16 Associates so far), sources with permissions, competitions | 🟡 | 83 associates and all sub-national research still pending |
+| Permitted website parser / authorized streaming feed | ⬜ | No permitted source identified yet |
+| Live ball-by-ball for non-SH matches | ⬜ | Needs a paid or licensed feed (not activated) |
+
+Files: `app/registry.py`, `app/gsheets.py`, `app/cricketdata.py`, `app/scheduler.py` (new); `app/schema.py` (migration 005: adds tables/columns and rebuilds match_results to allow "draw", copying every row), `app/cricsheet.py`, `app/api_v1.py`, `app/main.py`, `app/hub.html`, `app/admin.html`, `requirements.txt`, `tests/test_bridge.py` (new), `tests/test_v1.py`, `docs/CRICKET-DATA-BRIDGE.md`, `docs/SOURCE-REGISTRY.md` (new), docs updates.
