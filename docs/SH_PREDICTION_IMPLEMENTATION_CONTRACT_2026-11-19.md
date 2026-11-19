@@ -31,3 +31,6 @@ For EACH phase: implement actual code; run unit tests and browser navigation che
 [ ] Existing admin, predictions, social, and other features preserved
 [ ] Responsive mobile QA and accessibility checks pass
 [ ] Render live commit verified; actual browser screenshots captured
+
+## Multi-sport expansion — owner update
+The product is a multi-sport prediction platform, not cricket-only. Rollout priority: (1) Cricket, (2) Football, (3) Tennis, (4) Badminton. Keep PREDICTORS as a global top-level section, with sport-specific predictors and expert/community views. The sport selector must be data-driven and extensible; do not build four unrelated applications. Each sport gets its own scoring model, match phases, event taxonomy, statistics, match-center subtabs, and prediction logic; do not reuse cricket-specific scorecards for other sports. Ship cricket first, then add the other three in the specified order after working code and deployed-screen QA. The user requested real code-generated screens only; no speculative mockups.
