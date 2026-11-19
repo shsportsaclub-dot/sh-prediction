@@ -73,11 +73,16 @@ def validate(row):
     for k in REQUIRED:
         if not str(row.get(k) or "").strip():
             return "missing " + k
-    if row["home"].strip() == row["away"].strip():
+    if str(row["home"]).strip().casefold() == str(row["away"]).strip().casefold():
         return "teams must differ"
-    s = row["start_utc"]
-    if not ("Z" in s or "+" in s[10:] or "-" in s[10:]):
-        return "start_utc needs a timezone"
+    # Require an actual timezone-aware timestamp; merely containing Z or + is not enough.
+    import datetime
+    try:
+        dt = datetime.datetime.fromisoformat(str(row["start_utc"]).replace("Z", "+00:00"))
+        if dt.tzinfo is None or dt.utcoffset() is None:
+            return "start_utc needs a timezone"
+    except (TypeError, ValueError, OverflowError):
+        return "invalid start_utc timestamp"
     return None
 
 def sync(c, provider_name, create_match, adapter=None, retries=3, backoff=0.2):
