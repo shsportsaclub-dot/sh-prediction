@@ -191,7 +191,8 @@ def predict_match(c, match_id, use_toss=True, params=None, history=None):
     h, a = m["home_team_id"], m["away_team_id"]
     base = history if history is not None else completed_matches(c, dataset="demo" if m["data_origin"] == "demo" else "verified")
     hist = [r for r in base if pdt(r["start_utc"]) < pdt(m["start_utc"]) and r["id"] != m["id"]
-            and r["result_type"] in ("win", "tie_super_over", "awarded")]
+            and r["result_type"] in ("win", "tie_super_over", "awarded")
+            and r["format"] == m["format"]]
     L, W = P["laplace"], P["form_window"]
 
     def form(team):
@@ -219,7 +220,7 @@ def predict_match(c, match_id, use_toss=True, params=None, history=None):
          "contribution": round(P["form_weight"] * (_logit(fh) - _logit(fa)), 3)},
         {"factor": "head_to_head", "detail": "home won %d of %d" % (hh, len(h2h)),
          "contribution": round(P["h2h_weight"] * _logit(h2h_rate), 3)},
-        {"factor": "home_advantage", "detail": "listed home team", "contribution": P["home_weight"]},
+        {"factor": "home_advantage", "detail": "neutral competition: listing order is not home advantage" if m["format"] == "T10" else "listed home team", "contribution": 0.0 if m["format"] == "T10" else P["home_weight"]},
         {"factor": "venue_toss_bias", "detail": venue_note, "contribution": round(P["venue_weight"] * venue_bias, 3)},
     ]
     x = sum(f["contribution"] for f in factors)
