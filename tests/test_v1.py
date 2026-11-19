@@ -4,6 +4,8 @@ import os, sys, json, time, sqlite3, tempfile, threading, unittest, urllib.reque
 D = tempfile.mkdtemp()
 os.environ["SH_PREDICTION_DB"] = D + "/v1.sqlite3"
 os.environ["SH_PREDICTION_ADMIN_TOKEN"] = "adm-test-token"
+os.environ["SH_DEV_EXPOSE_CODES"] = "1"   # tests read verification codes from the API; never set in production
+os.environ["SH_MEDIA_DIR"] = D + "/media"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 import importlib
 import screen_login, main, api_v1, engine
@@ -41,9 +43,26 @@ def call(path, data=None, h=None, method=None):
 def setUpModule():
     _migrate_once()
 
+PASSWORD = "Test-Passw0rd-SH"
+
+def account(username, verify=True):
+    s, r = call("/api/v1/auth/register", {"username": username, "email": username + "@example.test", "password": PASSWORD, "display_name": username})
+    assert s == 201, r
+    if verify:
+        s, v = call("/api/v1/auth/verify-email", {"login": username, "code": r["dev_code"]})
+        assert s == 200, v
+    s, t = call("/api/v1/auth/login", {"login": username, "password": PASSWORD})
+    assert s == 200, t
+    return {"Authorization": "Bearer " + t["token"]}
+
 def login(phone):
-    s, o = call("/auth/generate", {"phone": phone})
-    s, t = call("/auth/verify", {"phone": phone, "otp": o["otp"]})
+    """Account session for a test user (the old phone-code login is disabled)."""
+    uname = "u" + str(phone)
+    s, t = call("/api/v1/auth/login", {"login": uname, "password": PASSWORD})
+    if s == 200:
+        return {"Authorization": "Bearer " + t["token"]}
+    return account(uname)
+    s, t = None, None
     return {"Authorization": "Bearer " + t["token"]}
 
 def iso(days):
@@ -90,8 +109,8 @@ class Security(unittest.TestCase):
 
     def test_unverified_expert_blocked_verified_allowed(self):
         phone = "9100000002"
-        s, r = call("/api/v1/admin/experts", {"display_name": "Unverified Tipster", "phone": phone}, A)
         u = login(phone)
+        s, r = call("/api/v1/admin/experts", {"display_name": "Unverified Tipster", "username": "u" + phone}, A)
         mid = mk_match("ExA", "ExB")
         h, _ = team_ids(mid)
         body = {"match_id": mid, "prediction_type": "winner", "predicted_team_id": h, "confidence": 70, "explanation": "form"}

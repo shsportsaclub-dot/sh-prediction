@@ -21,7 +21,7 @@ header.top img{width:34px;height:34px;object-fit:contain}
 header.top h1{font-size:16px;letter-spacing:.12em;margin:0;flex:1;font-weight:800}
 .bar{height:3px;background:linear-gradient(90deg,var(--brand-red),var(--brand-blue))}
 main{max-width:1000px;margin:auto;padding:12px 12px 90px}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 nav.tabs a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;color:var(--muted);text-decoration:none;font-size:10.5px;text-align:center}
 nav.tabs a svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8}
 nav.tabs a[aria-current=page]{color:var(--text)}
@@ -60,6 +60,13 @@ table.simple{width:100%;border-collapse:collapse;font-size:13px}table.simple td,
 canvas{width:100%;height:190px;display:block}
 .msg{padding:10px 12px;border-radius:12px;margin:8px 0;max-width:92%;white-space:pre-wrap}
 .msg.q{background:var(--brand-blue);color:#fff;margin-left:auto}.msg.a{background:var(--surface2)}
+.gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin:8px 0}.gal img,.gal video{width:100%;border-radius:10px;display:block;max-height:520px;object-fit:cover;background:#000;cursor:zoom-in}
+.act{padding:5px 10px;font-size:13px}.lightbox{position:fixed;inset:0;background:#000d;z-index:20;display:flex;align-items:center;justify-content:center}.lightbox img{max-width:96vw;max-height:92vh}
+.reels{height:calc(100vh - 150px);overflow-y:auto;scroll-snap-type:y mandatory;border-radius:14px;background:#000}
+.reel{position:relative;height:calc(100vh - 150px);scroll-snap-align:start;display:flex;align-items:center;justify-content:center}
+.reel video{height:100%;max-width:100%;aspect-ratio:9/16;object-fit:contain;background:#000}
+.rinfo{position:absolute;left:12px;right:70px;bottom:14px;color:#fff;text-shadow:0 1px 3px #000}.rinfo a{color:#fff}
+.ract{position:absolute;right:8px;bottom:20px;display:flex;flex-direction:column;gap:10px}.ract button,.ract .btn{background:#0008 !important;color:#fff !important;border:0 !important;box-shadow:none !important;border-radius:50%;width:48px;height:48px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px}.ract small{font-size:10px}
 </style>
 </head>
 <body>
@@ -75,7 +82,9 @@ const ICONS={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1
  matches:'<circle cx="12" cy="12" r="8"/><path d="M8 6c3 3 3 9 0 12M16 6c-3 3-3 9 0 12"/>',experts:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 15-5 16 0"/>',
  ai:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><rect x="7" y="7" width="10" height="10" rx="2"/>',assistant:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/>',
  accuracy:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'};
-const NAV=[["home","nav.home"],["matches","nav.matches"],["experts","nav.experts"],["ai","nav.ai"],["assistant","nav.assistant"],["accuracy","nav.accuracy"],["settings","nav.settings"]];
+ICONS.social='<path d="M4 5h16v11H9l-5 4z"/><circle cx="9" cy="10.5" r="1"/><circle cx="15" cy="10.5" r="1"/>';ICONS.reels='<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M11 9l4 3-4 3z"/>';ICONS.more='<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>';
+const NAV=[["home","nav.home"],["matches","nav.matches"],["social","nav.social"],["reels","nav.reels"],["experts","nav.experts"],["more","nav.more"]];
+const NAV_OF={match:"matches",post:"social",u:"social",tag:"social",compose:"social",ai:"more",assistant:"more",accuracy:"more",settings:"more",leaderboard:"more",game:"more",notifications:"more",dashboard:"more",account:"more"};
 const DEMO=()=>ls.get("shp_demo")==="1";
 const dq=p=>DEMO()?p+(p.includes("?")?"&":"?")+"dataset=demo":p;
 let S={},LANG=ls.get("shp_lang")||"en",PREF=null,CACHE={},CHAT=[];
@@ -136,7 +145,7 @@ async matches(el){
 async match(el,id,tab){
  tab=tab||"info";el.innerHTML=loading();
  let m;try{m=await api("/matches/"+id)}catch(e){return errorS(el,e,()=>SCREENS.match(el,id,tab))}
- const tabs=["info","weather","toss","pitch","h2h","prediction","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","result"];
+ const tabs=["info","weather","toss","pitch","h2h","prediction","community","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","result"];
  el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p><div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
   '<div class="sub" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t("mc."+k))+'</a>').join("")+'</div><div id="tb">'+loading()+'</div>';
  const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});
@@ -151,16 +160,24 @@ async match(el,id,tab){
   prediction:async()=>{const [p,s]=await Promise.all([api("/matches/"+id+"/predictions"),api("/matches/"+id+"/signals")]);const pm=s.pre_match;
    return '<div class="card"><h3>SH AI</h3>'+probBar(pm.home_win_probability,m)+'<p class="muted">'+esc(t("ai.confidence"))+': '+esc(pm.confidence_level)+' · '+esc(t("ai.toss_note"))+'</p>'+factorsHtml(pm.public_factors)+'</div>'+
     (p.items.length?p.items.map(x=>'<div class="card"><h3>'+esc(x.prediction_type.replace(/_/g," "))+' · '+(x.predicted_team_id?nm(x.predicted_team_id):esc(x.predicted_value))+'</h3><div class="muted">'+esc(x.expert_name?x.expert_name+(x.expert_verified?" · "+t("exp.verified"):""):(x.model||"SH"))+' · '+esc(t("ai.confidence"))+': '+(x.confidence==null?"—":x.confidence+"%")+'</div>'+(x.public_note?'<p>'+esc(x.public_note)+'</p>':(x.explanation?'<p>'+esc(x.explanation)+'</p>':''))+'<dl class="kv"><dt>Locked</dt><dd>'+when(x.locked_at)+'</dd><dt>Result</dt><dd class="'+({correct:"o-won",incorrect:"o-lost"}[x.evaluation]||"o-unknown")+'">'+esc(x.evaluation||"pending")+'</dd></dl></div>').join(""):emptyS(t("mc.no_pred")))},
+  community:async()=>{const j=await api("/matches/"+id+"/community");
+   setTimeout(()=>bindPosts($("#cp")),0);
+   return '<div class="card"><h3>'+esc(t("so.sh_ai"))+'</h3>'+probBar(j.sh_ai.home_win_probability,m)+'<p class="muted">'+esc(j.note)+'</p></div>'+
+    '<div class="card"><h3>'+esc(t("so.tipster_picks"))+'</h3>'+(j.tipster_picks.length?'<table class="simple"><tbody>'+j.tipster_picks.map(x=>'<tr><td><a href="#/u/'+esc(x.username)+'">'+esc(x.display_name)+'</a>'+(x.verified?' <span class="tag ver">Expert</span>':'')+'</td><td>'+esc(x.prediction_type)+': <b>'+esc(x.pick)+'</b></td><td class="muted">'+when(x.published_at)+'</td><td class="'+({correct:"o-won",incorrect:"o-lost"}[x.result]||"o-unknown")+'">'+esc(x.result||"pending")+'</td></tr>').join("")+'</tbody></table>':'<p class="muted">—</p>')+
+    (j.verified_result?'<p>'+esc(t("mc.result"))+': <b>'+esc(j.verified_result.winner||j.verified_result.result_type)+'</b></p>':'')+'</div>'+
+    '<p><a class="btn primary" href="#/compose">+ '+esc(t("so.compose"))+'</a></p><div id="cp">'+(j.posts.items.length?j.posts.items.map(postCard).join(""):emptyS())+'</div>'},
   xi:async()=>{const xi=m.playing_xi.length?m.playing_xi:m.squads;return xi.length?(m.playing_xi.length?"":'<p class="muted">Squad shown; Playing XI not announced yet.</p>')+[m.home,m.away].map(T=>'<div class="card"><h3>'+teamTxt(T,T===m.home?"c-home":"c-away")+' '+esc(T.name)+'</h3>'+xi.filter(p=>p.team_id===T.id).map(p=>'<div>'+esc(p.name)+(p.is_captain?" (c)":"")+(p.is_keeper?" (wk)":"")+' <span class="muted">'+esc((p.role||"").replace("_"," "))+'</span></div>').join("")+'</div>').join(""):emptyS(t("mc.not_reported"))},
   fantasy:async()=>{const f=await api("/matches/"+id+"/fantasy");if(!f.available)return emptyS(f.reason);
    return '<p class="muted">'+esc(t("fan.free"))+' '+esc(f.note)+' Rules: '+esc(f.rule_set)+'.</p>'+f.teams.map(x=>'<div class="card"><h3>'+esc(x.label)+' · '+esc(t("fan.risk"))+': '+esc(x.risk)+'</h3><div class="muted">'+esc(t("fan.captain"))+': <b>'+esc(x.captain.name)+'</b> · '+esc(t("fan.vice"))+': <b>'+esc(x.vice_captain.name)+'</b> · '+x.expected_points+' pts</div><table class="simple"><tbody>'+x.players.map(p=>'<tr><td>'+nm(p.team_id)+' '+esc(p.name)+'</td><td class="muted">'+esc(p.role.replace("_"," "))+'</td><td>'+p.expected_points+'</td><td class="muted">'+esc(p.confidence)+'</td></tr>').join("")+'</tbody></table></div>').join("")},
-  live:async()=>{const s=await api("/matches/"+id+"/signals");const L=s.live;if(!L)return emptyS("No ball-by-ball data for this match yet");
+  live:async()=>{const s=await api("/matches/"+id+"/signals");const L=s.live;
+   setTimeout(()=>liveSubscribe(id,(k,d)=>{if(k==="status"&&d.message&&$("#lvst"))$("#lvst").textContent=d.message;if(k==="ball"){if($("#lvst"))$("#lvst").textContent=d.score+" ("+d.overs+") · "+(d.commentary||"");clearTimeout(window.__lvT);window.__lvT=setTimeout(()=>{if(/\/live$/.test(location.hash))SCREENS.match($("#main"),id,"live")},1500)}}),0);
+   if(!L)return '<p class="muted" id="lvst" role="status"></p>'+emptyS("No ball-by-ball data for this match yet. Live data appears only for matches scored in SH PREDICTION or received from an authorized feed.");
    setTimeout(()=>drawLine($("#lh"),[s.live_history.map(v=>v.predicted_team_id===m.home.id?v.confidence:100-v.confidence)],["--home"]),0);
-   return '<div class="card"><h3>Innings '+L.innings_no+' · '+esc(L.score)+' ('+esc(L.overs)+' ov)</h3>'+probBar(L.home_win_probability,m)+'<dl class="kv"><dt>CRR</dt><dd>'+L.current_run_rate+'</dd>'+(L.required_run_rate!=null?'<dt>RRR</dt><dd>'+L.required_run_rate+' · need '+L.runs_needed+'</dd>':'<dt>Projected</dt><dd>'+L.projected_score+'</dd>')+'<dt>'+esc(t("mc.partnerships"))+'</dt><dd>'+L.partnership.runs+' ('+L.partnership.balls+')</dd><dt>Last 12 balls</dt><dd>'+L.momentum_last_12_balls.runs+' runs, '+L.momentum_last_12_balls.wickets+' wkts</dd>'+(s.wicket_impact?'<dt>Next wicket</dt><dd>'+s.wicket_impact.next_wicket_swing+'% for the batting side</dd>':'')+'</dl></div>'+
+   return '<p class="muted" id="lvst" role="status" aria-live="polite">Live updates: connected</p><div class="card"><h3>Innings '+L.innings_no+' · '+esc(L.score)+' ('+esc(L.overs)+' ov)</h3>'+probBar(L.home_win_probability,m)+'<dl class="kv"><dt>CRR</dt><dd>'+L.current_run_rate+'</dd>'+(L.required_run_rate!=null?'<dt>RRR</dt><dd>'+L.required_run_rate+' · need '+L.runs_needed+'</dd>':'<dt>Projected</dt><dd>'+L.projected_score+'</dd>')+'<dt>'+esc(t("mc.partnerships"))+'</dt><dd>'+L.partnership.runs+' ('+L.partnership.balls+')</dd><dt>Last 12 balls</dt><dd>'+L.momentum_last_12_balls.runs+' runs, '+L.momentum_last_12_balls.wickets+' wkts</dd>'+(s.wicket_impact?'<dt>Next wicket</dt><dd>'+s.wicket_impact.next_wicket_swing+'% for the batting side</dd>':'')+'</dl></div>'+
     (s.over_by_over?'<div class="card"><h3>Phases</h3><table class="simple"><tbody>'+s.over_by_over.phases.map(p=>'<tr><td>'+esc(p.phase)+'</td><td class="muted">overs '+esc(p.overs)+'</td><td>'+p.runs+'</td><td class="muted">'+esc(p.status)+'</td></tr>').join("")+'</tbody></table><p class="muted">Projected total '+s.over_by_over.projected_total+'</p></div>':'')+
     '<div class="card"><h3>Win probability history</h3><canvas id="lh" width="700" height="200" aria-label="Home win probability over time"></canvas><h3 style="margin-top:10px">Turning points</h3>'+(s.turning_points.length?s.turning_points.map(x=>'<div>'+esc(x.at)+': <b class="'+(x.home_swing>=0?"c-home":"c-away")+'">'+(x.home_swing>0?"+":"")+x.home_swing+'%</b></div>').join(""):'<span class="muted">—</span>')+'</div>'},
   scorecard:async()=>{const j=await api("/matches/"+id+"/scorecard");return (m.attribution&&j.innings.length?'<p class="muted">'+esc(m.attribution.text)+'</p>':'')+(j.innings.length?j.innings.map(i=>'<div class="card"><h3>'+nm(i.batting_team_id)+' '+i.runs+'/'+i.wickets+' ('+i.overs+' ov)'+(i.target?' · target '+i.target:'')+'</h3>'+(i.players.length?'<table class="simple"><thead><tr><th>Player</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>O</th><th>W</th></tr></thead><tbody>'+i.players.map(p=>'<tr><td>'+esc(p.name)+' <span class="muted">'+esc(p.dismissal||"")+'</span></td><td>'+(p.runs??"")+'</td><td>'+(p.balls??"")+'</td><td>'+(p.fours??"")+'</td><td>'+(p.sixes??"")+'</td><td>'+esc(p.overs_bowled||"")+'</td><td>'+(p.wickets??"")+'</td></tr>').join("")+'</tbody></table>':'<p class="muted">Player figures not verified yet.</p>')+'</div>').join(""):emptyS(t("mc.not_reported")))},
-  commentary:async()=>{const j=await api("/matches/"+id+"/commentary?limit=60");return j.items.length?'<div class="card">'+j.items.map(b=>'<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>'+b.over_no+'.'+b.ball_in_over+'</b> '+(b.is_wicket?'<b class="o-lost">W</b> ':'')+'<b>'+(b.runs_bat+b.extras)+'</b>'+(b.extra_type?' <span class="muted">'+esc(b.extra_type)+'</span>':'')+' '+esc(b.commentary||"")+'</div>').join("")+'</div>':emptyS(t("mc.not_reported"))},
+  commentary:async()=>{const j=await api("/matches/"+id+"/commentary?limit=60&lang="+encodeURIComponent(LANG));return j.items.length?(j.language_note?'<p class="muted">'+esc(j.language_note)+'</p>':'')+'<div class="card">'+j.items.map(b=>'<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>'+b.over_no+'.'+b.ball_in_over+'</b> '+(b.is_wicket?'<b class="o-lost">W</b> ':'')+esc(b.generated_commentary||"")+(b.scorer_note?'<div class="muted">'+esc(b.scorer_note)+'</div>':'')+'</div>').join("")+'</div><p class="muted">'+esc(j.note)+'</p>'+(m.attribution?'<p class="muted">'+esc(m.attribution.text)+'</p>':'')+'<p><a class="btn" href="#/replay/'+id+'">'+esc(t("game.replay"))+'</a></p>':emptyS(t("mc.not_reported"))},
   partnerships:async()=>{const j=await api("/matches/"+id+"/partnerships");return j.innings.length?j.innings.map(i=>'<div class="card"><h3>Innings '+i.innings_no+'</h3><table class="simple"><tbody>'+i.partnerships.map(p=>'<tr><td>Wicket '+p.wicket+'</td><td>'+p.runs+' ('+p.balls+')</td><td class="muted">'+(p.ended?'ended '+esc(p.ended):'unbroken')+'</td></tr>').join("")+'</tbody></table></div>').join(""):emptyS(t("mc.not_reported"))},
   fow:async()=>{const j=await api("/matches/"+id+"/fall-of-wickets");const any=j.innings.some(i=>i.fall_of_wickets.length);return any?j.innings.map(i=>'<div class="card"><h3>Innings '+i.innings_no+'</h3>'+(i.fall_of_wickets.map(w=>'<div>'+w.wicket+'-'+w.score+' <span class="muted">('+esc(w.over)+' ov'+(w.batter?', '+esc(w.batter):'')+(w.how?', '+esc(w.how):'')+')</span></div>').join("")||'<span class="muted">—</span>')+'</div>').join(""):emptyS(t("mc.not_reported"))},
   graphs:async()=>{const g=await api("/matches/"+id+"/graphs");if(!g.innings.length)return emptyS(t("mc.not_reported"));
@@ -174,7 +191,7 @@ async experts(el,id){
  if(id){el.innerHTML=loading();try{const j=await api("/experts/"+id+"/history");const x=j.expert,s=j.summary;
   el.innerHTML='<p><a href="#/experts">← '+esc(t("nav.experts"))+'</a></p><div class="card"><h3>'+esc(x.display_name)+(x.verified?' <span class="tag ver">'+esc(t("exp.verified"))+'</span>':'')+'</h3><p>'+esc(x.bio||"")+'</p><div class="stats">'+stat(s.accuracy==null?"—":s.accuracy+"%",t("acc.overall"))+stat(s.correct,t("acc.correct"))+stat(s.incorrect,t("acc.incorrect"))+stat(s.pending,t("acc.pending"))+'</div>'+(x.contact_url?'<p><a href="'+esc(x.contact_url)+'" rel="noopener" target="_blank">Contact</a></p>':'')+'</div><h3>'+esc(t("exp.history"))+'</h3>'+
    (j.items.length?j.items.map(p=>'<a class="card" href="#/match/'+p.match_id+'/prediction"><b>'+esc(p.prediction_type)+'</b> · '+esc(p.predicted_team||"")+' · '+(p.confidence??"—")+'% <span class="'+({correct:"o-won",incorrect:"o-lost"}[p.evaluation]||"o-unknown")+'">'+esc(p.evaluation||"pending")+'</span><div class="muted">'+when(p.created_at)+'</div></a>').join(""):emptyS())}catch(e){errorS(el,e,()=>SCREENS.experts(el,id))}return}
- el.innerHTML='<h2>'+esc(t("nav.experts"))+'</h2><div id="ex">'+loading()+'</div>';
+ el.innerHTML='<div class="row"><h2 class="grow">'+esc(t("nav.experts"))+'</h2><a class="btn" href="#/leaderboard">'+esc(t("so.leaderboard"))+'</a></div><div id="ex">'+loading()+'</div>';
  const go=async()=>{try{const j=await api("/experts?limit=50");$("#ex").innerHTML=j.items.length?j.items.map(x=>'<div class="card"><div class="row"><b class="grow">#'+x.rank+' '+esc(x.display_name)+(x.verified?' <span class="tag ver">'+esc(t("exp.verified"))+'</span>':'')+'</b><button data-f="'+x.id+'">'+esc(t("exp.follow"))+'</button></div><div class="muted">'+esc(x.country||"—")+' · '+esc(x.language_code||"")+' · '+x.followers+' followers</div><div>'+esc(t("acc.overall"))+': <b>'+(x.accuracy.accuracy==null?"—":x.accuracy.accuracy+"%")+'</b> <span class="muted">('+x.accuracy.correct+'/'+x.accuracy.settled+')</span></div><p><a href="#/experts/'+x.id+'">'+esc(t("exp.history"))+' →</a></p></div>').join(""):emptyS();
   document.querySelectorAll("[data-f]").forEach(b=>b.onclick=async()=>{if(!TOKEN){location.hash="#/settings";return}try{await api("/experts/"+b.dataset.f+"/follow",{method:"POST",body:'{"follow":true}'});b.textContent=t("exp.following");b.classList.add("on")}catch(e){b.textContent=e.message}})}
   catch(e){errorS($("#ex"),e,go)}};go();
@@ -216,17 +233,13 @@ async settings(el){
  $("#lang").onchange=async e=>{await loadLang(e.target.value);await save({language_code:e.target.value});route()};
  $("#theme").onchange=async e=>{setTheme(e.target.value);await save({theme:e.target.value})};
  $("#demo").onchange=e=>{ls.set("shp_demo",e.target.checked?"1":"0");$("#msg").textContent=t("settings.saved")};
- const acct=()=>{if(TOKEN){$("#acct").innerHTML='<p class="muted">'+esc(t("settings.saved"))+' ✓</p><button id="lo">'+esc(t("settings.logout"))+'</button>';$("#lo").onclick=async()=>{try{await fetch("/auth/logout",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+TOKEN},body:"{}"})}catch(e){}TOKEN="";ls.del("shp_session");PREF=null;acct()};return}
-  $("#acct").innerHTML='<p class="muted">'+esc(t("settings.login"))+'</p><div class="row"><input id="ph" class="grow" type="tel" inputmode="numeric" maxlength="15" placeholder="'+esc(t("settings.phone"))+'" aria-label="'+esc(t("settings.phone"))+'"><button id="gc">'+esc(t("settings.get_code"))+'</button></div><p id="code" class="muted"></p><div class="row"><input id="otp" class="grow" inputmode="numeric" maxlength="6" placeholder="OTP" aria-label="OTP"><button class="primary" id="vf">'+esc(t("settings.verify"))+'</button></div>';
-  const post=(p,b)=>fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(async r=>({ok:r.ok,j:await r.json()}));
-  $("#gc").onclick=async()=>{const r=await post("/auth/generate",{phone:$("#ph").value.trim()});$("#code").textContent=r.ok?"Code: "+r.j.otp:(r.j.error||"Error")};
-  $("#vf").onclick=async()=>{const r=await post("/auth/verify",{phone:$("#ph").value.trim(),otp:$("#otp").value.trim()});if(r.ok){TOKEN=r.j.token;ls.set("shp_session",TOKEN);await save({language_code:LANG,theme:document.documentElement.dataset.theme});acct()}else $("#code").textContent=r.j.error||"Error"}};
- acct();
+ $("#acct").innerHTML=TOKEN?'<a class="btn" href="#/account">'+esc(t("acc.login"))+' ✓</a>':'<p class="muted">'+esc(t("settings.login"))+'</p><a class="btn primary" href="#/account">'+esc(t("acc.login"))+' / '+esc(t("acc.register"))+'</a>';
 }};
 
 async function route(){
  const h=(location.hash||"#/home").slice(2).split("/");const el=$("#main");
- const page=h[0]||"home";navRender(page==="match"?"matches":page);window.scrollTo(0,0);
+ const page=h[0]||"home";navRender(NAV_OF[page]||page);window.scrollTo(0,0);
+ if(page==="replay"){el.innerHTML=loading();try{const r=await api("/matches/"+h[1]+"/replay");el.innerHTML='<p><a href="#/match/'+h[1]+'/commentary">←</a></p><h2>'+esc(t("game.replay"))+'</h2>'+fieldHtml()+'<div class="card" id="gl" style="max-height:260px;overflow:auto"></div>';playField(r.events,true)}catch(e){errorS(el,e,route)}return}
  const fn=SCREENS[page]||SCREENS.home;try{await fn(el,h[1],h[2])}catch(e){errorS(el,e,route)}
 }
 window.addEventListener("hashchange",route);
@@ -235,5 +248,6 @@ window.addEventListener("online",route);window.addEventListener("offline",()=>{$
  if(TOKEN){try{PREF=await api("/me/preferences");if(PREF.language_code!==LANG)await loadLang(PREF.language_code);setTheme(PREF.theme)}catch(e){if(e.status===401){TOKEN="";ls.del("shp_session")}}}
  route()})();
 </script>
+<script src="/hub_social.js"></script>
 </body>
 </html>

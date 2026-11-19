@@ -1,5 +1,5 @@
 import os,sys,json,tempfile,threading,unittest,urllib.request,urllib.error
-d=tempfile.mkdtemp();os.environ["SH_PREDICTION_DB"]=d+"/t.sqlite3";os.environ["SH_PREDICTION_ADMIN_TOKEN"]="adm-test-token"
+d=tempfile.mkdtemp();os.environ["SH_PREDICTION_DB"]=d+"/t.sqlite3";os.environ["SH_PREDICTION_ADMIN_TOKEN"]="adm-test-token";os.environ["SH_DEV_PHONE_LOGIN"]="1"  # legacy phone-code tests (dev mode only)
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),"..","app"))
 import main
 from http.server import ThreadingHTTPServer
@@ -42,7 +42,7 @@ def q1(sql,args=()):
  try:return c.execute(sql,args).fetchone()[0]
  finally:c.close()
 def fx(h,a,comp="Eng Cup",start="2031-01-01T10:00:00Z"):
- call("/admin/fixtures",{"competition":comp,"season":"2031","home":h,"away":a,"start_utc":start,"source":"manual","venue":"Test Ground","match_no":"1"},A)
+ _s,_r=call("/admin/fixtures",{"competition":comp,"season":"2031","home":h,"away":a,"start_utc":start,"source":"manual","venue":"Test Ground","match_no":"1"},A);assert _s==200,(_s,_r)
  return q1("select id from fixtures where home=? and away=?",(h,a))
 def predict(fid,toss,win):
  call("/admin/predictions",{"fixture_id":fid,"toss_pick":toss,"winner_pick":win},A)

@@ -212,8 +212,86 @@ def _seed3(c):
               (json.dumps({"licence": "Open Data Commons Attribution License 1.0", "licence_url": "https://cricsheet.org/licensing/",
                            "attribution": "Cricsheet (cricsheet.org)", "historical_only": True}),))
 
+M004 = """
+-- accounts: secure login (password + verified email), roles for the social network
+CREATE TABLE IF NOT EXISTS accounts(user_id INTEGER PRIMARY KEY REFERENCES users(id), username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  email TEXT UNIQUE COLLATE NOCASE, email_verified_at TEXT, password_hash TEXT NOT NULL,
+  account_type TEXT NOT NULL DEFAULT 'viewer' CHECK(account_type IN ('viewer','tipster','expert_tipster','creator')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended','deleted')), suspended_reason TEXT,
+  display_name TEXT NOT NULL, bio TEXT, avatar_media_id INTEGER, cover_media_id INTEGER, private_profile INTEGER NOT NULL DEFAULT 0,
+  tipster_application TEXT CHECK(tipster_application IN ('pending','approved','rejected') OR tipster_application IS NULL),
+  creator_verified INTEGER NOT NULL DEFAULT 0, failed_logins INTEGER NOT NULL DEFAULT 0, locked_until TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS auth_sessions(token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL, expires_at TEXT NOT NULL, user_agent TEXT);
+CREATE TABLE IF NOT EXISTS auth_codes(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+  purpose TEXT NOT NULL CHECK(purpose IN ('verify_email','reset_password')), code_hash TEXT NOT NULL, expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0, used_at TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS mail_outbox(id INTEGER PRIMARY KEY, to_address TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('queued','sent','failed','not_configured')), error TEXT, created_at TEXT NOT NULL, sent_at TEXT);
+-- media
+CREATE TABLE IF NOT EXISTS media_assets(id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK(kind IN ('image','video')), purpose TEXT NOT NULL DEFAULT 'post' CHECK(purpose IN ('post','reel','avatar','cover')),
+  status TEXT NOT NULL CHECK(status IN ('uploading','processing','ready','failed','removed')),
+  filename TEXT, mime TEXT, declared_bytes INTEGER NOT NULL, received_bytes INTEGER NOT NULL DEFAULT 0, sha256 TEXT,
+  width INTEGER, height INTEGER, duration_ms INTEGER, crop_json TEXT, scan_status TEXT, error TEXT, upload_secret TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, processed_at TEXT);
+CREATE TABLE IF NOT EXISTS media_renditions(id INTEGER PRIMARY KEY, media_id INTEGER NOT NULL REFERENCES media_assets(id),
+  kind TEXT NOT NULL, path TEXT NOT NULL, mime TEXT NOT NULL, width INTEGER, height INTEGER, bytes INTEGER, UNIQUE(media_id, kind));
+CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, ref_id INTEGER, status TEXT NOT NULL CHECK(status IN ('queued','running','done','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0, log TEXT, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- social
+CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY, author_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK(kind IN ('text','photo','video','reel','prediction','analysis','pitch_report','toss_prediction','playing_xi','fantasy','poll')),
+  body TEXT NOT NULL DEFAULT '', match_id INTEGER REFERENCES matches(id), prediction_id INTEGER REFERENCES predictions(id),
+  status TEXT NOT NULL DEFAULT 'published' CHECK(status IN ('processing','published','removed','deleted')),
+  removed_reason TEXT, created_at TEXT NOT NULL, edited_at TEXT, data_origin TEXT NOT NULL DEFAULT 'verified' CHECK(data_origin IN ('verified','demo')));
+CREATE INDEX IF NOT EXISTS posts_created ON posts(status, created_at);
+CREATE INDEX IF NOT EXISTS posts_match ON posts(match_id);
+CREATE INDEX IF NOT EXISTS posts_author ON posts(author_id, created_at);
+CREATE TABLE IF NOT EXISTS post_edits(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL REFERENCES posts(id), old_body TEXT NOT NULL, edited_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS post_media(post_id INTEGER NOT NULL REFERENCES posts(id), media_id INTEGER NOT NULL REFERENCES media_assets(id), position INTEGER NOT NULL,
+  PRIMARY KEY(post_id, media_id));
+CREATE TABLE IF NOT EXISTS hashtags(id INTEGER PRIMARY KEY, tag TEXT NOT NULL UNIQUE COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS post_hashtags(post_id INTEGER NOT NULL REFERENCES posts(id), hashtag_id INTEGER NOT NULL REFERENCES hashtags(id), PRIMARY KEY(post_id, hashtag_id));
+CREATE TABLE IF NOT EXISTS mentions(post_id INTEGER NOT NULL REFERENCES posts(id), user_id INTEGER NOT NULL REFERENCES users(id), PRIMARY KEY(post_id, user_id));
+CREATE TABLE IF NOT EXISTS polls(post_id INTEGER PRIMARY KEY REFERENCES posts(id), options_json TEXT NOT NULL, closes_at TEXT);
+CREATE TABLE IF NOT EXISTS poll_votes(post_id INTEGER NOT NULL REFERENCES posts(id), user_id INTEGER NOT NULL REFERENCES users(id), option_index INTEGER NOT NULL,
+  created_at TEXT NOT NULL, PRIMARY KEY(post_id, user_id));
+CREATE TABLE IF NOT EXISTS follows(follower_id INTEGER NOT NULL REFERENCES users(id), followee_id INTEGER NOT NULL REFERENCES users(id), created_at TEXT NOT NULL,
+  PRIMARY KEY(follower_id, followee_id), CHECK(follower_id<>followee_id));
+CREATE TABLE IF NOT EXISTS reactions(post_id INTEGER NOT NULL REFERENCES posts(id), user_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL DEFAULT 'like' CHECK(kind IN ('like','fire','clap','wow')), created_at TEXT NOT NULL, ip_hash TEXT, PRIMARY KEY(post_id, user_id));
+CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL REFERENCES posts(id), user_id INTEGER NOT NULL REFERENCES users(id),
+  parent_id INTEGER REFERENCES comments(id), body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'visible' CHECK(status IN ('visible','removed','deleted')),
+  created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS shares(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL REFERENCES posts(id), user_id INTEGER REFERENCES users(id), channel TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS bookmarks(user_id INTEGER NOT NULL REFERENCES users(id), post_id INTEGER NOT NULL REFERENCES posts(id), created_at TEXT NOT NULL, PRIMARY KEY(user_id, post_id));
+CREATE TABLE IF NOT EXISTS post_views(post_id INTEGER NOT NULL REFERENCES posts(id), viewer_key TEXT NOT NULL, day TEXT NOT NULL, first_seen_at TEXT NOT NULL,
+  PRIMARY KEY(post_id, viewer_key, day));
+CREATE TABLE IF NOT EXISTS watch_sessions(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL REFERENCES posts(id), viewer_key TEXT NOT NULL,
+  watched_ms INTEGER NOT NULL, duration_ms INTEGER NOT NULL, completed INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER NOT NULL REFERENCES users(id), blocked_id INTEGER NOT NULL REFERENCES users(id), created_at TEXT NOT NULL,
+  PRIMARY KEY(blocker_id, blocked_id));
+CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, reporter_id INTEGER NOT NULL REFERENCES users(id), target_type TEXT NOT NULL CHECK(target_type IN ('post','comment','user')),
+  target_id INTEGER NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','actioned','dismissed')),
+  created_at TEXT NOT NULL, resolved_at TEXT, resolved_by TEXT, UNIQUE(reporter_id, target_type, target_id));
+CREATE TABLE IF NOT EXISTS moderation_actions(id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL, target_type TEXT NOT NULL, target_id INTEGER NOT NULL,
+  reason TEXT, created_at TEXT NOT NULL);
+-- live event stream (own scoring) and virtual games (kept apart from real matches)
+CREATE TABLE IF NOT EXISTS live_events(id INTEGER PRIMARY KEY, match_id INTEGER NOT NULL REFERENCES matches(id), kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS live_events_match ON live_events(match_id, id);
+CREATE TABLE IF NOT EXISTS game_matches(id INTEGER PRIMARY KEY, created_by INTEGER REFERENCES users(id), format TEXT NOT NULL, seed INTEGER NOT NULL,
+  config_json TEXT NOT NULL, result_json TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS game_events(game_id INTEGER NOT NULL REFERENCES game_matches(id), seq INTEGER NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(game_id, seq));
+"""
+
+def _seed4(c):
+    for k, v in (("registration_open", "1"), ("max_image_mb", "15"), ("max_video_mb", "200"), ("posts_per_hour_limit", "20")):
+        c.execute("INSERT OR IGNORE INTO system_settings(key,value,updated_at,updated_by) VALUES(?,?,?,'migration')", (k, v, now()))
+
 MIGRATIONS = [("001_normalized_core", M001, _seed), ("002_publishing_admin_gateway", M002, _seed2),
-              ("003_cricsheet_history", M003, _seed3)]
+              ("003_cricsheet_history", M003, _seed3), ("004_accounts_social_media_live_game", M004, _seed4)]
 
 def pending(c):
     if not c.execute("SELECT 1 FROM sqlite_master WHERE name='schema_migrations'").fetchone():

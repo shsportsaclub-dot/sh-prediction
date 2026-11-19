@@ -65,3 +65,63 @@ Before the database migration has been run, every endpoint except `/i18n/*` and 
 * A pre-match prediction locked at or after the scheduled start is **ineligible**.
 * `Accuracy = Correct / (Correct + Incorrect) × 100`; pending, void and ineligible are excluded.
 * Revising a result supersedes the old evaluation (kept with `superseded_at`); predictions themselves never change.
+
+## Accounts (SH SOCIAL) — added in Batch 04
+Sessions are `Authorization: Bearer <token>` from `/auth/login`. Passwords: PBKDF2-SHA256, 10+ characters with upper, lower and a digit.
+Codes (email verification, password reset) are 6 digits, stored hashed, valid 15 minutes, sent only by email; **the API never returns them** (except when the developer-only flag `SH_DEV_EXPOSE_CODES=1` is set for automated tests). Five wrong passwords lock the account for 15 minutes. Phone-number login is disabled in production (`/auth/generate` answers 410).
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/auth/register` | `username`, `email`, `password`, `display_name?` → 201; verification email sent (or queued in the outbox if SMTP is not configured) |
+| POST | `/auth/verify-email` | `login`, `code` |
+| POST | `/auth/resend-verification` | `login` |
+| POST | `/auth/login` | `login` (username or email), `password` → `token` |
+| POST | `/auth/logout` | ends this session |
+| POST | `/auth/request-password-reset` | `login`; same answer whether or not the account exists |
+| POST | `/auth/reset-password` | `login`, `code`, `new_password`; signs out every session |
+| GET | `/me` | own account |
+| POST | `/me/profile` | `display_name`, `bio`, `private_profile`, `avatar_media_id`, `cover_media_id` |
+| POST | `/me/password` | `current_password`, `new_password` |
+| POST | `/me/delete` | `password`; removes profile, posts and media; locked prediction records stay, anonymised |
+| POST | `/me/tipster-application` | viewer → pending tipster (admin approves) |
+| GET | `/me/notifications`, POST `/me/notifications/read` | `ids` list or `"all"` |
+| GET | `/me/dashboard` | creator analytics: posts, views, watch time, completion rate, likes, comments, shares, saves, followers, daily/monthly trends, prediction performance |
+| GET | `/me/blocked` | |
+
+## Media uploads (resumable)
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/media/uploads` | `kind` image/video, `purpose` post/reel/avatar/cover, `mime`, `bytes`, `filename` → `media_id`, signed `upload_url` (1 h), `chunk_bytes` |
+| PUT | `/media/uploads/{id}?exp&sig` | raw bytes with `Content-Range: bytes a-b/total`; resume from `received_bytes` |
+| GET | `/media/uploads/{id}` | status `uploading/processing/ready/failed/removed`, renditions, fresh `upload_url` |
+| POST | `/media/uploads/{id}/complete` | type check by file signature, virus-scan hook, queues processing |
+| GET | `/media/{id}/{file}` | served with Range support; only ready media of public posts, or to owner / followers / admin |
+
+Limits: image 15 MB, video 200 MB, post video 180 s, reel 90 s (admin settings). Processing: photos → EXIF removed, 1080 px + 320 px JPEG; videos → H.264 MP4 (faststart), thumbnail, HLS 360p/720p; reels → 720×1280.
+
+## Social
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/social/feed` | `feed=for_you|following|latest|trending|reels|match|hashtag|user|saved|search`, with `match_id`, `tag`, `username`, `q`, paging |
+| GET | `/social/hashtags/trending`, `/social/leaderboard?board=accuracy|volume|recent|followers|engagement`, `/social/search/users?q=` | |
+| GET | `/social/posts/{id}`, `/social/posts/{id}/comments`, `/social/posts/{id}/edits` | |
+| GET | `/social/users/{username}`, `/followers`, `/following`, `/predictions` | accuracy is computed from locked picks only |
+| POST | `/social/posts` | `kind` text/analysis/pitch_report/playing_xi/fantasy/photo/video/reel/poll/prediction/toss_prediction; `body`, `media_ids`, `match_id`, `options` (poll), `prediction_type`, `predicted_team_id`, `confidence`. Needs a verified email. Prediction posts: tipsters only, pre-match only, create a separate locked pick |
+| POST | `/social/posts/{id}/view|watch|like|unlike|save|unsave|share|comments|vote|edit|delete` | view = one per viewer per post per UTC day, own views excluded; watch `watched_ms` (≥90% = completed) |
+| POST | `/social/users/{username}/follow|unfollow|block|unblock` | |
+| POST | `/social/reports` | `target_type` post/comment/user, `target_id`, `reason` |
+| GET | `/matches/{id}/community` | SH AI (separate) + tipster picks + verified result + match posts |
+| GET | `/matches/{id}/replay` | real recorded deliveries as animation directives, labelled reconstruction |
+| GET | `/matches/{id}/stream` | Server-Sent Events: `ball`, `probability`, `status`; resumes with `Last-Event-ID` |
+| POST | `/game/simulate` | `format` T10/T20/ODI, optional teams, `seed`; virtual result, never mixed with real data |
+| GET | `/game`, `/game/{id}` | |
+
+## Admin (SH SOCIAL)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/social/users?q=`, `/admin/social/reports`, `/admin/social/posts`, `/admin/social/spam`, `/admin/social/moderation-log` | |
+| POST | `/admin/social/moderate` | `action` remove_post/restore_post/remove_comment/suspend_user/unsuspend_user/approve_tipster/reject_tipster/verify_expert/unverify_expert/verify_creator/unverify_creator/dismiss_report, `target_type`, `target_id`, `reason` (required, logged) |
+| POST | `/admin/users/{id}/verify-email` | manual verification when email cannot be delivered |
+| GET | `/admin/media/jobs`, `/admin/media/storage` (includes which server tools are installed), `/admin/mail/outbox` (no message bodies) | |
+| POST | `/admin/media/cleanup`, `/admin/media/retry` | |
+| POST | `/admin/owner-master` | loads the owner's Abu Dhabi T10 results master (30 rows) as user-supplied; `start_utc` required, `dry_run` |

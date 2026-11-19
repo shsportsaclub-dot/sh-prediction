@@ -13,6 +13,7 @@
 import hashlib
 import io
 import json
+import sqlite3
 import os
 import tempfile
 import threading
@@ -249,23 +250,38 @@ def import_zip(c, path, create_match, limit=None, progress=None, commit_every=50
     counts = {"created": 0, "duplicate": 0, "skipped": 0, "errors": 0, "error_samples": []}
     with zipfile.ZipFile(path) as z:
         names = sorted(n for n in z.namelist() if n.endswith(".json"))
+        c.commit()
         for i, n in enumerate(names[:limit] if limit else names, 1):
             key = os.path.splitext(os.path.basename(n))[0]
-            c.execute("SAVEPOINT cs")
-            try:
-                doc = json.loads(z.read(n))
-                out = import_match(c, key, doc, create_match)
-                c.execute("RELEASE cs")
-                counts["created" if out == "created" else "duplicate" if out == "duplicate" else "skipped"] += 1
-            except Exception as e:
-                c.execute("ROLLBACK TO cs"); c.execute("RELEASE cs")
-                counts["errors"] += 1
-                if len(counts["error_samples"]) < 10:
-                    counts["error_samples"].append("%s: %s" % (key, e))
-            if i % commit_every == 0:
-                c.commit()
-                if progress:
-                    progress(i, len(names), counts)
+            # one short write transaction per match: BEGIN IMMEDIATE waits for other writers (busy timeout)
+            # instead of failing when a read transaction has to upgrade; retried if the database stays busy
+            for attempt in range(5):
+                try:
+                    c.execute("BEGIN IMMEDIATE")
+                except sqlite3.OperationalError as e:
+                    if "locked" in str(e) and attempt < 4:
+                        time.sleep(0.5 * (attempt + 1)); continue
+                    raise
+                try:
+                    doc = json.loads(z.read(n))
+                    out = import_match(c, key, doc, create_match)
+                    c.commit()
+                    counts["created" if out == "created" else "duplicate" if out == "duplicate" else "skipped"] += 1
+                except sqlite3.OperationalError as e:
+                    c.rollback()
+                    if "locked" in str(e) and attempt < 4:
+                        time.sleep(0.5 * (attempt + 1)); continue
+                    counts["errors"] += 1
+                    if len(counts["error_samples"]) < 10:
+                        counts["error_samples"].append("%s: %s" % (key, e))
+                except Exception as e:
+                    c.rollback()
+                    counts["errors"] += 1
+                    if len(counts["error_samples"]) < 10:
+                        counts["error_samples"].append("%s: %s" % (key, e))
+                break
+            if progress and i % commit_every == 0:
+                progress(i, len(names), counts)
     c.commit()
     return counts
 

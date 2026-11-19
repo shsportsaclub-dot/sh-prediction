@@ -1,0 +1,286 @@
+{
+ "ran_at": "2026-11-19T03:58:32Z",
+ "steps": [
+  {
+   "step": "database migration with verified backup",
+   "ok": true,
+   "applied": [
+    "001_normalized_core",
+    "002_publishing_admin_gateway",
+    "003_cricsheet_history",
+    "004_accounts_social_media_live_game"
+   ],
+   "backup": "ok"
+  },
+  {
+   "step": "1. User A registers, verifies email via SMTP and logs in",
+   "ok": true,
+   "register": {
+    "user_id": 1,
+    "username": "creator_asha",
+    "email_verification": "sent"
+   },
+   "verify_status": 200,
+   "login_status": 200,
+   "email_delivery": "sent",
+   "emails_received": 1
+  },
+  {
+   "step": "2. Photo uploaded (chunked), processed and published",
+   "ok": true,
+   "upload": {
+    "bytes": 73484,
+    "chunks": 1,
+    "complete": {
+     "media_id": 1,
+     "status": "processing",
+     "scan_status": "not_scanned"
+    }
+   },
+   "processing_seconds": 0.6,
+   "renditions": {
+    "image_lg": "/media/1/image_lg.jpg",
+    "thumb": "/media/1/thumb.jpg"
+   },
+   "post": {
+    "post_id": 1,
+    "status": "published",
+    "prediction_id": null
+   }
+  },
+  {
+   "step": "3. Text post created and published",
+   "ok": true,
+   "post": {
+    "post_id": 2,
+    "status": "published",
+    "prediction_id": null
+   }
+  },
+  {
+   "step": "4. Video uploaded; reel post waits for processing",
+   "ok": true,
+   "upload": {
+    "bytes": 2199538,
+    "chunks": 5,
+    "complete": {
+     "media_id": 2,
+     "status": "processing",
+     "scan_status": "not_scanned"
+    }
+   },
+   "post": {
+    "post_id": 3,
+    "status": "processing",
+    "prediction_id": null
+   }
+  },
+  {
+   "step": "5. Background worker processed the video automatically",
+   "ok": true,
+   "processing_seconds": 2.8,
+   "job": {
+    "id": 2,
+    "status": "done",
+    "attempts": 1,
+    "log": "2.4s video 1280x720 6.0s -> mp4 720x1280, thumb, hls 360p/720p\nffmpeg -i -vf scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1 -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -> 0 \nffmpeg -ss 1.00 -i -frames:v 1 -q:v 3 -> 0 \nffmpeg -i -vf scale=360:640 -c:v libx264 -preset veryfast -crf 28 -g 48 -sc_threshold 0 -c:a aac -b:a 96k -f hls -hls_time 4 -hls_playlist_type vod -hls_segment_filename -> 0 \nffmpeg -i -vf scale=720:1280 -c:v libx264 -preset veryfast -crf 28 -g 48 -sc_threshold 0 -c:a aac -b:a 96k -f hls -hls_time 4 -hls_playlist_type vod -hls_segment_filename -> 0 "
+   }
+  },
+  {
+   "step": "6. Thumbnail, MP4 and HLS renditions generated on disk",
+   "ok": true,
+   "files": [
+    "2/hls_360p/index.m3u8",
+    "2/hls_360p/seg_000.ts",
+    "2/hls_360p/seg_001.ts",
+    "2/hls_720p/index.m3u8",
+    "2/hls_720p/seg_000.ts",
+    "2/hls_720p/seg_001.ts",
+    "2/master.m3u8",
+    "2/thumb.jpg",
+    "2/video.mp4"
+   ],
+   "renditions": {
+    "hls": "/media/2/master.m3u8",
+    "mp4": "/media/2/video.mp4",
+    "thumb": "/media/2/thumb.jpg"
+   }
+  },
+  {
+   "step": "7. Reel published automatically after processing",
+   "ok": true,
+   "media": {
+    "id": 2,
+    "kind": "video",
+    "status": "ready",
+    "width": 720,
+    "height": 1280,
+    "duration_ms": 6000,
+    "urls": {
+     "hls": "/media/2/master.m3u8",
+     "mp4": "/media/2/video.mp4",
+     "thumb": "/media/2/thumb.jpg"
+    }
+   }
+  },
+  {
+   "step": "7b. Second reel published (needed to prove swipe navigation)",
+   "ok": true,
+   "post": {
+    "post_id": 4,
+    "status": "processing",
+    "prediction_id": null
+   }
+  },
+  {
+   "step": "8-9. User B opens the Reel in Chrome; it plays, advances and pauses",
+   "ok": true,
+   "playback": {
+    "readyState": 4,
+    "t0": 2.432185,
+    "t1": 3.932364,
+    "advanced": true,
+    "paused": true,
+    "src": "http://127.0.0.1:49773/media/3/video.mp4",
+    "videoWidth": 720,
+    "videoHeight": 1280,
+    "duration": 6.013991
+   }
+  },
+  {
+   "step": "9b. Swipe navigation scrolls to the next reel slot",
+   "ok": true,
+   "scroll_top_positive": true
+  },
+  {
+   "step": "10-13. User B followed, liked, commented, shared and saved; counts match the database",
+   "ok": true,
+   "api_counts": {
+    "views": 1,
+    "likes": 1,
+    "comments": 1,
+    "shares": 1,
+    "saves": 1
+   },
+   "db_counts": {
+    "follows": 1,
+    "likes": 1,
+    "comments": 1,
+    "shares": 1,
+    "saves": 1,
+    "views": 1
+   },
+   "me": {
+    "liked": true,
+    "saved": true,
+    "following_author": true,
+    "is_author": false
+   }
+  },
+  {
+   "step": "14. Creator analytics updated (views, likes, comments, shares, saves, followers, watch time, completion)",
+   "ok": true,
+   "database": {
+    "sessions": 3,
+    "watch_ms": 13055,
+    "rate": 33.3,
+    "views": 2
+   },
+   "dashboard": {
+    "posts": 4,
+    "views": 2,
+    "likes": 1,
+    "comments": 1,
+    "shares": 1,
+    "saves": 1,
+    "followers": 1,
+    "watch_time_ms": 13055,
+    "watch_sessions": 3,
+    "reel_completion_rate": 33.3
+   }
+  },
+  {
+   "step": "15. Cricket posts appear in the Match Center Community by Match ID",
+   "ok": true,
+   "community_post_ids": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "step": "16. Post reported by User B and removed by an administrator",
+   "ok": true,
+   "report_status": 201,
+   "moderation": {
+    "action": "remove_post",
+    "target_id": 2,
+    "done": true
+   },
+   "viewer_status_after": 404,
+   "report_row": [
+    {
+     "status": "actioned",
+     "resolved_by": "admin-token"
+    }
+   ]
+  },
+  {
+   "step": "17-18. Only the owner can delete; deletion removes the media files",
+   "ok": true,
+   "other_user_delete_status": 403,
+   "files_before": true,
+   "files_after": false,
+   "media_row": [
+    {
+     "status": "removed"
+    }
+   ]
+  },
+  {
+   "step": "19. Admin endpoints reject a logged-in non-admin",
+   "ok": true,
+   "statuses": {
+    "social/users": 403,
+    "social/reports": 403,
+    "media/storage": 403,
+    "master-list": 403,
+    "audit": 403
+   }
+  },
+  {
+   "step": "20. Social feed renders without horizontal overflow on android-phone",
+   "ok": true,
+   "viewport": {
+    "width": 360,
+    "height": 780
+   }
+  },
+  {
+   "step": "20. Social feed renders without horizontal overflow on desktop",
+   "ok": true,
+   "viewport": {
+    "width": 1366,
+    "height": 900
+   }
+  },
+  {
+   "step": "browser had no JavaScript errors",
+   "ok": true,
+   "errors": []
+  },
+  {
+   "step": "10 (persistence). After a server restart the Reel, its counts and its media are still served",
+   "ok": true,
+   "counts": {
+    "views": 2,
+    "likes": 1,
+    "comments": 1,
+    "shares": 1,
+    "saves": 1
+   },
+   "media_status": 206
+  }
+ ],
+ "emails_sent": 2
+}

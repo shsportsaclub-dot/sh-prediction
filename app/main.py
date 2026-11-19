@@ -3,7 +3,7 @@ from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from urllib.parse import urlparse,parse_qs
 from pathlib import Path
 from screen_login import generate,verify,authorized,logout
-import api_v1,apk
+import api_v1,apk,live,media,social,re
 DB=os.getenv("SH_PREDICTION_DB","data/prediction.sqlite3")
 TOKEN=os.getenv("SH_PREDICTION_ADMIN_TOKEN","")
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -18,6 +18,11 @@ def db():
  c=sqlite3.connect(DB,timeout=10,factory=LegacyConn);c.row_factory=sqlite3.Row
  # v1 owns the "predictions" table name. Until an admin runs the migration, the v0 table keeps its old
  # name and the classic screens keep working through this name mapping (no schema change on page load).
+ if not getattr(db,"wal",False):
+  # WAL lets readers (SSE, feeds) work while the scorer, importer or media worker writes
+  try:sqlite3.Connection.execute(c,"PRAGMA journal_mode=WAL");db.wal=True
+  except sqlite3.OperationalError:pass
+ sqlite3.Connection.execute(c,"PRAGMA busy_timeout=10000")
  c.lp="predictions" if "fixture_id" in {r[1] for r in sqlite3.Connection.execute(c,"PRAGMA table_info(predictions)")} else "legacy_predictions"
  c.executescript("""CREATE TABLE IF NOT EXISTS fixtures(id INTEGER PRIMARY KEY,competition TEXT NOT NULL,season TEXT NOT NULL,home TEXT NOT NULL,away TEXT NOT NULL,start_utc TEXT NOT NULL,source TEXT NOT NULL,UNIQUE(competition,season,home,away,start_utc));
  CREATE TABLE IF NOT EXISTS legacy_predictions(id INTEGER PRIMARY KEY,fixture_id INTEGER UNIQUE NOT NULL,toss_pick TEXT,winner_pick TEXT,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',approved_at TEXT);
@@ -88,10 +93,73 @@ class H(BaseHTTPRequestHandler):
   code,obj=api_v1.route(self,method,u.path,parse_qs(u.query),self.body)
   return self.sendj(code,obj)
  def do_PUT(self):
-  if urlparse(self.path).path.startswith("/api/v1/"):return self.v1("PUT")
+  u=urlparse(self.path);mm=re.fullmatch(r"/api/v1/media/uploads/(\d+)",u.path)
+  if mm:return self.upload_chunk(int(mm.group(1)),parse_qs(u.query))
+  if u.path.startswith("/api/v1/"):return self.v1("PUT")
   return self.sendj(405,{"error":"method not allowed"})
+ def upload_chunk(self,mid,q):
+  """Resumable signed upload: PUT raw bytes with Content-Range: bytes start-end/total."""
+  if not media.check_sig(mid,q.get("exp",[""])[0],q.get("sig",[""])[0]):return self.sendj(403,{"error":{"code":"BAD_SIGNATURE","message":"upload URL expired or invalid; ask for a new one"}})
+  n=int(self.headers.get("Content-Length","0"))
+  if n<1 or n>media.CHUNK*2:return self.sendj(400,{"error":{"code":"VALIDATION_ERROR","message":"chunk must be 1 byte to %d bytes"%(media.CHUNK*2)}})
+  cr=re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)",self.headers.get("Content-Range",""))
+  if not cr or int(cr.group(2))-int(cr.group(1))+1!=n:return self.sendj(400,{"error":{"code":"VALIDATION_ERROR","message":"Content-Range: bytes start-end/total required"}})
+  data=self.rfile.read(n);c=db()
+  try:
+   r=media.put_chunk(c,mid,int(cr.group(1)),data);c.commit();return self.sendj(200,r)
+  except media.MediaError as e:return self.sendj(e.status,{"error":{"code":e.code,"message":e.message}})
+  finally:c.close()
+ def serve_media(self,path):
+  """Media renditions with access control, HTTP Range (video seeking) and CDN-friendly caching for public files."""
+  mm=re.fullmatch(r"/media/(\d+)/([A-Za-z0-9_./-]+)",path)
+  if not mm or ".." in mm.group(2):return self.sendj(404,{"error":"not found"})
+  mid=int(mm.group(1));c=db()
+  try:
+   a=c.execute("SELECT * FROM media_assets WHERE id=?",(mid,)).fetchone() if c.execute("SELECT 1 FROM sqlite_master WHERE name='media_assets'").fetchone() else None
+   if not a or a["status"]!="ready":return self.sendj(404,{"error":"not found"})
+   public=a["purpose"] in ("avatar","cover") or c.execute("SELECT 1 FROM post_media pm JOIN posts p ON p.id=pm.post_id JOIN accounts ac ON ac.user_id=p.author_id WHERE pm.media_id=? AND p.status='published' AND ac.status='active' AND ac.private_profile=0",(mid,)).fetchone()
+   if not public:
+    import auth
+    acct=auth.session_user(c,self.headers.get("Authorization","").removeprefix("Bearer ").strip())
+    ok=self.admin_ok() or (acct and acct["user_id"]==a["owner_id"]) or (acct and c.execute("SELECT 1 FROM post_media pm JOIN posts p ON p.id=pm.post_id JOIN follows f ON f.followee_id=p.author_id WHERE pm.media_id=? AND p.status='published' AND f.follower_id=?",(mid,acct["user_id"])).fetchone())
+    if not ok:return self.sendj(404,{"error":"not found"})
+   c.commit()
+  finally:c.close()
+  fp=media.storage().path("%d/%s"%(mid,mm.group(2)))
+  if not os.path.isfile(fp):return self.sendj(404,{"error":"not found"})
+  ctype={".jpg":"image/jpeg",".mp4":"video/mp4",".m3u8":"application/vnd.apple.mpegurl",".ts":"video/mp2t"}.get(os.path.splitext(fp)[1],"application/octet-stream")
+  size=os.path.getsize(fp);start,end=0,size-1;status=200
+  rg=re.fullmatch(r"bytes=(\d*)-(\d*)",self.headers.get("Range",""))
+  if rg:
+   if rg.group(1):start=int(rg.group(1));end=int(rg.group(2)) if rg.group(2) else size-1
+   else:start=max(0,size-int(rg.group(2)))
+   if start>=size or start>end:
+    self.send_response(416);self.send_header("Content-Range","bytes */%d"%size);self.send_header("Content-Length","0");self.end_headers();return
+   end=min(end,size-1);status=206
+  self.send_response(status);self.send_header("Content-Type",ctype);self.send_header("Accept-Ranges","bytes");self.send_header("X-Content-Type-Options","nosniff")
+  self.send_header("Cache-Control","public, max-age=31536000, immutable" if public else "private, no-store")
+  if status==206:self.send_header("Content-Range","bytes %d-%d/%d"%(start,end,size))
+  self.send_header("Content-Length",str(end-start+1));self.end_headers()
+  with open(fp,"rb") as f:
+   f.seek(start);left=end-start+1
+   while left>0:
+    chunk=f.read(min(65536,left))
+    if not chunk:break
+    try:self.wfile.write(chunk)
+    except (BrokenPipeError,ConnectionResetError):return
+    left-=len(chunk)
  def do_GET(self):
   p=urlparse(self.path).path
+  sm=re.fullmatch(r"/api/v1/matches/(\d+)/stream",p)
+  if sm:
+   c=db();pending=__import__("schema").pending(c);c.close()
+   if pending:return self.sendj(503,{"error":{"code":"MIGRATION_PENDING","message":"migration pending"}})
+   q=parse_qs(urlparse(self.path).query)
+   last=self.headers.get("Last-Event-ID") or q.get("last_id",["0"])[0]
+   try:last=int(last)
+   except ValueError:last=0
+   return live.stream(self,db,int(sm.group(1)),last,int(os.getenv("SH_SSE_MAX_SECONDS","300")))
+  if p.startswith("/media/"):return self.serve_media(p)
   if p.startswith("/api/v1/"):return self.v1("GET")
   if p=="/download/sh-prediction.apk":
    try:
@@ -110,6 +178,8 @@ class H(BaseHTTPRequestHandler):
   if p in ("/","/app","/hub","/admin-panel"):
    f={"/admin-panel":"admin.html"}.get(p,"hub.html")
    b=(Path(__file__).parent/f).read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("X-Frame-Options","DENY");self.send_header("Referrer-Policy","no-referrer");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p=="/hub_social.js":
+   b=(Path(__file__).parent/"hub_social.js").read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/classic":
    b=(Path(__file__).parent/"index.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-original-blueprint.html":
@@ -145,7 +215,10 @@ class H(BaseHTTPRequestHandler):
   if urlparse(self.path).path.startswith("/api/v1/"):return self.v1("POST")
   try:
    p=urlparse(self.path).path;d=self.body();old=None
-   if p=="/auth/generate":return self.sendj(200,generate(d.get("phone","")))
+   if p=="/auth/generate":
+    # the on-screen phone code proves nothing about phone ownership: disabled outside local development
+    if os.getenv("SH_DEV_PHONE_LOGIN")!="1":return self.sendj(410,{"error":"Phone code login is disabled. Use account login (username/email + password)."})
+    return self.sendj(200,generate(d.get("phone","")))
    if p=="/auth/verify":
     token=verify(d.get("phone",""),d.get("otp",""))
     return self.sendj(200,{"token":token}) if token else self.sendj(403,{"error":"Incorrect or expired code"})
@@ -228,6 +301,12 @@ class H(BaseHTTPRequestHandler):
     if p.startswith("/admin/"):c.execute("INSERT INTO audit_logs(action,payload,old_value,created_at) VALUES(?,?,?,?)",(p,json.dumps(d,ensure_ascii=False)[:4000],json.dumps(old,ensure_ascii=False) if old else None,now()))
     c.commit();return self.sendj(200,result)
   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:return self.sendj(400,{"error":str(e)})
+WORKER=None
+def start_worker():
+ global WORKER
+ if WORKER is None and os.getenv("SH_WORKER_INLINE","1")=="1":WORKER=media.Worker(db,social.on_media_ready).start()
+ return WORKER
 if __name__=="__main__":
  with db():pass
+ start_worker()
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()

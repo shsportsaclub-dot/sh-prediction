@@ -1,15 +1,21 @@
 services:
   - type: web
     name: sh-prediction-api
-    runtime: python
-    plan: starter
-    buildCommand: echo ready
-    startCommand: python app/main.py
+    runtime: docker            # Dockerfile adds free FFmpeg + Pillow for photo/video processing
+    dockerfilePath: ./Dockerfile
+    plan: starter              # paid ($7/mo): needed for the persistent disk below; see docs/DEPLOYMENT.md
+    healthCheckPath: /health
     envVars:
       - key: SH_PREDICTION_ADMIN_TOKEN
         generateValue: true
+      - key: SH_MEDIA_SIGNING_KEY
+        generateValue: true
       - key: SH_PREDICTION_DB
         value: /var/data/prediction.sqlite3
+      - key: SH_MEDIA_DIR
+        value: /var/data/media
+      # Email verification / password reset: set SH_SMTP_HOST, SH_SMTP_PORT, SH_SMTP_USER, SH_SMTP_PASSWORD, SH_SMTP_FROM
+      # in the Render dashboard (secret values, never in this file). Render's free plan blocks SMTP ports.
     disk:
       name: sh-prediction-data
       mountPath: /var/data

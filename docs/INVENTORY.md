@@ -5,6 +5,8 @@ This batch: **Batch 02 — V1 foundation** (normalized schema, `/api/v1`, engine
 
 Batch 03 (local, not pushed): own platform per "SH PREDICTION — FINAL OWN PLATFORM DEVELOPMENT INSTRUCTIONS".
 
+Batch 04 (local, not pushed): Final Integration & Security directive, Tipster Social Network module, SH SOCIAL photos/videos/Reels.
+
 Legend: ✅ done and tested · 🟡 works, limited by data or not fully tested · ⬜ not started
 
 | Module | Status | Notes |
@@ -20,9 +22,49 @@ Legend: ✅ done and tested · 🟡 works, limited by data or not fully tested �
 | Expert tips engine | ✅ | Profiles, verification, private submissions, publishing, ranking on published tips |
 | Accuracy & audit engine | ✅ | ICC settlement, superseded evaluations, full audit log |
 | Admin management system | ✅ | 12 admin screens (`/admin-panel`) |
-| Notification engine | ⬜ | Table exists; no sending yet (needs a free channel decision) |
+| Notification engine | 🟡 | In-app notifications (follows, likes, comments, mentions, new posts from followed users, video ready, moderation, tipster approval); email for verification/reset. Push notifications to phones not built (needs a free channel decision) |
 | Cricsheet historical import | ✅ | Free (ODC-By 1.0), allow-listed downloads, own parser, results/toss/innings/ball-by-ball/scorecards/XI, dedupe by Cricsheet id, attribution shown; limited-overs only; not live; tested with synthetic files (this workspace cannot reach cricsheet.org) |
 | Data ingestion gateway | 🟡 | Contract, cache, validation, dedupe, retry, adapters (manual, demo, licensed placeholder); no licensed feed connected |
 | Multilingual system | ✅ | 9 languages complete; 15 more with honest partial coverage |
 | Master List (results, admin only) | ✅ | Matches the approved sample exactly |
 | Migration safety | ✅ | Explicit, backed-up, verified |
+| Accounts (register, email verification, login, reset, delete, privacy) | ✅ | Phone-code login removed from production; email via SMTP or admin outbox + manual verification |
+| Tipster network (apply, approve, verified expert, profiles, badges, computed accuracy, leaderboards) | ✅ | Prediction posts create separate locked picks; late/void/pending excluded |
+| Social posts (text, analysis, photo multi-image, video, reel, poll, prediction, toss prediction) | ✅ | Edit history, delete (pick kept), hashtags, mentions, match tagging |
+| Feeds (For You, Following, Latest, Trending, Reels, Saved, hashtag, match, search) | ✅ | Own ranking: engagement, freshness, interests, match relevance, watch completion, max 2 per creator |
+| Engagement (follow, like, comment/reply, share, save, vote, report, block, views, watch time) | ✅ | Views deduplicated per viewer per day; own views excluded |
+| Media pipeline (resumable uploads, Pillow, FFmpeg MP4 + HLS + thumbnails, worker, cleanup, retry) | ✅ locally | Needs FFmpeg on the server (Dockerfile added); media on the persistent disk, object storage not built |
+| Reels player (vertical swipe, autoplay/pause, mute, actions) | ✅ | Proven in Chrome (E2E) |
+| Creator dashboard | ✅ | Views, watch time, completion, likes, comments, shares, saves, followers, daily/monthly, prediction performance |
+| Match Center Community tab | ✅ | SH AI shown separately from tipster picks |
+| Live updates (SSE) + original multilingual commentary | ✅ | en/hi/te commentary; other languages say English is used |
+| Admin: social users, moderation, spam signals, media/storage, mail outbox | ✅ | Every action needs a reason and is logged |
+| Cricket game: virtual simulation + real-match replay | 🟡 | Simulation with Laws checks and 2D field; interactive play/3D not built |
+| Owner Abu Dhabi T10 master (30 matches) | ✅ | Admin → Master List → Load; user-supplied, dates needed from you |
+| Android app | 🟡 | Same site in the WebView APK; uploads use the phone's file picker; not tested on a physical phone |
+| Malware scanning | ⬜ | ClamAV hook only; not installed |
+| Object storage / CDN / Postgres | ⬜ | Option D in DEPLOYMENT.md |
+| Authorized live data feed | ⬜ | None connected (none bought, no scraping) |
+
+## Batch 04 file-by-file changes
+| File | Change |
+|---|---|
+| `app/auth.py` (new) | Accounts, password hashing, email codes, sessions, lockout, reset, deletion |
+| `app/media.py` (new) | Signed resumable uploads, type sniffing, scan hook, Pillow/FFmpeg processing, HLS, storage, cleanup, worker, tool check |
+| `app/social.py` (new) | Posts, feeds and ranking, engagement, views/watch, tipster stats, leaderboards, dashboard, notifications, spam signals, moderation |
+| `app/api_social.py` (new) | REST routes for auth, me, media, social, game, community/replay and social admin |
+| `app/commentary.py` (new) | Original commentary generator (en/hi/te) |
+| `app/game.py` (new) | Virtual cricket simulation, Laws validation, replay directives |
+| `app/live.py` (new) | Live event publishing and Server-Sent Events stream |
+| `app/hub_social.js` (new) | Viewer screens: Social, Reels, post, profile, compose, notifications, dashboard, leaderboard, account, game, replay, live SSE |
+| `app/data/owner_master_abu_dhabi_t10.json` (new) | The 30-row owner master copied from the prototype `index.html` |
+| `app/schema.py` | Migration 004 (accounts, media, jobs, posts…, live and game tables) |
+| `app/api_v1.py` | Account identity, social routing, own-scoring live updates, owner-master import |
+| `app/main.py` | Media upload/serving, SSE route, worker start, `/auth/generate` → 410, WAL mode |
+| `app/hub.html` | 6-item nav (Home, Matches, Social, Reels, Expert Tips, More), Community tab, live SSE, commentary language, account link replaces phone login |
+| `app/admin.html` | Social Users, Moderation, Media & Storage sections; owner-master loader |
+| `app/i18n.py` | 57 new strings, 9 languages complete (140 keys) |
+| `Dockerfile`, `requirements.txt`, `render.yaml` | Docker build with FFmpeg + Pillow; media signing key; media dir on disk |
+| `tests/test_social.py`, `tests/test_owner_master.py` (new), `tests/test_v1.py`, `tests/test_api.py` | Account-based helpers; social, media, live, game, admin sweep, owner master |
+| `tools/e2e_social.py` (new) | Mandatory end-to-end acceptance proof |
+| `docs/*` | API, SECURITY, DEPLOYMENT, CRICKET-DATA-ENGINE, GAME-ENGINE, QA report, this inventory |

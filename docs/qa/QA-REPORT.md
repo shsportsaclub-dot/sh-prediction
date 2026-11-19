@@ -1,3 +1,52 @@
+# QA report — Batch 04 (Final Integration & Security, Tipster Social Network, SH SOCIAL photos/videos/Reels)
+
+Run date: 2026-11-19T03:58:32Z (UTC). Python 3.13, SQLite (WAL), FFmpeg 6.1, Pillow 12, Google Chrome (Playwright).
+
+## Automated tests
+`python -m pytest -q tests` → **72 passed**, repeated **15 times in a row with no failure** after the fixes below.
+New: `tests/test_social.py` (accounts, social, media with real JPEG/MP4, live SSE, commentary, game, admin sweep of 22 GET + 33 POST admin paths × no credentials / normal account / wrong key) and `tests/test_owner_master.py` (30-row owner master, approved colour rule rows 01–05, idempotent, admin-only).
+
+Bugs found and fixed during QA:
+* Cricsheet background import intermittently rejected matches with "database is locked" (about 1 run in 6) → one `BEGIN IMMEDIATE` transaction per match with retry.
+* Media worker could leave a job "running" forever if the final write met a lock → retried final write; jobs stuck over 30 min are re-queued (max 3 attempts).
+* Demo mode hid real users' posts from the feed → real posts always show; demo adds only labelled DEMO posts.
+* Reel action buttons picked up two different styles → unified.
+* Login lockout counter was rolled back on error → committed before the error.
+
+## Mandatory end-to-end acceptance proof (`tools/e2e_social.py`)
+Real server process, production-like settings (codes not exposed; verification emails delivered over SMTP to a local mail catcher), real files (2000×1200 JPEG, 6-second 1280×720 H.264 video), real Chrome. Evidence: `docs/qa/e2e/e2e-evidence.json` (API responses, database counts, worker logs), `docs/qa/e2e/server.log`, screenshots in `docs/qa/e2e/`.
+
+| Step | Result |
+|---|---|
+| database migration with verified backup | PASS |
+| 1. User A registers, verifies email via SMTP and logs in | PASS |
+| 2. Photo uploaded (chunked), processed and published | PASS |
+| 3. Text post created and published | PASS |
+| 4. Video uploaded; reel post waits for processing | PASS |
+| 5. Background worker processed the video automatically | PASS |
+| 6. Thumbnail, MP4 and HLS renditions generated on disk | PASS |
+| 7. Reel published automatically after processing | PASS |
+| 7b. Second reel published (needed to prove swipe navigation) | PASS |
+| 8-9. User B opens the Reel in Chrome; it plays, advances and pauses | PASS |
+| 9b. Swipe navigation scrolls to the next reel slot | PASS |
+| 10-13. User B followed, liked, commented, shared and saved; counts match the database | PASS |
+| 14. Creator analytics updated (views, likes, comments, shares, saves, followers, watch time, completion) | PASS |
+| 15. Cricket posts appear in the Match Center Community by Match ID | PASS |
+| 16. Post reported by User B and removed by an administrator | PASS |
+| 17-18. Only the owner can delete; deletion removes the media files | PASS |
+| 19. Admin endpoints reject a logged-in non-admin | PASS |
+| 20. Social feed renders without horizontal overflow on android-phone | PASS |
+| 20. Social feed renders without horizontal overflow on desktop | PASS |
+| browser had no JavaScript errors | PASS |
+| 10 (persistence). After a server restart the Reel, its counts and its media are still served | PASS |
+
+Not covered by this proof (blocked here, not claimed): object storage/CDN (not set up), real SMTP provider (local catcher used), ClamAV (not installed), Docker image build (Docker Hub unreachable from this workspace), a physical Android phone, Firefox and Safari (not installed; Chrome desktop + Android-size emulation only).
+
+## Viewer screens checked in Chrome (390×844 @2x), no JavaScript errors
+Account login, Social feed (English and Telugu), Create post, Profile, Creator dashboard, Leaderboard, More, Cricket game with 2D field, Reels, post detail with comment, Match Center Community, admin Moderation and Master List (owner Abu Dhabi T10, 30 rows). Screenshots: `docs/qa/social/`, `docs/qa/e2e/`, `docs/qa/owner-master-list.png`.
+
+---
+
 # QA report — Batch 03 (own platform: admin/viewer split, engines, fantasy, assistant, data gateway)
 
 Run date: 2026-11-19 (IST). Python 3.13, SQLite, Google Chrome headless (Playwright).
