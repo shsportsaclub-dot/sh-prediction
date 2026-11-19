@@ -208,6 +208,13 @@ class CricketDataAdapter(unittest.TestCase):
         c.close()
         self.assertGreaterEqual(raw, 3)                                                              # original source records kept
 
+    def test_bot_key_name_also_accepted(self):
+        os.environ.pop("CRICKETDATA_API_KEY", None); os.environ["CRIC_API_KEY"] = "bot-name-key"
+        try:
+            self.assertEqual(cricketdata.key(), "bot-name-key")
+        finally:
+            os.environ.pop("CRIC_API_KEY", None)
+
     def test_reserve_protects_shared_key(self):
         near = dict(CD_MATCHES, info={"hitsToday": 90, "hitsLimit": 100})
         c = T.db()

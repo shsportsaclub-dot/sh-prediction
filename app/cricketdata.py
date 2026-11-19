@@ -23,7 +23,8 @@ class CDError(Exception):
 
 
 def key():
-    return os.getenv("CRICKETDATA_API_KEY", "").strip()
+    """CRICKETDATA_API_KEY, or CRIC_API_KEY (the name the SH live-line bot uses for the same key)."""
+    return (os.getenv("CRICKETDATA_API_KEY", "") or os.getenv("CRIC_API_KEY", "")).strip()
 
 
 def today():
