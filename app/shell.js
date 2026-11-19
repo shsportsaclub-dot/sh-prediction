@@ -9,10 +9,17 @@ function inningsOf(m){const L=m.live_score;if(L&&L.innings&&L.innings.length)ret
 function rrr(m){const I=inningsOf(m);if(!I||I.length<2||!/^(T20|T10|ODI|The Hundred|List A)$/.test(m.format))return null;
  const per={T10:60,T20:120,"The Hundred":100,ODI:300,"List A":300}[m.format];const tgt=I[0].r+1,b=String(I[1].o).split("."),used=(+b[0]||0)*6+(+b[1]||0),left=per-used,need=tgt-I[1].r;
  return need>0&&left>0?{need,left,rrr:(need*6/left).toFixed(2)}:null}
-function liveCard(m){const I=inningsOf(m),R=rrr(m);
+function freshLive(m){
+ if(m.status!=="live")return false;
+ const started=Date.parse(m.start_utc||"");
+ if(!Number.isFinite(started)||Date.now()-started>86400000||started-Date.now()>3600000)return false;
+ const fetched=Date.parse((m.live_score&&m.live_score.fetched_at)||"");
+ return !Number.isFinite(fetched)||Date.now()-fetched<=1800000;
+}
+function liveCard(m){const I=inningsOf(m),R=rrr(m),isLive=freshLive(m);
  const side=(team)=>{const x=I&&I.filter(i=>i.team===team.name||i.team===team.short_code).slice(-1)[0];return '<div class="lc-team"><b>'+esc(short(team))+'</b><span class="lc-sc">'+(x?x.r+'-'+x.w+' <small>('+esc(String(x.o))+')</small>':'')+'</span></div>'};
  const status=m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+' won'+(m.margin?' by '+m.margin:'')):m.result_type.replace("_"," ")):(m.live_score&&m.live_score.status_text)||(m.status==="scheduled"?fmtTime(m.start_utc):m.status);
- return '<a class="lcard '+(m.status==="live"?"is-live":"")+'" href="#/match/'+m.id+'"><div class="lc-top"><span class="lc-comp">'+esc(m.competition)+'</span>'+(m.status==="live"?'<span class="live-dot">LIVE</span>':'')+'</div>'+
+ return '<a class="lcard '+(isLive?"is-live":"")+'" href="#/match/'+m.id+'"><div class="lc-top"><span class="lc-comp">'+esc(m.competition)+'</span>'+(isLive?'<span class="live-dot">LIVE</span>':'')+'</div>'+
   '<div class="muted lc-meta">'+esc([m.match_no,m.format].filter(Boolean).join(" · "))+'</div>'+side(m.home)+side(m.away)+
   (R?'<div class="lc-rrr">Need '+R.need+' from '+R.left+' balls · RRR '+R.rrr+'</div>':'')+'<div class="lc-status">'+esc(status)+'</div></a>'}
 window.liveCard=liveCard;
@@ -49,7 +56,7 @@ SCREENS.home=async function(el){
   '<div class="sec"><h2>'+esc(t("home.dashboard"))+'</h2><div id="dash">'+loading()+'</div></div>'+
   '<div class="sec"><h2>'+esc(t("home.news"))+'</h2><div id="news">'+loading()+'</div></div>';
  // A: featured live / next matches
- try{const [l,u,r]=await Promise.all(["live","upcoming","results"].map(s=>api(dq("/matches?status="+s+"&limit=8"))));const list=[...l.items,...u.items.slice(0,4),...r.items.slice(0,4)];
+ try{const [l,u,r]=await Promise.all(["live","upcoming","results"].map(s=>api(dq("/matches?status="+s+"&limit=8"))));const list=[...l.items.filter(freshLive),...u.items.slice(0,4),...r.items.slice(0,4),...l.items.filter(m=>!freshLive(m)).slice(0,2)];
   $("#feat").innerHTML=list.length?list.map(liveCard).join(""):NA()}catch(e){errorS($("#feat"),e,()=>SCREENS.home(el))}
  // B: filters
  let cur=sessionStorage.getItem("shp_hf")||"all";
