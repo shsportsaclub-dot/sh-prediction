@@ -1002,6 +1002,8 @@ def live_status(c):
     A = cricketdata.auto(c, {}) if c.execute("SELECT 1 FROM sqlite_master WHERE name='api_budget'").fetchone() else {}
     out = {"time": now.isoformat(), "key_set": bool(cricketdata.key()), "plan_paid": A.get("paid"), "plan_unlimited": A.get("unlimited"),
            "hits_today": cricketdata.hits_used(c) if A else None, "loop": dict(scheduler.LIVE_STATE), "matches": []}
+    import shdataline
+    out["sh_data_line"] = dict(shdataline.STATE, configured=shdataline.configured())
     if out["loop"].get("last_ok"):
         out["loop"]["seconds_since_ok"] = age(out["loop"]["last_ok"])
     if not c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():

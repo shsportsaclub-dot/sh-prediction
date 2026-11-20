@@ -263,16 +263,25 @@ def live_loop(db_fn, opener=None, stop=None):
     The 15-minute/6-minute jobs keep running for the free plan; this loop only acts when the plan is paid."""
     import api_v1
     import live as live_mod
-    last_list = 0.0
+    last_list = last_detail = 0.0
     while not (stop and stop.is_set()):
         wait = 30
         try:
             c = db_fn()
             try:
+                import shdataline
+                if shdataline.configured() and c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():
+                    shdataline.sync(c, now, opener) if opener else shdataline.sync(c, now)       # SH's own data line, merged with CricketData
+                    wait = 10
+                    live_mod.wake()
                 if c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() and cricketdata.key():
                     A = cricketdata.auto(c, {})
-                    if A["paid"]:
-                        wait = 10 if A["unlimited"] else 60
+                    step = 10 if A["unlimited"] else 60
+                    if A["paid"] and time.time() - last_detail < step - 1:
+                        pass                                   # SH Data Line runs every 10 s; CricketData keeps its own pace
+                    elif A["paid"]:
+                        last_detail = time.time()
+                        wait = min(wait, step)
                         create_match, record_result = _helpers(c)
                         if time.time() - last_list >= (30 if A["unlimited"] else 120):
                             cricketdata.sync(c, "currentMatches", A["budget"], create_match, record_result, now, opener or __import__("urllib.request").request.urlopen)
@@ -286,6 +295,7 @@ def live_loop(db_fn, opener=None, stop=None):
                                                                                     "notes": sorted({n[:160] for f in res.get("featured") or [] for n in f.get("notes") or []})[:8]})
                     else:
                         LIVE_STATE.update(running=True, last_result={"skipped": "plan is not paid: the 6-minute job runs instead"})
+                        wait = min(wait, 30)
             finally:
                 c.close()
         except Exception as e:

@@ -234,3 +234,65 @@ class LiveLoopStatus(unittest.TestCase):
             self.assertNotIn("apikey", json.dumps(st))
         finally:
             os.environ.pop("CRICKETDATA_API_KEY", None); TB.free_plan()
+
+
+class TwoProvidersMerge(unittest.TestCase):
+    """Synthetic balls: CricketData + SH Data Line merged into one list, each delivery once, conflicts counted, live events once."""
+    CD = [{"n": 1, "inning": "Heat Inning 1", "over": 0, "ball": 1, "runs": 1, "wicket": False, "extra": None},
+          {"n": 2, "inning": "Heat Inning 1", "over": 0, "ball": 2, "runs": 1, "wicket": False, "extra": "wd"},
+          {"n": 3, "inning": "Heat Inning 1", "over": 0, "ball": 2, "runs": 4, "wicket": False, "extra": None}]
+    SH = [{"inning": 1, "over": 0, "ball": 1, "runs": 1, "wicket": False, "extra": None, "src": "sh"},      # same as CD ball 1
+          {"inning": 1, "over": 0, "ball": 2, "runs": 6, "wicket": False, "extra": None, "src": "sh"},      # disagrees with CD ball 3
+          {"inning": 1, "over": 0, "ball": 3, "runs": 0, "wicket": True, "extra": None, "src": "sh"}]      # only SH has it
+
+    def test_merge(self):
+        import ball_merge
+        out, st = ball_merge.merge(self.CD, self.SH)
+        self.assertEqual(len(out), 4)
+        self.assertEqual((st["duplicates"], st["conflicts"], st["added"]), (2, 1, [3, 1]))
+        self.assertEqual(out[2]["runs"], 4)                       # first provider kept, nothing changed
+        self.assertTrue(out[3]["wicket"] and out[3]["src"] == "sh")
+
+    def test_sh_data_line_sync_and_single_events(self):
+        import shdataline, cricketdata
+        c = sqlite3.connect(":memory:"); c.row_factory = sqlite3.Row
+        c.executescript("""CREATE TABLE teams(id INTEGER PRIMARY KEY, name TEXT, short_code TEXT);
+            CREATE TABLE matches(id INTEGER PRIMARY KEY, home_team_id INT, away_team_id INT, status TEXT, start_utc TEXT, data_origin TEXT);
+            CREATE TABLE data_provider_syncs(id INTEGER PRIMARY KEY, provider TEXT, provider_entity TEXT, provider_id TEXT, local_table TEXT, local_id INT, synced_at TEXT,
+                UNIQUE(provider,provider_entity,provider_id));
+            CREATE TABLE ext_match_detail(match_id INTEGER PRIMARY KEY, source TEXT, balls_json TEXT, balls_at TEXT);
+            CREATE TABLE live_events(id INTEGER PRIMARY KEY, match_id INT, kind TEXT, payload TEXT, created_at TEXT);
+            INSERT INTO teams VALUES(1,'Brisbane Heat Women','BH-W'),(2,'Sydney Thunder Women','ST-W'),(3,'Brisbane Heat','BH'),(4,'Sydney Thunder','ST');
+            INSERT INTO matches VALUES(5,3,4,'live','2026-11-20T08:00:00+00:00','provider'),(6,1,2,'live','2026-11-20T08:00:00+00:00','provider');""")
+        c.execute("INSERT INTO ext_match_detail VALUES(6,'cricketdata',?, 'x')", (json.dumps(self.CD),))
+        pubs = []
+        import live
+        orig = live.publish
+        live.publish = lambda c_, mid, kind, p: pubs.append((mid, kind, p))
+        os.environ.update(SH_DATA_API_URL="https://sh-data-line.example", SH_DATA_API_KEY="secret-k")
+        try:
+            cricketdata.publish_new_balls(c, 6, self.CD, lambda: "t")          # backlog recorded, nothing sent
+            class R:
+                def __init__(s, o): s.o = o
+                def read(s): return json.dumps(s.o).encode()
+            seen = []
+            def opener(req, timeout):
+                seen.append(req.headers.get("Authorization"))
+                if req.full_url.endswith("/api/v1/matches"):
+                    return R({"matches": [{"match_id": "dl-1", "status": "live", "teams": ["Sydney Thunder Women", "Brisbane Heat Women"], "source": "x"},
+                                          {"match_id": "dl-2", "status": "live", "teams": ["Nowhere XI", "Elsewhere XI"], "source": "x"}]})
+                return R({"balls": [{"innings": 1, "over_number": 0, "ball_number": b["ball"], "runs_bat": b["runs"], "extras": 0, "wicket": b["wicket"],
+                                     "source": "x", "source_event_id": str(i)} for i, b in enumerate(self.SH)]})
+            r = shdataline.sync(c, lambda: "2026-11-20T09:00:00+00:00", opener)
+            self.assertEqual((r["linked"], r["seen"], r["new_sh_balls"], r["conflicts"]), (1, 2, 1, 1), r)   # women's match, not the men's
+            self.assertEqual(shdataline.STATE["unlinked"], ["Nowhere XI v Elsewhere XI"])
+            self.assertEqual(len(json.loads(c.execute("SELECT balls_json FROM ext_match_detail WHERE match_id=6").fetchone()[0])), 4)
+            self.assertEqual([p[2]["wicket"] for p in pubs if p[1] == "delivery"], [True])                 # only the new SH ball goes live
+            shdataline.sync(c, lambda: "t2", opener)
+            self.assertEqual(len([p for p in pubs if p[1] == "delivery"]), 1)                              # repeat poll: nothing twice
+            self.assertTrue(all(h == "Bearer secret-k" for h in seen))
+            self.assertIsNone(c.execute("SELECT 1 FROM ext_match_detail WHERE match_id=5").fetchone())
+        finally:
+            live.publish = orig
+            for k in ("SH_DATA_API_URL", "SH_DATA_API_KEY"):
+                os.environ.pop(k, None)
