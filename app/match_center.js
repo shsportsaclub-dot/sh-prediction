@@ -204,7 +204,14 @@ window.mcFlash=function(ev){const box=document.querySelector(".board .sc")||docu
  fx.innerHTML=(k==="six"?'<div class="fx-rays"></div>':"")+(k==="four"?'<div class="fx-sweep"></div>':"")+(k==="wkt"?stumps:"")+(k==="dot"?'<div class="fx-ring"></div>':"")+
   '<div class="fx-t">'+esc(txt)+'</div>'+(sub?'<div class="fx-s">'+esc(sub)+'</div>':"")+run;
  box.appendChild(fx);box.classList.remove("shake");if(k==="wkt"){void box.offsetWidth;box.classList.add("shake")}
- setTimeout(()=>{fx.classList.add("out");setTimeout(()=>fx.remove(),400)},2500)};
+ // after the flash the score comes back into the plate (fresh numbers when the page passes a refresher)
+ setTimeout(()=>{fx.classList.add("out");setTimeout(()=>{fx.remove();const sc=document.querySelector(".board .sc");if(sc){sc.classList.remove("score-in");void sc.offsetWidth;sc.classList.add("score-in")}
+  if(typeof ev.after==="function")ev.after()},400)},2500)};
+/* replace only the board with fresh data and play the score-in effect (no page reload, scroll kept) */
+window.mcBoardRefresh=async function(mid){try{const m=await api("/matches/"+mid);const old=document.querySelector(".board");if(!old)return;
+ const tmp=document.createElement("div");tmp.innerHTML=mcBoard(m);const nb=tmp.querySelector(".board");if(!nb)return;old.replaceWith(nb);
+ const meta=tmp.querySelector(".mc-meta"),om=document.querySelector(".mc-meta");if(meta&&om)om.replaceWith(meta);
+ const sc=nb.querySelector(".sc");if(sc)sc.classList.add("score-in")}catch(e){}};
 
 /* player photos: any element with data-ph="<player name>" gets a free-licence photo (Wikimedia Commons) when one exists;
    otherwise the initials stay. Author and licence are in the tooltip. */

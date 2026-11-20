@@ -166,7 +166,7 @@ class H(BaseHTTPRequestHandler):
    q=parse_qs(urlparse(self.path).query)
    last=self.headers.get("Last-Event-ID") or q.get("last_id",["0"])[0]
    try:last=int(last)
-   except ValueError:last=0
+   except ValueError:last=-1 if last=="latest" else 0   # latest = only events after this moment (first connect of a page)
    return live.stream(self,db,int(sm.group(1)),last,int(os.getenv("SH_SSE_MAX_SECONDS","300")))
   if p.startswith("/media/"):return self.serve_media(p)
   if p.startswith("/api/v1/"):return self.v1("GET")

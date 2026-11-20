@@ -307,9 +307,12 @@ let ES=null,ESmid=null,timer=null,poll=null;
 window.mcLive=(m,tab)=>{const on=m.status==="live";
  if(on&&window.mcFlash&&window._mcFlashed!==m.id){window._mcFlashed=m.id;const B=(m.provider_detail&&m.provider_detail.balls)||[];const lb=B[B.length-1];if(lb)setTimeout(()=>mcFlash({runs:lb.runs,extra:lb.extra,wicket:lb.wicket,batter:lb.batter}),600)}if(!on||!window.EventSource){if(ES&&ESmid!==m.id){ES.close();ES=null;ESmid=null}return}
  const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(!new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash))return;const y=scrollY;route();setTimeout(()=>scrollTo(0,y),400)},1500)};
- if(ES&&ESmid===m.id)return;if(ES)ES.close();ESmid=m.id;ES=new EventSource("/api/v1/matches/"+m.id+"/stream");
+ if(ES&&ESmid===m.id)return;if(ES)ES.close();ESmid=m.id;ES=new EventSource("/api/v1/matches/"+m.id+"/stream?last_id=latest");
  ["ball","delivery","probability","status"].forEach(k=>ES.addEventListener(k,e=>{if(k==="status")return;
-  if(k==="delivery"){try{if(window.mcFlash)mcFlash(JSON.parse(e.data))}catch(x){}clearTimeout(timer);timer=setTimeout(()=>refresh(),2700);return}refresh()}));
+  if(k==="delivery"){let ev={};try{ev=JSON.parse(e.data)}catch(x){}
+   // flash first, then the new score is projected into the plate; the rest of the tab refreshes a little later
+   if(window.mcFlash){ev.after=()=>{if(window.mcBoardRefresh)mcBoardRefresh(m.id)};mcFlash(ev)}clearTimeout(timer);timer=setTimeout(()=>refresh(),6000);return}
+  if(window.mcBoardRefresh)mcBoardRefresh(m.id);clearTimeout(timer);timer=setTimeout(()=>refresh(),3000)}));
  ES.onerror=()=>{if(!poll)poll=setInterval(()=>{if(new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash)&&document.visibilityState==="visible")refresh();else{clearInterval(poll);poll=null}},30000)};
  ES.onopen=()=>{if(poll){clearInterval(poll);poll=null}}};
 window.addEventListener("hashchange",()=>{if(ES&&ESmid&&!new RegExp("^#/match/"+ESmid+"(/|$)").test(location.hash)){ES.close();ES=null;ESmid=null}});

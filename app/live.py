@@ -35,6 +35,8 @@ def stream(handler, db_fn, match_id, last_id=0, max_seconds=300, heartbeat=15):
     start = time.time()
     c = db_fn()
     try:
+        if last_id < 0:
+            last_id = c.execute("SELECT COALESCE(MAX(id),0) FROM live_events WHERE match_id=?", (match_id,)).fetchone()[0]
         m = c.execute("SELECT status, data_origin FROM matches WHERE id=?", (match_id,)).fetchone()
         status = {"match_id": match_id, "status": m["status"] if m else "unknown", "data_origin": m["data_origin"] if m else None,
                   "live_source": (("CricketData.org" if c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() and
