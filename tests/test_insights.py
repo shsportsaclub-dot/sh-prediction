@@ -355,5 +355,6 @@ class AgentStages(unittest.TestCase):
 class LockedTabOrder(unittest.TestCase):
     def test_match_center_order_is_locked(self):
         hub = (Path(__file__).resolve().parents[1] / "app" / "hub.html").read_text()
-        self.assertIn('const MAIN=["info","xi","live","commentary","scorecard","graphs","results"];', hub)
-        self.assertIn("const tabs=MAIN;", hub)          # every view (SH Pulse / Classic / Pro) uses the same order
+        # owner, 20 Nov 2026: reference-app order for the menu bar, then SH extras; one design for everyone
+        self.assertIn('const MAIN=["info","fantasy","community","commentary","live","scorecard","history","graphs","seriesstats","xi","results","prediction"];', hub)
+        self.assertIn("const tabs=MAIN;", hub)

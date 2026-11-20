@@ -86,6 +86,14 @@ SCREENS.matches=async function(el){
   const L=$("#list");L.innerHTML=loading();try{const items=await filtered(cur,$("#q").value.trim(),30);L.innerHTML=items.length?'<div class="mgrid">'+items.map(liveCard).join("")+'</div>':NA()}catch(e){errorS(L,e,go)}};
  go();let tm;$("#q").oninput=()=>{clearTimeout(tm);tm=setTimeout(go,300)}};
 SCREENS["live-now"]=async el=>{sessionStorage.setItem("shp_mf","live");location.hash="#/matches"};
+/* section bar under the app header: Live Scores / Schedule / Archives / News / Series */
+const SECS=[["live","sec.live","#/matches","live"],["schedule","sec.schedule","#/matches","upcoming"],["archives","sec.archives","#/matches","results"],["news","sec.news","#/news",""],["series","sec.series","#/series",""]];
+window.secbar=page=>{const b=document.getElementById("secbar");if(!b)return;const mf=sessionStorage.getItem("shp_mf");
+ const cur=page==="series"?"series":page==="news"?"news":page==="matches"?({live:"live",upcoming:"schedule",results:"archives"}[mf]||""):"";
+ b.innerHTML=SECS.map(([k,l,href,f])=>'<a href="'+href+'" data-mf="'+f+'" class="'+(k===cur?"on":"")+'">'+esc(t(l))+'</a>').join("");
+ b.querySelectorAll("a[data-mf]").forEach(a=>a.onclick=()=>{if(a.dataset.mf)sessionStorage.setItem("shp_mf",a.dataset.mf);if(location.hash===a.getAttribute("href")){route();return false}})};
+SCREENS.news=async el=>{el.innerHTML='<h2>'+esc(t("home.news"))+'</h2><div id="news">'+loading()+'</div>';
+ try{const d=await api("/home/dashboard");const n=d.news;$("#news").innerHTML=n&&n.items&&n.items.length?n.items.map(x=>'<div class="card"><b>'+esc(x.title||"")+'</b><p class="muted">'+esc(x.summary||"")+'</p></div>').join(""):'<div class="state">'+esc(d.news_note||t("data.na"))+'</div>'}catch(e){errorS($("#news"),e,()=>SCREENS.news(el))}};
 document.addEventListener("click",e=>{const b=e.target.closest(".sp[aria-disabled=true]");if(b){e.preventDefault();b.classList.add("shake");setTimeout(()=>b.classList.remove("shake"),500)}});
 
 /* ---------------- Series list and series page */

@@ -164,7 +164,20 @@ window.mcTab.community=async m=>{const id="dz"+m.id;let sort=sessionStorage.getI
 /* ---------------- Live + Commentary: last two overs, partnership, last wicket */
 const ovStrip=x=>!x||!x.last_overs||!x.last_overs.length?"":'<div class="card ovchips">'+x.last_overs.map((o,i)=>(i?'<span class="sep"></span>':'')+'<small>'+esc(t("ins.over"))+' '+o.over+'</small>'+o.balls.map(chip).join("")+'<small>= '+o.runs+'</small>').join("")+'</div>';
 const pshipLine=x=>!x||(!x.partnership&&!x.last_wicket)?"":'<div class="card dl"><span>'+esc(t("ins.pship"))+': <b>'+(x.partnership?x.partnership.runs+' ('+x.partnership.balls+')':"—")+'</b></span><span class="muted">'+esc(t("ins.last_wkt"))+': '+(x.last_wicket?esc(x.last_wicket.name)+(x.last_wicket.runs!=null?' '+x.last_wicket.runs+' ('+x.last_wicket.balls+')':''):"—")+'</span></div>';
-window.mcTabBefore.live=async m=>{if(m.status!=="live")return "";try{const x=await I(m,"live");return ovStrip(x)+pshipLine(x)}catch(e){return ""}};
+/* Live tab in the reference order: overs strip, batters R (B) 4s 6s SR with the striker marked, partnership + last wicket, bowler W-R Ov Econ */
+const baseLive=window.mcTab.live;
+window.mcTab.live=async m=>{const pd=m.provider_detail;if(!pd||!pd.scorecard||!pd.scorecard.length||(m.status!=="live"&&!pd.featured))return baseLive?baseLive(m):null;
+ let x=null;try{x=await I(m,"live")}catch(e){}
+ const li=pd.scorecard[pd.scorecard.length-1],balls=pd.balls||[],lb=balls[balls.length-1]||{};
+ const notOut=(li.batting||[]).filter(b=>/not out|batting/i.test(b.dismissal||""));const bats=notOut.length?notOut:(li.batting||[]).slice(-2);
+ const same=(a,b)=>a&&b&&(a===b||String(a).split(" ").slice(-1)[0]===String(b).split(" ").slice(-1)[0]);
+ const bw=(li.bowling||[]).find(b=>same(b.name,lb.bowler))||(li.bowling||[]).slice(-1)[0];
+ const sr=b=>b.b?(100*(b.r||0)/b.b).toFixed(1):"—";
+ return ovStrip(x)+'<div class="card lv"><table class="simple lvt"><thead><tr><th>'+esc(t("an.player"))+'</th><th>R (B)</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody>'+
+  bats.map(b=>'<tr><td><b>'+esc(b.name||"")+'</b>'+(same(b.name,lb.batter)?' 🏏':'')+'</td><td><b>'+(b.r??0)+'</b> ('+(b.b??0)+')</td><td>'+(b.fours??0)+'</td><td>'+(b.sixes??0)+'</td><td>'+sr(b)+'</td></tr>').join("")+'</tbody></table>'+
+  '<div class="dl lvp"><span>'+esc(t("ins.pship"))+': <b>'+(x&&x.partnership?x.partnership.runs+' ('+x.partnership.balls+')':"—")+'</b></span><span class="muted">'+esc(t("ins.last_wkt"))+': '+(x&&x.last_wicket?esc(x.last_wicket.name)+(x.last_wicket.runs!=null?' '+x.last_wicket.runs+' ('+x.last_wicket.balls+')':''):"—")+'</span></div>'+
+  (bw?'<table class="simple lvt"><thead><tr><th>'+esc(t("an.bowl"))+'</th><th>W-R</th><th>Ov</th><th>Econ</th></tr></thead><tbody><tr><td><b>'+esc(bw.name||"")+'</b></td><td><b>'+(bw.w??0)+'-'+(bw.r??0)+'</b></td><td>'+esc(String(bw.o??"—"))+'</td><td>'+(bw.eco??"—")+'</td></tr></tbody></table>':'')+
+  '</div><p class="muted">'+esc(t("ins.source"))+': '+esc(pd.source)+'</p>'};
 window.mcTabBefore.commentary=async m=>{if(m.status!=="live")return "";try{return ovStrip(await I(m,"live"))}catch(e){return ""}};
 
 /* ---------------- Scorecard: one innings at a time, with a switcher and "yet to bat" */
@@ -251,13 +264,12 @@ window.mcAgent=async(m,box)=>{if(!box)return;let d;try{d=await I(m,"agent")}catc
  const H=d.headline,L=d.live;if(!H&&!L){box.innerHTML=d.note?'<div class="agent"><b>🧠 '+esc(t("ag.title"))+'</b><p class="muted">'+esc(d.note)+'</p></div>':"";return}
  const p=L||H,hp=p.home_win_probability,ap=p.away_win_probability;
  const pick=H?(H.predicted_team||""):(hp>=50?m.home.name:m.away.name);
- box.innerHTML='<div class="agent"><div class="ag-top"><b>🧠 '+esc(t("ag.title"))+'</b><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+'</small></div>'+
-  '<div class="ag-pick">'+esc(pick)+' <small class="muted">'+esc(t("ag.to_win"))+'</small></div>'+
+ box.innerHTML='<details class="agent"><summary class="ag-top"><span>🧠 <b>'+esc(t("ag.title"))+'</b> · <b>'+esc(pick)+'</b> '+Math.round(Math.max(hp,ap))+'%</span><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+' ▾</small></summary>'+
   '<div class="ag-bar"><i style="width:'+hp+'%;background:#4fb3ff"></i><i style="width:'+ap+'%;background:#ff8a1f"></i></div>'+
   '<div class="dl"><b class="c-home">'+esc(m.home.short_code||m.home.name)+' '+hp+'%</b><b class="c-away">'+ap+'% '+esc(m.away.short_code||m.away.name)+'</b></div>'+
   (H?'<div class="muted">'+esc(t("ag.confidence"))+': '+esc(H.confidence_level||"—")+' · '+esc(H.model)+' · '+esc(new Date(H.created_at).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</div>':'')+
   '<div class="ag-stages">'+d.stages.map(s=>'<span class="'+(s.outcome||"")+'">'+esc(t(STG[s.stage]))+': '+esc(s.predicted_team||"")+' '+s.confidence+'%'+(s.outcome==="correct"?" ✓":s.outcome==="incorrect"?" ✗":"")+'</span>').join("")+(L?'<span>'+esc(t("ag.live"))+': '+esc(t("ins.over"))+' '+L.after_over+'</span>':'')+'</div>'+
-  '<p class="muted" style="margin:6px 0 0">'+esc(d.verification)+' <a href="#/match/'+m.id+'/prediction">'+esc(t("ag.why"))+' ›</a></p></div>'};
+  '<p class="muted" style="margin:6px 0 0">'+esc(d.verification)+' <a href="#/match/'+m.id+'/prediction">'+esc(t("ag.why"))+' ›</a></p></details>'};
 
 /* Playing XI: our tables first, then the XI / squad the source sent; captain and keeper marked when the source says so */
 const baseXI=window.mcTab.xi;

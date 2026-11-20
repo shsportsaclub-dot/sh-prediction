@@ -1164,3 +1164,15 @@ for _code, _vals in _RS.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+KEYS13 = ["sec.live", "sec.schedule", "sec.archives", "sec.news", "sec.series"]
+_SEC = {"en": ["Live Scores", "Schedule", "Archives", "News", "Series"],
+ "hi": ["लाइव स्कोर", "कार्यक्रम", "पुराने मैच", "समाचार", "सीरीज़"], "te": ["లైవ్ స్కోర్లు", "షెడ్యూల్", "ఆర్కైవ్స్", "వార్తలు", "సిరీస్"],
+ "ta": ["நேரலை ஸ்கோர்", "அட்டவணை", "காப்பகம்", "செய்திகள்", "தொடர்"], "kn": ["ಲೈವ್ ಸ್ಕೋರ್", "ವೇಳಾಪಟ್ಟಿ", "ಆರ್ಕೈವ್", "ಸುದ್ದಿ", "ಸರಣಿ"],
+ "bn": ["লাইভ স্কোর", "সূচি", "আর্কাইভ", "খবর", "সিরিজ"], "mr": ["थेट स्कोअर", "वेळापत्रक", "संग्रह", "बातम्या", "मालिका"],
+ "ur": ["لائیو اسکور", "شیڈول", "آرکائیو", "خبریں", "سیریز"], "es": ["En vivo", "Calendario", "Archivo", "Noticias", "Series"]}
+for _code, _vals in _SEC.items():
+    _d = dict(zip(KEYS13, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)
