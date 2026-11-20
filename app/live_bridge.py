@@ -62,6 +62,33 @@ class SqliteSeen:
             c.close()
 
 
+    def store_once(self, key, event, store):
+        """Atomically reserve key and persist event using one SQLite transaction.
+
+        store(connection, key, event) must persist data on the supplied connection
+        without committing or notifying clients. Notify SSE after commit; for
+        crash-safe notification use a transactional outbox.
+        """
+        c = self.db_fn()
+        try:
+            c.execute('BEGIN IMMEDIATE')
+            cur = c.execute(
+                "INSERT OR IGNORE INTO live_event_keys(event_key, match_id) VALUES(?,?)",
+                (key, str(event.get('match_id', '')))
+            )
+            if cur.rowcount == 0:
+                c.rollback()
+                return False
+            store(c, key, event)
+            c.commit()
+            return True
+        except BaseException:
+            c.rollback()
+            raise
+        finally:
+            c.close()
+
+
 class LiveBridge:
     """One-second-capable poller with deduplication and no fabricated events.
 
