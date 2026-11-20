@@ -104,7 +104,27 @@ SCREENS.analysis=async function(el,mid,qs){const Q=new URLSearchParams(qs||"");c
 
 /* ---------------- Fantasy: live SH points before the SH team suggestions */
 window.mcTabBefore=window.mcTabBefore||{};
-window.mcTabBefore.fantasy=async m=>{const ss=await seriesStatsBlock(m);let d;try{d=await I(m,"fantasy")}catch(e){return ss}if(!d.players.length)return ss;
+/* SH Prediction XI: our best 11 on a pitch view, locked at the toss; after play, its real points and the dream team */
+const ROLES=[["wicket_keeper","pxi.wk"],["batter","pxi.bat"],["all_rounder","pxi.ar"],["bowler","pxi.bowl"]];
+function pitchView(m,players,key){return '<div class="pxi-pitch">'+ROLES.map(([r,l])=>{const ps=players.filter(p=>p.role===r);if(!ps.length)return "";
+  return '<div class="pxi-row"><div class="pxi-rl">'+esc(t(l))+'</div><div class="pxi-ps">'+ps.map(p=>{const home=p.team_id===m.home.id,v=p[key];
+   return '<div class="pxi-p"><div class="pxi-av '+(home?"h":"a")+'">'+esc(p.name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase())+(p.captain?'<i class="pxi-c">C</i>':p.vice_captain?'<i class="pxi-c vc">VC</i>':'')+'</div>'+
+    '<div class="pxi-n">'+esc((w=>w.length>1&&w[w.length-1].length<=2?w.slice(-2).join(" "):w[w.length-1])(p.name.split(/\s+/)))+'</div><div class="pxi-pts">'+(v==null?"—":(+v).toFixed(1))+'</div></div>'}).join("")+'</div></div>'}).join("")+'</div>'}
+async function predictionXI(m){let d;try{d=await I(m,"prediction_xi")}catch(e){return ""}
+ if(!d.available)return sec(esc(t("pxi.title")),'<div class="state">'+esc(d.reason)+'</div>');
+ const id="pxi"+m.id,hasA=d.actual_points!=null;
+ later(()=>{const b=document.getElementById(id);if(!b)return;b.querySelectorAll("[data-v]").forEach(x=>x.onclick=()=>{b.querySelectorAll("[data-v]").forEach(y=>y.classList.toggle("on",y===x));
+  b.querySelectorAll(".pxi-view").forEach(v=>v.style.display=v.dataset.view===x.dataset.v?"":"none")})});
+ const head='<div class="dl"><span><b>'+esc(t(d.locked?"pxi.locked":"pxi.live_until_toss"))+'</b><div class="muted">'+esc(t(d.pool_status==="playing_xi"?"pxi.from_xi":"pxi.from_squad"))+'</div></span>'+
+  '<span style="text-align:right">'+esc(t("pxi.expected"))+' <b>'+d.expected_points+'</b>'+(hasA?'<br>'+esc(t("pxi.actual"))+' <b style="color:#f0b43c">'+d.actual_points+'</b>':'')+'</span></div>';
+ const cmp=hasA&&d.dream_team?'<div class="mcard dl"><span>'+esc(t("pxi.dream"))+' <b>'+d.dream_team.points+'</b></span><span>'+esc(t("pxi.match_pct"))+' <b>'+(d.accuracy_pct??"—")+'%</b> · '+d.in_dream_team+'/11</span></div>':'';
+ const tabs=hasA&&d.dream_team?'<div class="seg"><button class="on" data-v="xi">'+esc(t("pxi.title"))+'</button><button data-v="dream">'+esc(t("pxi.dream"))+'</button></div>':'';
+ return '<section class="ins-sec" id="'+id+'"><h3><span>🎯 '+esc(t("pxi.title"))+'</span><small>'+esc(d.rule_set)+'</small></h3><div class="mcard">'+head+'</div>'+cmp+tabs+
+  '<div class="pxi-view" data-view="xi">'+pitchView(m,d.players,hasA?"actual_points":"expected_points")+'</div>'+
+  (hasA&&d.dream_team?'<div class="pxi-view" data-view="dream" style="display:none">'+pitchView(m,d.dream_team.players,"actual_points")+'</div>':'')+
+  '<p class="muted">'+esc(d.note)+'</p></section>'}
+
+window.mcTabBefore.fantasy=async m=>{const ss=(await predictionXI(m))+(await seriesStatsBlock(m));let d;try{d=await I(m,"fantasy")}catch(e){return ss}if(!d.players.length)return ss;
  window._fp=d;const id="fp"+m.id;
  later(()=>{const b=document.getElementById(id);if(!b)return;b.querySelectorAll("[data-fp]").forEach(x=>x.onclick=()=>fpSheet(+x.dataset.fp,m));
   const all=b.querySelector("[data-all]");if(all)all.onclick=()=>{const s=document.createElement("div");s.className="sheet";s.innerHTML='<div><div class="dl"><b>'+esc(t("ins.top_points"))+'</b><button class="btn" data-x>'+esc(t("ins.close"))+'</button></div><div class="fp-list">'+
@@ -113,8 +133,8 @@ window.mcTabBefore.fantasy=async m=>{const ss=await seriesStatsBlock(m);let d;tr
   const lb=b.querySelector("[data-lb]");if(lb)lb.onclick=()=>{const s=document.createElement("div");s.className="sheet";const L=d.leaderboard;
    s.innerHTML='<div><div class="dl"><b>'+esc(t("ins.leaderboard"))+'</b><button class="btn" data-x>✕</button></div><p class="muted">'+L.teams+' '+esc(t("ins.teams"))+'</p>'+(L.items.length?L.items.map(x=>'<div class="dl"><span><b>'+esc(x.name)+'</b><div class="muted">'+x.points+' pts</div></span><span>'+esc(t("ins.rank"))+' '+x.rank+'</span></div>').join(""):NA())+'</div>';
    document.body.appendChild(s);s.onclick=e=>{if(e.target===s||e.target.closest("[data-x]"))s.remove()}}});
- return '<div id="'+id+'"><div class="mcard dl"><span><b>'+d.leaderboard.teams+'</b> '+esc(t("ins.teams_playing"))+'</span><a href="javascript:void 0" data-lb>'+esc(t("ins.leaderboard"))+' ›</a></div>'+
-  ss+sec(esc(t("ins.top_points"))+(d.live?' <span class="tag" style="color:#ff6b6b">● LIVE</span>':''),'<div class="fp-cards">'+d.players.slice(0,8).map((p,i)=>'<button class="fp-card'+(p.team===lab(m,"away")||p.team===m.away.name?" aw":"")+'" data-fp="'+i+'"><small>'+esc(p.team||"")+'</small><b>'+esc(p.name)+'</b><strong>'+p.points.toFixed(1)+'</strong> <small style="display:inline">pts</small></button>').join("")+'</div>',
+ return ss+'<div id="'+id+'"><div class="mcard dl"><span><b>'+d.leaderboard.teams+'</b> '+esc(t("ins.teams_playing"))+'</span><a href="javascript:void 0" data-lb>'+esc(t("ins.leaderboard"))+' ›</a></div>'+
+  sec(esc(t("ins.top_points"))+(d.live?' <span class="tag" style="color:#ff6b6b">● LIVE</span>':''),'<div class="fp-cards">'+d.players.slice(0,8).map((p,i)=>'<button class="fp-card'+(p.team===lab(m,"away")||p.team===m.away.name?" aw":"")+'" data-fp="'+i+'"><small>'+esc(p.team||"")+'</small><b>'+esc(p.name)+'</b><strong>'+p.points.toFixed(1)+'</strong> <small style="display:inline">pts</small></button>').join("")+'</div>',
    '<a href="javascript:void 0" data-all>'+esc(t("ins.see_all"))+' ›</a>')+'<p class="muted">'+esc(d.rules_note)+' '+esc(t("ins.dots"))+': '+esc(d.dot_balls)+'. '+esc(t("ins.source"))+': '+esc(d.source)+'</p></div>'};
 const EVL={announced:"ins.ev_announced",runs:"ins.ev_runs",fours:"4's",sixes:"6's",sr:"SR",milestone:"25/50/75/100",duck:"ins.ev_duck",dots:"ins.ev_dots",wickets:"ins.ev_wickets",lbw_bowled:"LBW/Bowled",haul:"ins.ev_haul",maidens:"ins.ev_maidens",economy:"ins.ev_economy",catches:"ins.ev_catches",three_catch:"ins.ev_3catch",stumpings:"ins.ev_stumpings",run_outs:"ins.ev_runouts"};
 function fpSheet(i,m){const d=window._fp;if(!d)return;const p=d.players[i];document.querySelectorAll(".sheet").forEach(x=>x.remove());

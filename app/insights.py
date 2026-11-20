@@ -741,3 +741,146 @@ def series_stats(c, r, provider_detail, cat="fantasy", last=None, venue=False, v
             "qualification": {"sr": "at least %d balls faced" % MIN_SR_BALLS, "econ": "at least %s overs bowled" % _ovs(min_econ)}.get(cat),
             "empty": "No matching statistics" if not rows_ else None,
             "note": "From %d completed match(es) of this series with a scorecard (CricketData.org or the SH database). Last 5 = each player's own last 5 matches." % len(used)}
+
+
+# ------------------------------------------------------------------ SH Prediction XI (dream-team style, free to play)
+def _role(s):
+    s = (s or "").lower()
+    if "keeper" in s or "wk" in s:
+        return "wicket_keeper"
+    if "allrounder" in s.replace("-", "").replace(" ", ""):
+        return "all_rounder"
+    if "bowl" in s:
+        return "bowler"
+    return "batter"
+
+def _nkey(n):
+    t = re.sub(r"[^a-z ]", "", (n or "").lower()).split()
+    return (t[0][0] + " " + t[-1]) if len(t) >= 2 else (t[0] if t else "")
+
+_FP_CACHE = {}
+def _form_points(c, fmt, before, provider_detail, max_matches=80):
+    """SH fantasy points per player from recent completed matches of the same format (any competition), newest first."""
+    ms = c.execute("""SELECT m.id, m.start_utc, m.home_team_id, m.away_team_id, m.format, m.venue_id, h.name AS home_name, a.name AS away_name,
+                      CASE WHEN h.short_code_approved THEN h.short_code END AS home_short, CASE WHEN a.short_code_approved THEN a.short_code END AS away_short,
+                      (SELECT scorecard_at FROM ext_match_detail e WHERE e.match_id=m.id) AS sc_at
+                      FROM matches m JOIN teams h ON h.id=m.home_team_id JOIN teams a ON a.id=m.away_team_id
+                      WHERE m.format=? AND m.status='completed' AND m.start_utc<? AND m.data_origin<>'demo'
+                        AND (EXISTS(SELECT 1 FROM ext_match_detail e WHERE e.match_id=m.id AND e.scorecard_json IS NOT NULL)
+                             OR EXISTS(SELECT 1 FROM scorecards s WHERE s.match_id=m.id))
+                      ORDER BY m.start_utc DESC LIMIT ?""", (fmt, before, max_matches)).fetchall()
+    out = {}
+    for m in ms:
+        ck = (m["id"], m["sc_at"])
+        if ck not in _FP_CACHE:
+            M = dict(m); M["status"] = "completed"
+            try:
+                _FP_CACHE[ck] = [(p["name"], p["points"]) for p in fantasy(c, M, provider_detail(c, m["id"]))["players"]]
+            except Exception:
+                _FP_CACHE[ck] = []
+        for name, pts in _FP_CACHE[ck]:
+            for k in {(name or "").lower(), _nkey(name)}:
+                out.setdefault(k, []).append((m["start_utc"], pts, m["venue_id"]))
+    return out
+
+def _xi_table(c):
+    c.execute("""CREATE TABLE IF NOT EXISTS prediction_xi_snapshots(match_id INTEGER PRIMARY KEY REFERENCES matches(id), team_json TEXT NOT NULL,
+                 created_at TEXT NOT NULL, locked INTEGER NOT NULL DEFAULT 0)""")
+
+def prediction_xi(c, r, provider_detail, now_fn, locked_fn):
+    import fantasy as F
+    _xi_table(c)
+    snap = c.execute("SELECT * FROM prediction_xi_snapshots WHERE match_id=?", (r["id"],)).fetchone()
+    is_locked = locked_fn(c, r)
+    pd = provider_detail(c, r["id"])
+    rule_name, R = F.rules(c)
+    if snap and (snap["locked"] or is_locked):
+        team = json.loads(snap["team_json"])
+        if is_locked and not snap["locked"]:
+            c.execute("UPDATE prediction_xi_snapshots SET locked=1 WHERE match_id=?", (r["id"],))
+    else:
+        # pool: the announced XI (12 or fewer per side) or the squad from the source, else our own XI / squad tables
+        pool, status = [], "squad"
+        teams = {(r["home_name"] or "").lower(): r["home_team_id"], (r["away_name"] or "").lower(): r["away_team_id"],
+                 (r["home_short"] or "~").lower(): r["home_team_id"], (r["away_short"] or "~").lower(): r["away_team_id"]}
+        if pd and pd.get("squads"):
+            sq = [t for t in pd["squads"] if (t.get("team") or "").lower() in teams]
+            if sq and all(len(t.get("players") or []) <= 12 for t in sq):
+                status = "playing_xi"
+            for t in sq:
+                for p in t.get("players") or []:
+                    if p.get("name"):
+                        pool.append({"name": p["name"], "team_id": teams[(t["team"] or "").lower()], "role": _role(p.get("role"))})
+        if not pool:
+            try:
+                _, ps, st = F.pool(c, r["id"])
+                pool = [{"name": p["name"], "team_id": p["team_id"], "role": p["role"]} for p in ps]
+                status = "playing_xi" if st == "confirmed" else "squad"
+            except LookupError:
+                pool = []
+        if len(pool) < R["team_size"]:
+            return {"available": False, "reason": "Playing XI / squad not available from the source yet.", "rule_set": rule_name}
+        form = _form_points(c, r["format"], r["start_utc"], provider_detail)
+        vids = set(_venue_ids(c, r["venue_id"])) if r["venue_id"] else set()
+        for i, p in enumerate(pool):
+            hist = form.get(p["name"].lower()) or form.get(_nkey(p["name"])) or []
+            last = [x[1] for x in sorted(hist, reverse=True)[:5]]
+            at_v = [x[1] for x in hist if x[2] in vids]
+            if last:
+                exp = sum(last) / len(last)
+                if len(at_v) >= 2:
+                    exp = 0.8 * exp + 0.2 * (sum(at_v) / len(at_v))
+                conf = "high" if len(last) >= 5 else "medium" if len(last) >= 2 else "low"
+            else:
+                exp, conf = F.ROLE_BASE[p["role"]], "low"
+            p.update(player_id=i + 1, expected_points=round(exp, 1), confidence=conf, form=last, venue_matches=len(at_v))
+        team, ok = F._pick(pool, R, r["home_team_id"], r["away_team_id"])
+        if not ok:
+            return {"available": False, "reason": "Role limits of rule set '%s' cannot be met with the known players." % rule_name, "rule_set": rule_name}
+        order = sorted(team, key=lambda p: -p["expected_points"])
+        for p in team:
+            p["captain"] = p is order[0]
+            p["vice_captain"] = p is order[1]
+        team = {"players": team, "pool_status": status, "built_at": now_fn()}
+        c.execute("INSERT INTO prediction_xi_snapshots(match_id,team_json,created_at,locked) VALUES(?,?,?,?) "
+                  "ON CONFLICT(match_id) DO UPDATE SET team_json=excluded.team_json, created_at=excluded.created_at, locked=excluded.locked",
+                  (r["id"], json.dumps(team), now_fn(), 1 if is_locked else 0))
+    mult = lambda p: R["captain_multiplier"] if p.get("captain") else R["vice_captain_multiplier"] if p.get("vice_captain") else 1
+    expected = round(sum(p["expected_points"] * mult(p) for p in team["players"]), 1)
+    out = {"available": True, "rule_set": rule_name, "rules": R, "pool_status": team["pool_status"], "built_at": team["built_at"],
+           "locked": bool(is_locked), "players": team["players"], "expected_points": expected,
+           "note": "SH Prediction XI: our model's best 11 from recent SH fantasy points in this format (last 5 matches, venue form when known). "
+                   "Free to play, no money. It updates until the toss and is then locked."}
+    # after the first ball: how the locked XI actually scored, and the best possible XI (dream team) for comparison
+    if r["status"] in ("live", "completed"):
+        actual = {p["name"].lower(): p["points"] for p in fantasy(c, r, pd)["players"]}
+        akey = {_nkey(k): v for k, v in actual.items()}
+        got = lambda n: actual.get(n.lower(), akey.get(_nkey(n), 0.0))
+        for p in out["players"]:
+            p["actual_points"] = got(p["name"])
+        out["actual_points"] = round(sum(p["actual_points"] * mult(p) for p in out["players"]), 1)
+        allp = [dict(p, expected_points=got(p["name"])) for p in _pool_for_dream(c, r, pd, team["players"])]
+        best, ok = F._pick(allp, R, r["home_team_id"], r["away_team_id"]) if len(allp) >= R["team_size"] else ([], False)
+        if ok:
+            bo = sorted(best, key=lambda p: -p["expected_points"])
+            dream = [{"name": p["name"], "team_id": p["team_id"], "role": p["role"], "actual_points": p["expected_points"],
+                      "captain": p is bo[0], "vice_captain": p is bo[1]} for p in best]
+            out["dream_team"] = {"players": dream, "points": round(sum(p["actual_points"] * mult(p) for p in dream), 1)}
+            out["accuracy_pct"] = round(100 * out["actual_points"] / out["dream_team"]["points"]) if out["dream_team"]["points"] > 0 else None
+            names = {p["name"] for p in dream}
+            out["in_dream_team"] = sum(1 for p in out["players"] if p["name"] in names)
+    return out
+
+def _pool_for_dream(c, r, pd, fallback):
+    teams = {(r["home_name"] or "").lower(): r["home_team_id"], (r["away_name"] or "").lower(): r["away_team_id"]}
+    pool = []
+    for t in (pd or {}).get("squads") or []:
+        tid = teams.get((t.get("team") or "").lower())
+        for p in t.get("players") or []:
+            if tid and p.get("name"):
+                pool.append({"name": p["name"], "team_id": tid, "role": _role(p.get("role"))})
+    pool = pool or [{"name": p["name"], "team_id": p["team_id"], "role": p["role"]} for p in fallback]
+    for i, p in enumerate(pool):
+        p["player_id"] = i + 1
+        p["confidence"] = "high"
+    return pool

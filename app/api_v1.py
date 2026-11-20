@@ -1910,6 +1910,9 @@ def match_insights(c, who, method, mid, what, q, body_fn):
         return 200, insights.live(c, R, pd)
     if part == "points":
         return 200, insights.points(c, R, series_detail)
+    if part == "prediction_xi":
+        locked = lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled"
+        return 200, insights.prediction_xi(c, R, provider_detail, now, locked)
     if part == "series_stats":
         try:
             return 200, insights.series_stats(c, R, provider_detail, qv(q, "cat") or "fantasy", qv(q, "last"), qv(q, "venue") in ("1", "true"),
@@ -1918,7 +1921,7 @@ def match_insights(c, who, method, mid, what, q, body_fn):
             raise ApiError(400, "BAD_REQUEST", str(e))
     if part == "tipsters":
         return 200, insights.tipsters(c, R, prediction_window(c, r))
-    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points, tipsters or series_stats")
+    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points, tipsters, series_stats or prediction_xi")
 
 def need_user(who):
     if not who or not who.get("user_id"):

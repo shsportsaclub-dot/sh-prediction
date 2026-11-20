@@ -1116,3 +1116,22 @@ for _code, _vals in _AN.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+KEYS11 = ["pxi.title", "pxi.wk", "pxi.bat", "pxi.ar", "pxi.bowl", "pxi.locked", "pxi.live_until_toss", "pxi.from_xi", "pxi.from_squad", "pxi.expected", "pxi.actual", "pxi.dream", "pxi.match_pct"]
+_PXI = {
+ "en": ["SH Prediction XI", "Wicket-keepers", "Batters", "All-rounders", "Bowlers", "Locked at the toss", "Updates until the toss", "From the announced Playing XI", "From the squad (XI not announced yet)", "Expected", "Scored", "Dream Team", "Matched"],
+ "hi": ["SH प्रेडिक्शन XI", "विकेटकीपर", "बल्लेबाज़", "ऑलराउंडर", "गेंदबाज़", "टॉस पर लॉक", "टॉस तक अपडेट होती है", "घोषित प्लेइंग XI से", "स्क्वॉड से (XI अभी घोषित नहीं)", "अनुमानित", "बनाए", "ड्रीम टीम", "मेल"],
+ "te": ["SH ప్రిడిక్షన్ XI", "వికెట్ కీపర్లు", "బ్యాటర్లు", "ఆల్‌రౌండర్లు", "బౌలర్లు", "టాస్‌తో లాక్ అయింది", "టాస్ వరకు అప్‌డేట్ అవుతుంది", "ప్రకటించిన ప్లేయింగ్ XI నుంచి", "స్క్వాడ్ నుంచి (XI ఇంకా ప్రకటించలేదు)", "అంచనా", "సాధించినవి", "డ్రీమ్ టీమ్", "సరిపోలింది"],
+ "ta": ["SH கணிப்பு XI", "விக்கெட் கீப்பர்கள்", "பேட்டர்கள்", "ஆல்ரவுண்டர்கள்", "பந்துவீச்சாளர்கள்", "டாஸில் பூட்டப்பட்டது", "டாஸ் வரை புதுப்பிக்கப்படும்", "அறிவிக்கப்பட்ட ஆடும் XI-லிருந்து", "அணியிலிருந்து (XI இன்னும் அறிவிக்கப்படவில்லை)", "எதிர்பார்ப்பு", "பெற்றது", "ட்ரீம் அணி", "பொருந்தியது"],
+ "kn": ["SH ಪ್ರಿಡಿಕ್ಷನ್ XI", "ವಿಕೆಟ್ ಕೀಪರ್‌ಗಳು", "ಬ್ಯಾಟರ್‌ಗಳು", "ಆಲ್‌ರೌಂಡರ್‌ಗಳು", "ಬೌಲರ್‌ಗಳು", "ಟಾಸ್‌ನಲ್ಲಿ ಲಾಕ್", "ಟಾಸ್‌ವರೆಗೆ ನವೀಕರಣ", "ಘೋಷಿತ ಆಡುವ XI ನಿಂದ", "ತಂಡದಿಂದ (XI ಇನ್ನೂ ಘೋಷಿಸಿಲ್ಲ)", "ನಿರೀಕ್ಷಿತ", "ಗಳಿಸಿದ್ದು", "ಡ್ರೀಮ್ ತಂಡ", "ಹೊಂದಿಕೆ"],
+ "bn": ["SH প্রেডিকশন একাদশ", "উইকেটকিপার", "ব্যাটার", "অলরাউন্ডার", "বোলার", "টসে লক", "টস পর্যন্ত আপডেট হয়", "ঘোষিত একাদশ থেকে", "স্কোয়াড থেকে (একাদশ এখনও ঘোষিত হয়নি)", "প্রত্যাশিত", "অর্জিত", "ড্রিম টিম", "মিল"],
+ "mr": ["SH प्रेडिक्शन XI", "यष्टिरक्षक", "फलंदाज", "अष्टपैलू", "गोलंदाज", "नाणेफेकीला लॉक", "नाणेफेकीपर्यंत अपडेट", "जाहीर प्लेइंग XI मधून", "संघातून (XI अजून जाहीर नाही)", "अपेक्षित", "मिळवले", "ड्रीम टीम", "जुळले"],
+ "ur": ["SH پیش گوئی الیون", "وکٹ کیپر", "بلے باز", "آل راؤنڈر", "گیند باز", "ٹاس پر لاک", "ٹاس تک اپ ڈیٹ ہوتی ہے", "اعلان شدہ پلیئنگ الیون سے", "اسکواڈ سے (الیون ابھی اعلان نہیں)", "متوقع", "حاصل کیے", "ڈریم ٹیم", "مطابقت"],
+ "es": ["SH Predicción XI", "Guardametas", "Bateadores", "Polivalentes", "Lanzadores", "Bloqueado en el sorteo", "Se actualiza hasta el sorteo", "Del XI anunciado", "De la plantilla (XI aún no anunciado)", "Esperado", "Logrado", "Equipo ideal", "Coincidencia"],
+}
+for _code, _vals in _PXI.items():
+    assert len(_vals) == len(KEYS11)
+    _d = dict(zip(KEYS11, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)

@@ -1,3 +1,10 @@
+# QA addendum — SH Prediction XI (dream-team style) in Fantasy (20 Nov 2026)
+
+`pytest`: **104 passed** (new PredictionXI test: captain from best form, team limits, freeze at toss even when the source squad changes, dream team ≥ actual). Chrome 390/1366 px: no errors, no overflow.
+`GET /matches/{id}/insights?part=prediction_xi`. Pool: announced XI (≤12 per side) or squad from the source, else SH XI/squad tables. Expected points = average SH fantasy points of the player's last 5 matches in the same format (any competition), blended 80/20 with venue form when the player has 2+ matches there; no history = role baseline (low confidence). Team built under the admin rule set (SH Standard 11: 11 players, max 7 per side, role limits), captain/vice-captain = top two (2x / 1.5x). Snapshot updates until the toss, then locked (prediction_xi_snapshots). After the first ball: points actually scored by the locked XI, the Dream Team (best possible XI by actual points under the same rules), % of the Dream Team total and players matched. Free to play, no money.
+
+---
+
 # QA addendum — Fantasy "Player stats in series" + Analysis drill-down (contract §Fantasy analysis, 19 Nov 2026)
 
 `pytest`: **103 passed** (new SeriesAnalysis test with hand-checked numbers). Chrome 390/1366 px: no errors, no overflow; Back returns to Fantasy with the last category kept.

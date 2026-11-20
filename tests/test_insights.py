@@ -258,3 +258,57 @@ class SeriesAnalysis(unittest.TestCase):
         lone = T.mk_match("An Lions", "An Tigers", days=1, comp="Empty Cup 2026")
         e = T.call("/api/v1/matches/%d/insights?part=series_stats&cat=runs&last=5&venue=1" % lone)[1]
         self.assertEqual((e["items"], e["empty"]), ([], "No matching statistics"))   # never borrows other series' records
+
+
+class PredictionXI(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def test_build_lock_and_dream_team(self):
+        roles = ["WK-Batsman"] + ["Batsman"] * 4 + ["Batting Allrounder"] * 2 + ["Bowler"] * 4
+        squad = lambda team: {"team": team, "players": [{"name": "%s P%d" % (team.split()[-1], i), "role": roles[i]} for i in range(11)]}
+        # one earlier match where X Opener P1 scored big: form should make him captain
+        past = T.mk_match("Xi Hawks", "Xi Owls", days=-4, comp="XI Cup 2026")
+        c = T.db()
+        c.execute("UPDATE matches SET status='completed' WHERE id=?", (past,))
+        card = [{"inning": "Xi Hawks Inning 1", "batting": [{"name": "Hawks P1", "r": 90, "b": 45, "fours": 9, "sixes": 4, "dismissal": "not out"}], "bowling": [{"name": "Owls P9", "o": "4", "m": 0, "r": 20, "w": 3}]},
+                {"inning": "Xi Owls Inning 1", "batting": [{"name": "Owls P2", "r": 30, "b": 25, "fours": 3, "sixes": 0, "dismissal": "b Hawks P8"}], "bowling": [{"name": "Hawks P8", "o": "4", "m": 1, "r": 18, "w": 2}]}]
+        c.execute("INSERT INTO ext_match_detail(match_id,source,scorecard_json,scorecard_at) VALUES(?,?,?,?)", (past, "cricketdata", json.dumps(card), iso_min(-5000)))
+        c.commit(); c.close()
+        mid = T.mk_match("Xi Hawks", "Xi Owls", days=1, comp="XI Cup 2026")
+        c = T.db()
+        c.execute("INSERT INTO ext_match_detail(match_id,source,squad_json,squad_at) VALUES(?,?,?,?)", (mid, "cricketdata", json.dumps([squad("Xi Hawks"), squad("Xi Owls")]), iso_min(0)))
+        c.commit(); c.close()
+        g = lambda: T.call("/api/v1/matches/%d/insights?part=prediction_xi" % mid)[1]
+        d = g()
+        self.assertTrue(d["available"], d)
+        P = d["players"]
+        self.assertEqual(len(P), 11)
+        cap = next(p for p in P if p["captain"])
+        self.assertEqual(cap["name"], "Hawks P1")                                     # best recent form
+        self.assertEqual(sum(p["vice_captain"] for p in P), 1)
+        h, a = T.team_ids(mid)
+        self.assertTrue(all(sum(p["team_id"] == t for p in P) <= d["rules"]["max_per_team"] for t in (h, a)))
+        self.assertGreaterEqual(sum(p["role"] == "wicket_keeper" for p in P), 1)
+        self.assertEqual((d["locked"], d["pool_status"]), (False, "playing_xi"))
+        # toss: the XI is frozen, even if the source changes the squad afterwards
+        c = T.db()
+        c.execute("INSERT INTO toss_results(match_id,winner_team_id,decision,source,verified_at) VALUES(?,?,?,?,?)", (mid, h, "bat", "test", iso_min(0)))
+        c.commit(); c.close()
+        before = [p["name"] for p in g()["players"]]
+        c = T.db()
+        c.execute("UPDATE ext_match_detail SET squad_json=? WHERE match_id=?", (json.dumps([squad("Xi Owls"), {"team": "Xi Hawks", "players": [{"name": "New Guy %d" % i, "role": roles[i]} for i in range(11)]}]), mid))
+        c.commit(); c.close()
+        after = g()
+        self.assertEqual(([p["name"] for p in after["players"]], after["locked"]), (before, True))
+        # play starts: actual points and the dream team appear
+        c = T.db()
+        c.execute("UPDATE matches SET status='completed' WHERE id=?", (mid,))
+        c.execute("UPDATE ext_match_detail SET squad_json=?, scorecard_json=? WHERE match_id=?", (json.dumps([squad("Xi Hawks"), squad("Xi Owls")]), json.dumps(card), mid))
+        c.commit(); c.close()
+        done = g()
+        self.assertIn("dream_team", done)
+        self.assertEqual(len(done["dream_team"]["players"]), 11)
+        self.assertGreaterEqual(done["dream_team"]["points"], done["actual_points"])        # nobody beats the best possible XI
+        self.assertEqual(next(p for p in done["dream_team"]["players"] if p["captain"])["name"], "Hawks P1")
