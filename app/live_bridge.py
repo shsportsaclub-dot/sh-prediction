@@ -17,6 +17,51 @@ def event_key(event):
     return hashlib.sha256(json.dumps(fields, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
+class MemorySeen:
+    """Seen-key store for tests and short runs (lost on restart)."""
+    def __init__(self, max_seen=50000):
+        self._seen, self._order, self.max_seen = set(), [], max_seen
+
+    def has(self, key):
+        return key in self._seen
+
+    def add(self, key):
+        if key in self._seen:
+            return False
+        self._seen.add(key); self._order.append(key)
+        if len(self._order) > self.max_seen:
+            self._seen.discard(self._order.pop(0))
+        return True
+
+
+class SqliteSeen:
+    """Persistent seen-key store: a restart never republishes an event (UNIQUE key in the database)."""
+    def __init__(self, db_fn):
+        self.db_fn = db_fn
+        c = db_fn()
+        try:
+            c.execute("CREATE TABLE IF NOT EXISTS live_event_keys(event_key TEXT PRIMARY KEY, match_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+            c.commit()
+        finally:
+            c.close()
+
+    def has(self, key):
+        c = self.db_fn()
+        try:
+            return c.execute("SELECT 1 FROM live_event_keys WHERE event_key=?", (key,)).fetchone() is not None
+        finally:
+            c.close()
+
+    def add(self, key, match_id=None):
+        c = self.db_fn()
+        try:
+            cur = c.execute("INSERT OR IGNORE INTO live_event_keys(event_key, match_id) VALUES(?,?)", (key, match_id))
+            c.commit()
+            return cur.rowcount == 1
+        finally:
+            c.close()
+
+
 class LiveBridge:
     """One-second-capable poller with deduplication and no fabricated events.
 
@@ -24,13 +69,12 @@ class LiveBridge:
     events. For production durability publish must store the event transactionally
     with its unique event key before notifying SSE clients.
     """
-    def __init__(self, fetch_events, publish, interval_seconds=1.0, max_seen=50000):
+    def __init__(self, fetch_events, publish, interval_seconds=1.0, max_seen=50000, seen=None):
         if interval_seconds <= 0 or max_seen < 1:
             raise ValueError('invalid polling configuration')
         self.fetch_events, self.publish = fetch_events, publish
         self.interval_seconds, self.max_seen = interval_seconds, max_seen
-        self._seen = set()
-        self._order = []
+        self.seen = seen or MemorySeen(max_seen)
         self._stop = threading.Event()
 
     def poll_once(self):
@@ -39,13 +83,10 @@ class LiveBridge:
             if not isinstance(event, dict):
                 raise ValueError('structured event dictionary required')
             key = event_key(event)
-            if key in self._seen:
+            if self.seen.has(key):
                 continue
-            self.publish(key, event)
-            self._seen.add(key)
-            self._order.append(key)
-            if len(self._order) > self.max_seen:
-                self._seen.remove(self._order.pop(0))
+            self.publish(key, event)          # mark seen only after the event was stored/published
+            self.seen.add(key)
             count += 1
         return count
 

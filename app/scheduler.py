@@ -145,9 +145,26 @@ def job_cricsheet_backfill(conn, cfg, opener, db_fn):
     return r
 
 
+def job_sh_agent_snapshots(conn, cfg, opener):
+    """Save SH Agent Prediction stages for matches starting within the next 36 hours or live (no outside calls)."""
+    import api_v1, insights
+    lo = (_now_dt() - datetime.timedelta(hours=6)).isoformat()
+    hi = (_now_dt() + datetime.timedelta(hours=cfg.get("hours_ahead", 36))).isoformat()
+    made = {}
+    for (mid,) in conn.execute("SELECT id FROM matches WHERE status IN ('scheduled','live') AND start_utc BETWEEN ? AND ? AND data_origin<>'demo' LIMIT 200", (lo, hi)).fetchall():
+        r = api_v1.get_match(conn, mid)
+        R = dict(r, home_short=r["home_code"] if r["home_code_ok"] else None, away_short=r["away_code"] if r["away_code_ok"] else None)
+        xi_fn = lambda: insights.prediction_xi(conn, R, api_v1.provider_detail, now, lambda c2, m2: api_v1.prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled")
+        s = insights.agent_capture(conn, R, api_v1.provider_detail, now, xi_fn)
+        if s:
+            made[mid] = s
+    conn.commit()
+    return {"saved": made}
+
+
 JOBS = {"owner_sheets_sync": job_owner_sheets_sync, "registry_index_sync": job_registry_index_sync,
         "cricketdata_matches": job_cricketdata_matches, "cricketdata_live": job_cricketdata_live, "cricketdata_detail": job_cricketdata_detail,
-        "cricsheet_recent": job_cricsheet_recent, "cricsheet_backfill": job_cricsheet_backfill}
+        "cricsheet_recent": job_cricsheet_recent, "cricsheet_backfill": job_cricsheet_backfill, "sh_agent_snapshots": job_sh_agent_snapshots}
 NEEDS_DB_FN = {"cricsheet_recent", "cricsheet_backfill"}
 
 
@@ -204,7 +221,25 @@ def due(db_fn):
         c.close()
 
 
+def ensure_jobs(db_fn):
+    """Add any collector job that is new in this release (existing jobs and their settings are left as they are)."""
+    import registry
+    c = db_fn()
+    try:
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='collector_jobs'").fetchone():
+            for name, (mins, en, cfg) in registry.JOBS.items():
+                c.execute("INSERT OR IGNORE INTO collector_jobs(name,enabled,interval_minutes,config_json,next_run_at) VALUES(?,?,?,?,?)",
+                          (name, en, mins, json.dumps(cfg), now()))
+            c.commit()
+    finally:
+        c.close()
+
+
 def loop(db_fn, tick=60):
+    try:
+        ensure_jobs(db_fn)
+    except Exception:
+        traceback.print_exc()
     while True:
         try:
             for name in due(db_fn):

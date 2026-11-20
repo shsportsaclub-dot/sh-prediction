@@ -337,7 +337,9 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
         if cfg.get("balls", True) and info.get("bbbEnabled") is not False and age(row["balls_at"]) >= A["balls_every_min"] - 0.2:
             data, err = _detail_call(c, "match_bbb", pid, budget, opener)
             if data is not None:
-                c.execute("UPDATE ext_match_detail SET balls_json=?, balls_at=? WHERE match_id=?", (json.dumps(norm_balls(data)), now_fn(), mid))
+                nb = norm_balls(data)
+                c.execute("UPDATE ext_match_detail SET balls_json=?, balls_at=? WHERE match_id=?", (json.dumps(nb), now_fn(), mid))
+                publish_new_balls(c, mid, nb, now_fn)
             else:
                 mnotes.append(err)
         elif info.get("bbbEnabled") is False:
@@ -348,3 +350,40 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
         notes += mnotes
     return {"featured": done, "hits_used_today": hits_used(c), "plan_limit": A["limit"], "budget": budget, "max_featured": A["max_featured"],
             "note": None if targets else "no live CricketData match right now; no hit spent"}
+
+
+_EXT = {"wd": "wide", "wides": "wide", "wide": "wide", "nb": "no_ball", "noballs": "no_ball", "noball": "no_ball",
+        "b": "bye", "byes": "bye", "lb": "leg_bye", "legbyes": "leg_bye"}
+
+def publish_new_balls(c, mid, balls, now_fn):
+    """One live 'delivery' event per new provider ball, with SH's own commentary. The event key is stored in the same
+    transaction (UNIQUE), so a restart or a repeated poll never sends a ball twice."""
+    import commentary as commentary_engine
+    import live, live_bridge
+    c.execute("CREATE TABLE IF NOT EXISTS live_event_keys(event_key TEXT PRIMARY KEY, match_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+    first = not c.execute("SELECT 1 FROM live_event_keys WHERE match_id=?", (str(mid),)).fetchone()
+    inn_ids, sent = {}, 0
+    for i, b in enumerate(balls or []):
+        if b.get("over") is None or b.get("ball") is None:
+            continue
+        ino = inn_ids.setdefault(str(b.get("inning")), len(inn_ids) + 1)
+        key = live_bridge.event_key({"provider": "cricketdata", "match_id": str(mid), "innings": ino, "event_id": b.get("n"),
+                                     "over": b.get("over"), "ball": b.get("ball")})
+        if c.execute("INSERT OR IGNORE INTO live_event_keys(event_key, match_id) VALUES(?,?)", (key, str(mid))).rowcount != 1:
+            continue
+        if first:
+            continue          # first sight of a match already in progress: record the backlog without flooding clients
+        et = _EXT.get(str(b.get("extra") or "").lower())
+        runs = b.get("runs") or 0
+        ev = {"innings_no": ino, "seq": b.get("n") or i + 1, "over_no": b.get("over") or 0, "ball_in_over": b.get("ball") or 0,
+              "runs_bat": 0 if et in ("wide", "bye", "leg_bye") else runs, "extras": runs if et in ("wide", "bye", "leg_bye") else 0,
+              "extra_type": et, "is_wicket": 1 if b.get("wicket") else 0, "wicket_kind": None,
+              "batter": b.get("batter"), "bowler": b.get("bowler"), "batting_team_id": None}
+        text = (commentary_engine.generate([ev], "en", {}) or [{}])[0].get("text")
+        live.publish(c, mid, "delivery", {"innings": ino, "over": "%s.%s" % (b.get("over"), b.get("ball")), "runs": runs, "extra": et,
+                                          "wicket": bool(b.get("wicket")), "batter": b.get("batter"), "bowler": b.get("bowler"),
+                                          "commentary": text, "source": "CricketData", "status": "PROVIDER_REPORTED", "event_key": key})
+        sent += 1
+    if sent:
+        live.wake()
+    return sent

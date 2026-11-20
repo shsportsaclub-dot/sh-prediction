@@ -127,6 +127,12 @@ nav.tabs a.nav-plus span{display:flex;align-items:center;justify-content:center;
 .tp{padding:12px 14px;border-bottom:1px solid var(--line)}.tp .who{display:flex;gap:8px;align-items:center}.tp .av{width:30px;height:30px;border-radius:50%;background:#2a3d66;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
 .tp .pk{margin:6px 0 0 38px}.tp .pk div{padding:2px 0}.tp .up{margin:8px 0 0 38px;padding:8px 10px;border-left:3px solid #f0b43c;background:#f0b43c14;border-radius:0 8px 8px 0}
 .tp .res-correct{color:#58c04a;font-weight:700}.tp .res-incorrect{color:#ef6a6a;font-weight:700}
+.mc-extra{margin-top:4px}.mc-extra .btn{font-size:12px;padding:5px 10px;opacity:.85}
+.agent{border-radius:16px;padding:12px 14px;margin:6px 0 10px;background:linear-gradient(135deg,#0d1b3d,#1a0f2e);border:1px solid #3b5bdb66}
+.agent .ag-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.agent .ag-pick{font-size:20px;font-weight:800}
+.agent .ag-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin:8px 0 4px}.agent .ag-bar i{display:block}
+.agent .ag-stages{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.agent .ag-stages span{font-size:11px;padding:3px 8px;border-radius:10px;background:#ffffff14}
+.agent .ag-stages .correct{background:#3e8e2e88}.agent .ag-stages .incorrect{background:#b52a2a88}
 .sec{margin:14px 0}.sec-h{display:flex;align-items:baseline;justify-content:space-between}.sec h2{font-size:18px;margin:6px 0 8px}
 .hscroll{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.hscroll .lcard{flex:0 0 82%;max-width:330px;scroll-snap-align:start}
 .lcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--text);text-decoration:none}.lcard.is-live{border-color:#e0262f}
@@ -233,19 +239,19 @@ async match(el,id,tab){
  el.innerHTML=loading();
  let m;try{m=await api("/matches/"+id)}catch(e){return errorS(el,e,()=>SCREENS.match(el,id,tab))}
  // three SH layouts with our own names; old saved keys from the first build are mapped across
- const VIEWS={pulse:["live","commentary","scorecard","info","fantasy","community","history","seriesstats","graphs"],
-  classic:["scorecard","info","live","commentary","seriesstats","xi"],pro:["prediction","graphs","fantasy","h2h","live","scorecard","info"]};
- const DEF={pulse:m=>m.status==="live"?"live":m.status==="completed"?"scorecard":"info",classic:m=>m.status==="scheduled"?"info":"scorecard",pro:()=>"prediction"};
- const LBL={community:"mc.discussions",history:"mc.history",seriesstats:"ins.points_table"};
- const OLD={crex:"pulse",cricbuzz:"classic",sh:"pro"};let view=ls.get("shp_view")||"pulse";view=OLD[view]||view;if(!VIEWS[view])view="pulse";
- const tabs=VIEWS[view];document.body.dataset.mcview=view;
- const ALL=["info","weather","toss","pitch","h2h","prediction","xi","fantasy","live","scorecard","commentary","partnerships","fow","graphs","history","seriesstats","community","result"];
- const more=ALL.filter(k=>!tabs.includes(k)).map(k=>[k,LBL[k]||"mc."+k]);
+ // LOCKED Match Center order (owner master script, 20 Nov 2026) — the same on every view, phone and desktop
+ const MAIN=["info","xi","live","commentary","scorecard","graphs","results"];
+ const DEF={pulse:m=>m.status==="live"?"live":m.status==="completed"?"results":"info",classic:m=>m.status==="scheduled"?"info":"scorecard",pro:()=>"info"};
+ const LBL={community:"mc.discussions",history:"mc.history",seriesstats:"ins.points_table",results:"mc.results",xi:"mc.xi"};
+ const OLD={crex:"pulse",cricbuzz:"classic",sh:"pro"};let view=ls.get("shp_view")||"pulse";view=OLD[view]||view;if(!DEF[view])view="pulse";
+ const tabs=MAIN;document.body.dataset.mcview=view;
+ const EXTRA=["prediction","fantasy","community","seriesstats","h2h","history","partnerships","fow","weather","toss","pitch"];
+ const more=EXTRA.map(k=>[k,LBL[k]||"mc."+k]);
  tab=tab||DEF[view](m);
- el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p>'+(window.mcHeader?mcHeader(m):'')+'<div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
+ el.innerHTML='<p><a href="#/matches">← '+esc(t("nav.matches"))+'</a></p><div id="agent"></div>'+(window.mcHeader?mcHeader(m):'')+'<div class="card"><h3>'+teamTxt(m.home,"c-home")+' <span class="muted">vs</span> '+teamTxt(m.away,"c-away")+origin(m.data_origin)+'</h3><div class="muted">'+esc(m.home.name)+' vs '+esc(m.away.name)+' · '+esc(m.competition)+' · '+esc(m.format)+' · '+when(m.start_utc)+'</div></div>'+
   '<div class="mc-views" role="group" aria-label="'+esc(t("mc.view"))+'">'+[["pulse","mc.view_pulse","⚡"],["classic","mc.view_classic","📋"],["pro","mc.view_pro","🎯"]].map(([k,l,i])=>'<button type="button" aria-pressed="'+(k===view)+'" class="'+(k===view?"on":"")+'" onclick="ls.set(\'shp_view\',\''+k+'\');(location.hash===\'#/match/'+id+'\'?route():location.hash=\'#/match/'+id+'\')">'+i+' '+esc(t(l))+'</button>').join("")+'</div>'+
   '<div class="sub mc-tabs" role="tablist">'+tabs.map(k=>'<a class="btn '+(k===tab?"on":"")+'" role="tab" aria-selected="'+(k===tab)+'" href="#/match/'+id+'/'+k+'">'+esc(t(LBL[k]||"mc."+k))+'</a>').join("")+
-  '<select class="btn mc-more'+(tabs.includes(tab)?'':' on')+'" aria-label="'+esc(t("mc.more"))+'" onchange="if(this.value)location.hash=\'#/match/'+id+'/\'+this.value"><option value="">'+esc(t("mc.more"))+' ▾</option>'+more.map(([k,l])=>'<option value="'+k+'"'+(k===tab&&!tabs.includes(tab)?' selected':'')+'>'+esc(t(l))+'</option>').join("")+'</select></div><div id="tb">'+loading()+'</div>';
+  '</div><div class="sub mc-extra" aria-label="'+esc(t("mc.more"))+'">'+more.map(([k,l])=>'<a class="btn'+(k===tab?" on":"")+'" href="#/match/'+id+'/'+k+'">'+esc(t(l))+'</a>').join("")+'</div><div id="tb">'+loading()+'</div>';
  const cur=document.querySelector('.sub .on');if(cur)cur.scrollIntoView({inline:"center",block:"nearest"});
  const tb=el.querySelector("#tb");const nm=tid=>tid===m.home.id?teamTxt(m.home,"c-home"):(tid===m.away.id?teamTxt(m.away,"c-away"):"—");
  const kv=pairs=>'<div class="card"><dl class="kv">'+pairs.map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+b+'</dd>').join("")+'</dl></div>';
@@ -288,7 +294,8 @@ async match(el,id,tab){
    if(!tb.isConnected)return;
    tb.innerHTML=pre+main+(window.mcTabAfter&&mcTabAfter[tab]?mcTabAfter[tab](m):"")+end;
    // DOM binders queued by the tab code run only now, after the whole tab is on screen
-   q.splice(0).forEach(f=>{try{f()}catch(e){console.error(e)}})}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
+   q.splice(0).forEach(f=>{try{f()}catch(e){console.error(e)}});
+   if(window.mcAgent)mcAgent(m,el.querySelector("#agent"));if(window.mcLive)mcLive(m,tab)}catch(e){errorS(tb,e,()=>SCREENS.match(el,id,tab))}
 },
 async experts(el,id){
  if(id){el.innerHTML=loading();try{const j=await api("/experts/"+id+"/history");const x=j.expert,s=j.summary;

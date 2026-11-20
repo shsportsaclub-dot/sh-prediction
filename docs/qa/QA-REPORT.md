@@ -1,3 +1,16 @@
+# QA addendum — Master execution scripts (live bridge + match center), 20 Nov 2026
+
+`pytest`: **113 passed** (+ app/test_live_bridge.py 4 passed). Chrome: 28 route loads at 390/1366 px, all three views: no errors, no overflow, no "undefined".
+- Match Center order LOCKED on every view and width: INFO, PLAYING XI, LIVE, COMMENTARY, SCORECARD, GRAPHS, RESULTS & STATS. Other match pages (Prediction, Fantasy XI, Discussions, Points Table, H2H, History, Partnerships, FoW, Weather, Toss, Pitch) in a second chip row.
+- SH Agent Prediction card first on the match page. Stages saved once, never changed (sh_agent_snapshots, INSERT OR IGNORE): pre-match (before toss), post-toss (before first ball), Playing XI (XI-strength adjusted, before first ball); live win % computed separately; each stage marked ✓/✗ when the result arrives. Scheduler job sh_agent_snapshots every 10 min for matches within 36 h.
+- Playing XI tab uses the source's XI/squad when SH tables are empty (captain/keeper/sub marked when the source says so, PROVIDER_REPORTED). Results & Stats: result + status (VERIFIED / PROVIDER_REPORTED / USER_REPORTED / PENDING), user-reported scores, top performers (SH figures, not an official award), prediction accuracy for every saved stage, tipster ✓/✗, owner sheet picks, points-table rows.
+- Live: each new CricketData ball becomes one "delivery" SSE event with SH commentary; key stored in live_event_keys (UNIQUE) in the same transaction: repeated polls and restarts never resend; the backlog of a match already in progress is recorded, not flooded. Match pages of live matches subscribe to the stream and refresh without a reload (30 s fallback). live_bridge: persistent SqliteSeen store; keys marked only after a successful publish.
+- sh_commentary_agent: byes / leg-byes never called a dot ball; dismissal kinds (bowled, caught, lbw, run out, stumped, hit wicket, ...); no-ball runs off the bat; no invented shots/fielders/speeds (regression tests).
+- Owner sheet "SH Predictor - Abu Dhabi T10 / SH Complete Match Master" (read on 20 Nov 2026: 32 rows, columns # DATE IST HOME VS AWAY TOSS WIN RESULT P.T T✓ P.WIN W✓ NOTES): codes UB/YL/RDC/EE/UT/AA -> full names, times read as IST (header), "UB\n121/3 (9.4)" split into team + USER_REPORTED score, RESULT margin ("7 wickets"), Pending kept pending, TBD rows skipped, picks stored as first seen (edits logged in sheet_pick_history), results/tosses from another source never overwritten (reported as conflicts), one match per fixture with the T10 snapshot. Admin dry-run: POST /api/v1/admin/sheets/reconcile.
+- Not done / blocked: deployed-site proof (the workspace cannot reach onrender.com), news agent (no licensed news feed), official Player of the Match (not in the source).
+
+---
+
 # QA addendum — SH Prediction XI (dream-team style) in Fantasy (20 Nov 2026)
 
 `pytest`: **104 passed** (new PredictionXI test: captain from best form, team limits, freeze at toss even when the source squad changes, dream team ≥ actual). Chrome 390/1366 px: no errors, no overflow.

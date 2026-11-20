@@ -241,3 +241,62 @@ window.mcTabEnd=window.mcTabEnd||{};
 window.mcTabEnd.live=block;
 window.mcTabEnd.info=m=>m.status==="scheduled"?block(m):"";
 })();
+/* ---------------- SH Agent Prediction (first on the page), Playing XI, Results & Stats, live refresh */
+(function(){
+const later=window.mcLater;
+const I=(m,part)=>api("/matches/"+m.id+"/insights?part="+part);
+const NA=()=>'<p class="muted">'+esc(t("data.na"))+'</p>';
+const STG={pre_match:"ag.pre_match",post_toss:"ag.post_toss",playing_xi:"ag.playing_xi"};
+window.mcAgent=async(m,box)=>{if(!box)return;let d;try{d=await I(m,"agent")}catch(e){return}
+ const H=d.headline,L=d.live;if(!H&&!L){box.innerHTML=d.note?'<div class="agent"><b>🧠 '+esc(t("ag.title"))+'</b><p class="muted">'+esc(d.note)+'</p></div>':"";return}
+ const p=L||H,hp=p.home_win_probability,ap=p.away_win_probability;
+ const pick=H?(H.predicted_team||""):(hp>=50?m.home.name:m.away.name);
+ box.innerHTML='<div class="agent"><div class="ag-top"><b>🧠 '+esc(t("ag.title"))+'</b><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+'</small></div>'+
+  '<div class="ag-pick">'+esc(pick)+' <small class="muted">'+esc(t("ag.to_win"))+'</small></div>'+
+  '<div class="ag-bar"><i style="width:'+hp+'%;background:#4fb3ff"></i><i style="width:'+ap+'%;background:#ff8a1f"></i></div>'+
+  '<div class="dl"><b class="c-home">'+esc(m.home.short_code||m.home.name)+' '+hp+'%</b><b class="c-away">'+ap+'% '+esc(m.away.short_code||m.away.name)+'</b></div>'+
+  (H?'<div class="muted">'+esc(t("ag.confidence"))+': '+esc(H.confidence_level||"—")+' · '+esc(H.model)+' · '+esc(new Date(H.created_at).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</div>':'')+
+  '<div class="ag-stages">'+d.stages.map(s=>'<span class="'+(s.outcome||"")+'">'+esc(t(STG[s.stage]))+': '+esc(s.predicted_team||"")+' '+s.confidence+'%'+(s.outcome==="correct"?" ✓":s.outcome==="incorrect"?" ✗":"")+'</span>').join("")+(L?'<span>'+esc(t("ag.live"))+': '+esc(t("ins.over"))+' '+L.after_over+'</span>':'')+'</div>'+
+  '<p class="muted" style="margin:6px 0 0">'+esc(d.verification)+' <a href="#/match/'+m.id+'/prediction">'+esc(t("ag.why"))+' ›</a></p></div>'};
+
+/* Playing XI: our tables first, then the XI / squad the source sent; captain and keeper marked when the source says so */
+const baseXI=window.mcTab.xi;
+window.mcTab.xi=async m=>{if((m.playing_xi&&m.playing_xi.length)||(m.squads&&m.squads.length))return baseXI?baseXI(m):null;
+ const sq=m.provider_detail&&m.provider_detail.squads;if(!sq||!sq.length)return '<div class="state">'+esc(t("pxi.from_squad"))+' — '+esc(t("data.na"))+'</div>';
+ const conf=sq.every(x=>(x.players||[]).length<=12);
+ const roleTag=r=>{r=(r||"").toLowerCase();return /wk|keeper/.test(r)?"WK":/allrounder|all-rounder/.test(r.replace(/\s/g,""))?"AR":/bowl/.test(r)?"BOWL":r?"BAT":""};
+ return '<p class="muted">'+esc(t(conf?"pxi.from_xi":"pxi.from_squad"))+' · '+esc(t("ins.source"))+': CricketData.org (PROVIDER_REPORTED)</p>'+sq.map(T=>{const ps=T.players||[];
+  return '<div class="card"><h3>'+esc(T.team)+' <small class="muted">'+ps.length+'</small></h3><table class="simple"><tbody>'+ps.map((p,i)=>{const cap=/\(c\)|captain/i.test((p.name||"")+" "+(p.role||""));
+   return '<tr'+(conf&&i>=11?' class="muted"':'')+'><td>'+(i+1)+'</td><td><b>'+esc(String(p.name||"").replace(/\s*\((c|wk|c & wk)\)/ig,""))+'</b>'+(cap?' <span class="tag">C</span>':'')+(roleTag(p.role)==="WK"?' <span class="tag">WK</span>':'')+(conf&&i>=11?' <span class="tag">'+esc(t("xi.sub"))+'</span>':'')+'</td><td class="muted">'+esc(p.role||"—")+'</td></tr>'}).join("")+'</tbody></table></div>'}).join("")};
+
+/* Results & Stats */
+window.mcTab.results=async m=>{let ag=null,tp=null,pts=null,fan=null;
+ [ag,tp,pts,fan]=await Promise.all([I(m,"agent").catch(()=>null),I(m,"tipsters").catch(()=>null),I(m,"points").catch(()=>null),I(m,"fantasy").catch(()=>null)]);
+ const src=(m.result_source||m.source||"");const st=/^Owner Google Sheet/.test(m.result_source||"")?"USER_REPORTED":/CricketData/i.test(m.result_source||"")?"PROVIDER_REPORTED":m.result_type?"VERIFIED":"PENDING";
+ let out='<div class="card"><h3>'+esc(t("mc.results"))+'</h3>'+(m.result_type?'<div class="ag-pick" style="font-size:20px;font-weight:800">'+esc(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" "+t("rs.won")+(m.margin?" · "+m.margin:"")):m.result_type.replace(/_/g," "))+'</div>'
+  :'<div class="state">'+esc(t(m.status==="live"?"rs.in_progress":"rs.pending"))+'</div>')+
+  '<p class="muted">'+esc(t("rs.status"))+': <span class="tag">'+st+'</span>'+(m.result_source?' · '+esc(m.result_source):'')+'</p>'+
+  (m.reported_scores&&m.reported_scores.length?'<p>'+m.reported_scores.map(s=>'<b>'+esc(s.team)+'</b> '+s.runs+'/'+s.wickets+(s.overs?' ('+esc(s.overs)+')':'')).join(" · ")+' <span class="tag">USER_REPORTED</span></p>':'')+
+  '<p class="muted">'+esc(t("rs.potm"))+': '+esc(t("data.na"))+'</p></div>';
+ if(fan&&fan.players&&fan.players.length&&m.status!=="scheduled"){const P=fan.players;const by=(f)=>P.slice().sort((a,b)=>f(b)-f(a))[0];
+  const ev=(p,k)=>((p.breakdown||[]).find(x=>x.event===k)||{}).actual||0;const tr=by(p=>ev(p,"runs")),tw=by(p=>ev(p,"wickets"));
+  out+='<div class="card"><h3>'+esc(t("rs.top"))+'</h3><div class="dl"><span>'+esc(t("an.cat_runs"))+'</span><b>'+(ev(tr,"runs")?esc(tr.name)+' '+ev(tr,"runs"):"—")+'</b></div><div class="dl"><span>'+esc(t("an.cat_wickets"))+'</span><b>'+(ev(tw,"wickets")?esc(tw.name)+' '+ev(tw,"wickets"):"—")+'</b></div><div class="dl"><span>'+esc(t("an.cat_fantasy"))+'</span><b>'+esc(P[0].name)+' '+P[0].points+'</b></div><p class="muted">'+esc(t("rs.top_note"))+'</p></div>'}
+ out+='<div class="card"><h3>'+esc(t("rs.accuracy"))+'</h3>'+(ag&&ag.stages.length?ag.stages.map(s=>'<div class="dl"><span>'+esc(t(STG[s.stage]))+'</span><b>'+esc(s.predicted_team||"")+' '+s.confidence+'% '+(s.outcome==="correct"?"✓":s.outcome==="incorrect"?"✗":"·")+'</b></div>').join(""):NA());
+ if(tp&&tp.items.length){let ok=0,bad=0;tp.items.forEach(e=>e.reports.forEach(r=>{if(r.result==="correct")ok++;else if(r.result==="incorrect")bad++}));
+  out+='<div class="dl"><span>'+esc(t("ins.tipster_reports"))+'</span><b>'+ok+' ✓ · '+bad+' ✗ <small class="muted">('+tp.items.length+')</small></b></div>'}
+ if(m.sheet_picks){const sp=m.sheet_picks;out+='<div class="dl"><span>'+esc(t("rs.sheet_picks"))+'</span><b>'+esc([sp.toss_pick&&("Toss "+sp.toss_pick+" "+(sp.toss_mark||"")),sp.win_pick&&("Win "+sp.win_pick+" "+(sp.win_mark||""))].filter(Boolean).join(" · "))+'</b></div><p class="muted">USER_REPORTED · '+esc(sp.notes||"")+'</p>'}
+ out+='</div>';
+ if(pts&&pts.table&&pts.table.length){const rows=pts.table.map((x,i)=>Object.assign({rank:i+1},x)).filter(x=>pts.teams.includes(x.team_id));
+  out+='<div class="card"><h3>'+esc(t("ins.in_points"))+'</h3><table class="simple"><tbody>'+rows.map(x=>'<tr><td>'+x.rank+'</td><td><b>'+esc(x.short_code||x.team)+'</b></td><td>'+x.played+' P</td><td>'+x.won+' W</td><td><b>'+x.points+'</b></td></tr>').join("")+'</tbody></table><a href="#/match/'+m.id+'/seriesstats">'+esc(t("ins.points_table"))+' ›</a></div>'}
+ return out};
+
+/* live refresh without reloading: Server-Sent Events for live matches, with a 30-second fallback when the stream drops */
+let ES=null,ESmid=null,timer=null,poll=null;
+window.mcLive=(m,tab)=>{const on=m.status==="live";if(!on||!window.EventSource){if(ES&&ESmid!==m.id){ES.close();ES=null;ESmid=null}return}
+ const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(!new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash))return;const y=scrollY;route();setTimeout(()=>scrollTo(0,y),400)},1500)};
+ if(ES&&ESmid===m.id)return;if(ES)ES.close();ESmid=m.id;ES=new EventSource("/api/v1/matches/"+m.id+"/stream");
+ ["ball","delivery","probability","status"].forEach(k=>ES.addEventListener(k,e=>{if(k!=="status")refresh()}));
+ ES.onerror=()=>{if(!poll)poll=setInterval(()=>{if(new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash)&&document.visibilityState==="visible")refresh();else{clearInterval(poll);poll=null}},30000)};
+ ES.onopen=()=>{if(poll){clearInterval(poll);poll=null}}};
+window.addEventListener("hashchange",()=>{if(ES&&ESmid&&!new RegExp("^#/match/"+ESmid+"(/|$)").test(location.hash)){ES.close();ES=null;ESmid=null}});
+})();

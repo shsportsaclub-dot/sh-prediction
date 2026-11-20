@@ -312,3 +312,48 @@ class PredictionXI(unittest.TestCase):
         self.assertEqual(len(done["dream_team"]["players"]), 11)
         self.assertGreaterEqual(done["dream_team"]["points"], done["actual_points"])        # nobody beats the best possible XI
         self.assertEqual(next(p for p in done["dream_team"]["players"] if p["captain"])["name"], "Hawks P1")
+
+
+class AgentStages(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        T._migrate_once()
+
+    def test_stages_saved_once_and_never_changed(self):
+        mid = T.mk_match("Ag Kites", "Ag Gulls", days=0.5, comp="Agent Cup 2026")
+        h, a = T.team_ids(mid)
+        g = lambda: T.call("/api/v1/matches/%d/insights?part=agent" % mid)[1]
+        d = g()
+        self.assertEqual([s["stage"] for s in d["stages"]], ["pre_match"])
+        pre = d["stages"][0]
+        # new history arrives (a completed earlier meeting): the saved pre-match numbers stay exactly as they were
+        old = T.mk_match("Ag Kites", "Ag Gulls", days=-3, comp="Agent Cup 2026")
+        T.call("/api/v1/admin/results", {"match_id": old, "result_type": "win", "winner_team_id": a, "source": "test"}, T.A)
+        self.assertEqual(g()["stages"][0]["home_win_probability"], pre["home_win_probability"])
+        c = T.db()
+        c.execute("INSERT INTO toss_results(match_id,winner_team_id,decision,source,verified_at) VALUES(?,?,?,?,?)", (mid, a, "bowl", "test", iso_min(0)))
+        c.commit(); c.close()
+        d = g()
+        self.assertEqual([s["stage"] for s in d["stages"]], ["pre_match", "post_toss"])
+        self.assertEqual(d["headline"]["stage"], "post_toss")
+        self.assertEqual(d["stages"][1]["toss"]["team_id"], a)
+        # the result marks every saved stage right or wrong; nothing is rewritten
+        T.call("/api/v1/admin/results", {"match_id": mid, "result_type": "win", "winner_team_id": h, "source": "test"}, T.A)
+        d = g()
+        self.assertTrue(all(s["outcome"] in ("correct", "incorrect") for s in d["stages"]))
+        self.assertEqual(d["stages"][0]["created_at"], pre["created_at"])
+
+    def test_scheduler_job_saves_upcoming(self):
+        import scheduler
+        mid = T.mk_match("Ag Rooks", "Ag Jays", days=1, comp="Agent Cup 2026")
+        r = scheduler.run_job(T.db, "sh_agent_snapshots")
+        c = T.db()
+        self.assertTrue(c.execute("SELECT 1 FROM sh_agent_snapshots WHERE match_id=? AND stage='pre_match'", (mid,)).fetchone(), r)
+        c.close()
+
+
+class LockedTabOrder(unittest.TestCase):
+    def test_match_center_order_is_locked(self):
+        hub = (Path(__file__).resolve().parents[1] / "app" / "hub.html").read_text()
+        self.assertIn('const MAIN=["info","xi","live","commentary","scorecard","graphs","results"];', hub)
+        self.assertIn("const tabs=MAIN;", hub)          # every view (SH Pulse / Classic / Pro) uses the same order

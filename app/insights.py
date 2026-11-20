@@ -884,3 +884,86 @@ def _pool_for_dream(c, r, pd, fallback):
         p["player_id"] = i + 1
         p["confidence"] = "high"
     return pool
+
+
+# ------------------------------------------------------------------ SH Agent Prediction: immutable stage snapshots
+STAGES = ("pre_match", "post_toss", "playing_xi")
+
+def _agent_table(c):
+    c.execute("""CREATE TABLE IF NOT EXISTS sh_agent_snapshots(match_id INTEGER NOT NULL REFERENCES matches(id), stage TEXT NOT NULL,
+                 payload_json TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(match_id, stage))""")
+
+def _ball_bowled(c, r, pd):
+    if c.execute("SELECT 1 FROM ball_events WHERE match_id=? LIMIT 1", (r["id"],)).fetchone():
+        return True
+    if pd and (pd.get("scorecard") or []):
+        return any((i.get("total") or {}).get("o") not in (None, 0, "0", "0.0") for i in pd["scorecard"])
+    return r["status"] in ("completed",)
+
+def agent_capture(c, r, provider_detail, now_fn, xi_fn=None):
+    """Store each stage once (INSERT OR IGNORE): pre-match before the toss, post-toss after the toss and before the first ball,
+    Playing XI once both XIs are known and before the first ball. A stored stage is never changed."""
+    _agent_table(c)
+    pd = provider_detail(c, r["id"])
+    toss = c.execute("SELECT winner_team_id, decision, verified_at, source FROM toss_results WHERE match_id=?", (r["id"],)).fetchone()
+    bowled = _ball_bowled(c, r, pd)
+    have = {x[0] for x in c.execute("SELECT stage FROM sh_agent_snapshots WHERE match_id=?", (r["id"],))}
+    made = []
+    def put(stage, p, extra=None):
+        payload = {"home_win_probability": p["home_win_probability"], "away_win_probability": p["away_win_probability"],
+                   "predicted_team_id": p["predicted_team_id"], "confidence": p["confidence"], "confidence_level": p.get("confidence_level"),
+                   "factors": p.get("factors"), "history_matches_used": p.get("history_matches_used")}
+        payload.update(extra or {})
+        if c.execute("INSERT OR IGNORE INTO sh_agent_snapshots(match_id,stage,payload_json,model,created_at) VALUES(?,?,?,?,?)",
+                     (r["id"], stage, json.dumps(payload), p["model"], now_fn())).rowcount:
+            made.append(stage)
+    if "pre_match" not in have and not toss and r["status"] == "scheduled":
+        put("pre_match", engine.predict_match(c, r["id"], use_toss=False))
+    if toss and not bowled and "post_toss" not in have:
+        put("post_toss", engine.predict_match(c, r["id"], use_toss=True),
+            {"toss": {"team_id": toss[0], "decision": toss[1], "source": toss[3]}})
+    if not bowled and "playing_xi" not in have and xi_fn:
+        xi = xi_fn()
+        if xi and xi.get("available") and xi.get("pool_status") == "playing_xi":
+            p = engine.predict_match(c, r["id"], use_toss=bool(toss))
+            sh = sum(x["expected_points"] for x in xi["players"] if x["team_id"] == r["home_team_id"])
+            sa = sum(x["expected_points"] for x in xi["players"] if x["team_id"] == r["away_team_id"])
+            # XI adjustment: shift the log-odds by the two XIs' expected SH fantasy strength (bounded to +/-0.4)
+            adj = max(-0.4, min(0.4, 1.5 * (sh - sa) / (sh + sa))) if sh + sa > 0 else 0.0
+            import math
+            x = math.log(p["home_win_probability"] / max(0.1, 100 - p["home_win_probability"])) + adj
+            ph = 100 / (1 + math.exp(-x))
+            p = dict(p, home_win_probability=round(ph, 1), away_win_probability=round(100 - ph, 1),
+                     predicted_team_id=r["home_team_id"] if ph >= 50 else r["away_team_id"], confidence=round(max(ph, 100 - ph), 1),
+                     factors=(p.get("factors") or []) + [{"factor": "playing_xi_strength", "detail": "SH Prediction XI expected points %.0f v %.0f" % (sh, sa),
+                                                          "contribution": round(adj, 3)}])
+            put("playing_xi", p)
+    return made
+
+def agent(c, r, provider_detail, now_fn, xi_fn=None):
+    agent_capture(c, r, provider_detail, now_fn, xi_fn)
+    snaps = {x["stage"]: dict(json.loads(x["payload_json"]), stage=x["stage"], model=x["model"], created_at=x["created_at"])
+             for x in c.execute("SELECT * FROM sh_agent_snapshots WHERE match_id=?", (r["id"],))}
+    live = None
+    if r["status"] == "live":
+        g = graphs(c, r, provider_detail(c, r["id"]))
+        if g.get("win_probability"):
+            w = g["win_probability"][-1]
+            live = {"home_win_probability": w["home"], "away_win_probability": round(100 - w["home"], 1), "after_over": w["over"], "innings": w["innings"],
+                    "source": g.get("source")}
+    res = c.execute("SELECT result_type, winner_team_id, source FROM match_results WHERE match_id=?", (r["id"],)).fetchone()
+    for s in snaps.values():
+        if res and res[0] == "win":
+            s["outcome"] = "correct" if s["predicted_team_id"] == res[1] else "incorrect"
+        elif res:
+            s["outcome"] = "void"
+    tm = lambda tid: r["home_name"] if tid == r["home_team_id"] else r["away_name"] if tid == r["away_team_id"] else None
+    for s in snaps.values():
+        s["predicted_team"] = tm(s["predicted_team_id"])
+    order = [s for s in STAGES if s in snaps]
+    return {"stages": [snaps[s] for s in order], "live": live,
+            "headline": snaps[order[-1]] if order else None,
+            "result": {"type": res[0], "winner": tm(res[1]), "source": res[2]} if res else None,
+            "verification": "Model output from verified match history; not a guarantee. Each stage is saved once and never changed.",
+            "note": None if order else ("No prediction was saved before this match started." if r["status"] != "scheduled"
+                                        else "The pre-match prediction is saved when this page or the scheduler first sees the match before the toss.")}

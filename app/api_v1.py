@@ -289,6 +289,13 @@ def match_detail(c, mid):
     d["squads"] = rows(c.execute("SELECT s.team_id,p.id AS player_id,p.name,p.role FROM match_squads s JOIN players p ON p.id=s.player_id WHERE s.match_id=?", (mid,)))
     d["provider_detail"] = provider_detail(c, mid)
     d["history"] = match_history(c, r)
+    rs = c.execute("SELECT source FROM match_results WHERE match_id=?", (mid,)).fetchone()
+    d["result_source"] = rs[0] if rs else None
+    has = lambda t: c.execute("SELECT 1 FROM sqlite_master WHERE name=?", (t,)).fetchone()
+    d["reported_scores"] = rows(c.execute("""SELECT t.name AS team, s.runs, s.wickets, s.overs, s.status FROM reported_scores s JOIN teams t ON t.id=s.team_id
+                                             WHERE s.match_id=? ORDER BY s.team_id=?""", (mid, a))) if has("reported_scores") else []
+    sp = c.execute("SELECT toss_pick, win_pick, toss_mark, win_mark, notes, first_seen_at FROM sheet_picks WHERE match_id=?", (mid,)).fetchone() if has("sheet_picks") else None
+    d["sheet_picks"] = dict(sp) if sp else None
     return d
 
 def provider_detail(c, mid):
@@ -1109,6 +1116,20 @@ def admin_bridge_job(c, who, name, action, d):
 
 OWNER_MASTER = Path(__file__).parent / "data" / "owner_master_abu_dhabi_t10.json"
 
+def admin_sheets_reconcile(c, who, d):
+    """ADMIN ONLY. Read every owner league sheet and report what a sync would change, without writing anything."""
+    import gsheets, scheduler
+    leagues = json.loads((c.execute("SELECT value FROM system_settings WHERE key='owner_sheets'").fetchone() or ["[]"])[0])
+    create_match, record_result = scheduler._helpers(c)
+    out = {}
+    for lg in leagues:
+        try:
+            out[lg["league"]] = gsheets.sync_league(c, lg, gsheets.fetch_xlsx(lg["sheet_id"]), create_match, record_result, now, dry_run=True)
+        except Exception as e:
+            out[lg["league"]] = {"error": str(e)}
+    c.rollback()
+    return {"dry_run": True, "leagues": out, "note": "Nothing was written. Run the owner_sheets_sync job to apply."}
+
 def admin_owner_master(c, who, d):
     """ADMIN ONLY. Load the owner's Abu Dhabi T10 actual-results master (Match | Home | Away | Toss | Winner).
     Codes like 'H-UB' / 'A-EE'; None = not yet known. Stored as imported, user-supplied, not independently verified.
@@ -1913,6 +1934,9 @@ def match_insights(c, who, method, mid, what, q, body_fn):
     if part == "prediction_xi":
         locked = lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled"
         return 200, insights.prediction_xi(c, R, provider_detail, now, locked)
+    if part == "agent":
+        xi_fn = lambda: insights.prediction_xi(c, R, provider_detail, now, lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled")
+        return 200, insights.agent(c, R, provider_detail, now, xi_fn)
     if part == "series_stats":
         try:
             return 200, insights.series_stats(c, R, provider_detail, qv(q, "cat") or "fantasy", qv(q, "last"), qv(q, "venue") in ("1", "true"),
@@ -1921,7 +1945,7 @@ def match_insights(c, who, method, mid, what, q, body_fn):
             raise ApiError(400, "BAD_REQUEST", str(e))
     if part == "tipsters":
         return 200, insights.tipsters(c, R, prediction_window(c, r))
-    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points, tipsters, series_stats or prediction_xi")
+    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points, tipsters, series_stats, prediction_xi or agent")
 
 def need_user(who):
     if not who or not who.get("user_id"):
@@ -1938,6 +1962,10 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
         raise ApiError(404, "NOT_FOUND", "unknown endpoint")
     if len(P) == 3 and P[0] == "matches" and P[2] in ("insights", "fan-poll", "discussions"):
         return match_insights(c, who, method, int_id(P[1], "match id"), P[2], q, body_fn)
+    if method == "POST" and P == ["admin", "sheets", "reconcile"]:
+        if not is_admin(who):
+            raise ApiError(403, "FORBIDDEN", "admin only")
+        return 200, admin_sheets_reconcile(c, who, body_fn() or {})
     if method == "GET" and len(P) == 3 and P[0] == "matches" and P[2] in ("community", "replay"):
         mid = int_id(P[1], "match id")
         get_match(c, mid)

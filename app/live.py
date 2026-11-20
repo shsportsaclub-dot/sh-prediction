@@ -37,7 +37,9 @@ def stream(handler, db_fn, match_id, last_id=0, max_seconds=300, heartbeat=15):
     try:
         m = c.execute("SELECT status, data_origin FROM matches WHERE id=?", (match_id,)).fetchone()
         status = {"match_id": match_id, "status": m["status"] if m else "unknown", "data_origin": m["data_origin"] if m else None,
-                  "live_source": "SH scorer" if m and m["status"] == "live" else None,
+                  "live_source": (("CricketData.org" if c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone() and
+                                    c.execute("SELECT 1 FROM ext_match_detail WHERE match_id=?", (match_id,)).fetchone() else "SH scorer")
+                                   if m and m["status"] == "live" else None),
                   "message": None if m and m["status"] == "live" else "No live data for this match right now."}
         w.write(("event: status\ndata: %s\nretry: 3000\n\n" % json.dumps(status)).encode()); w.flush()
         last_beat = time.time()

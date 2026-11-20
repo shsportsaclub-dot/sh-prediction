@@ -26,11 +26,42 @@ ALIASES = {
     "venue": ["venue", "ground", "stadium", "location"],
     "toss": ["toss", "toss winner", "toss won by", "toss result"],
     "decision": ["toss decision", "decision", "elected", "elected to", "choice"],
-    "winner": ["winner", "match winner", "won", "won by team", "winning team", "result winner"],
+    "winner": ["winner", "win", "match winner", "won", "won by team", "winning team", "result winner"],
     "result": ["result", "result type", "outcome", "status"],
     "margin": ["margin", "won by", "win margin", "winning margin"],
     "season": ["season", "year", "edition"],
+    "pick_toss": ["p.t", "pt", "predicted toss", "toss pick", "my toss"],
+    "pick_toss_mark": ["t✓", "t ✓", "toss ✓", "toss check"],
+    "pick_win": ["p.win", "pwin", "p win", "predicted winner", "winner pick", "my winner"],
+    "pick_win_mark": ["w✓", "w ✓", "win ✓", "winner check"],
+    "notes": ["notes", "note", "remarks", "comment", "comments"],
 }
+# Extra facts per owner sheet that the sheet itself does not carry: the season's competition name and the team codes it uses.
+# Codes are the owner's abbreviations; full names match the SH fixture snapshot (app/data/abu_dhabi_t10_2026_11_19_prematch.json).
+SHEET_EXTRAS = {
+    "1ydZ1gF9u8ii_qWu8fTSj2xGSnoKg0tsToMpcVzXwdZo": {
+        "competition": "Abu Dhabi T10 2026",
+        "codes": {"UB": "UAE Bulls", "YL": "Yas Lions", "RDC": "Royal Desert Champions", "EE": "Emirates Eagles", "UT": "United Tigers", "AA": "Arabian Aces"}},
+}
+HEADER_TZ = {"ist": "+05:30", "time (ist)": "+05:30", "gst": "+04:00", "time (gst)": "+04:00", "utc": "+00:00", "time (utc)": "+00:00"}
+MARGIN_RE = re.compile(r"^\s*(\d+)\s*(runs?|wkts?|wickets?)\s*$", re.I)
+SCORE_RE = re.compile(r"^(\d{1,3})\s*[/-]\s*(\d{1,2})\s*(?:\((\d{1,3}(?:\.\d)?)\))?$")
+PLACEHOLDER_TEAMS = {"tbd", "tba", "tbc", "—", "-", "?"}
+
+
+def split_team_cell(v, codes=None):
+    """'UB\n121/3 (9.4)' -> ('UAE Bulls', {'runs':121,'wickets':3,'overs':'9.4'}). The score line is user-reported, never verified."""
+    lines = [x.strip() for x in str(v or "").splitlines() if x.strip()]
+    if not lines:
+        return None, None
+    name = lines[0]
+    name = (codes or {}).get(name.upper(), name)
+    score = None
+    for ln in lines[1:]:
+        m = SCORE_RE.match(ln)
+        if m:
+            score = {"runs": int(m.group(1)), "wickets": int(m.group(2)), "overs": m.group(3)}
+    return name, score
 TZ = {"Indian Premier League": "+05:30", "Women's Premier League": "+05:30", "Abu Dhabi T10": "+04:00",
       "Nepal Premier League": "+05:45", "Big Bash League": None, "Women's Big Bash League": None}   # Australia: several time zones
 
@@ -51,6 +82,8 @@ def header_map(row):
             if cell in names and i not in m.values():
                 m[field] = i
                 break
+    if m and "time" in m:
+        m["_tz"] = HEADER_TZ.get(cells[m["time"]])
     return m if "home" in m and "away" in m else None
 
 
@@ -143,7 +176,7 @@ def parse_rows(rows):
         return None, []
     out = []
     for r in rows[hi + 1:]:
-        d = {f: _cell(r[i]) if i < len(r) else None for f, i in hm.items()}
+        d = {f: _cell(r[i]) if i < len(r) else None for f, i in hm.items() if not f.startswith("_")}
         if d.get("home") and d.get("away"):
             out.append(d)
     return hm, out
@@ -221,11 +254,31 @@ def row_key(sheet_id, tab, d):
     return "%s:%s:%s:%s:%s" % (sheet_id, tab, d.get("date"), d["home"], d["away"])
 
 
-def sync_league(c, league, xlsx, create_match, record_result, now_fn):
-    """Import every tab of one league workbook. Returns counts; raises nothing for bad rows (they are reported)."""
+def _sheet_tables(c):
+    c.execute("""CREATE TABLE IF NOT EXISTS reported_scores(match_id INTEGER NOT NULL REFERENCES matches(id), team_id INTEGER NOT NULL REFERENCES teams(id),
+                 runs INTEGER NOT NULL, wickets INTEGER NOT NULL, overs TEXT, status TEXT NOT NULL DEFAULT 'USER_REPORTED', source TEXT NOT NULL,
+                 synced_at TEXT NOT NULL, PRIMARY KEY(match_id, team_id))""")
+    c.execute("""CREATE TABLE IF NOT EXISTS sheet_picks(match_id INTEGER PRIMARY KEY REFERENCES matches(id), toss_pick TEXT, win_pick TEXT,
+                 toss_mark TEXT, win_mark TEXT, notes TEXT, source TEXT NOT NULL, first_seen_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS sheet_pick_history(id INTEGER PRIMARY KEY, match_id INTEGER NOT NULL REFERENCES matches(id), field TEXT NOT NULL,
+                 old_value TEXT, new_value TEXT, changed_at TEXT NOT NULL)""")
+
+
+def _owned(source):
+    return str(source or "").startswith("Owner Google Sheet")
+
+
+def sync_league(c, league, xlsx, create_match, record_result, now_fn, dry_run=False):
+    """Import every tab of one league workbook. Returns counts and a reconciliation report; bad rows are reported, never guessed.
+    Owner picks (P.T / P.WIN) are kept as first seen; later edits are logged in sheet_pick_history. Results or tosses that came
+    from another source (e.g. CricketData) are never overwritten: the difference is reported as a conflict."""
+    _sheet_tables(c)
     tabs = read_tabs(xlsx)
-    k = {"tabs": 0, "rows": 0, "created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "toss": 0, "results": 0, "problems": []}
-    comp = league["league"]
+    k = {"tabs": 0, "rows": 0, "created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "placeholder": 0, "toss": 0, "results": 0,
+         "scores": 0, "picks": 0, "conflicts": [], "problems": [], "dry_run": bool(dry_run)}
+    extras = SHEET_EXTRAS.get(league.get("sheet_id"), {})
+    comp = league.get("competition") or extras.get("competition") or league["league"]
+    codes = dict(extras.get("codes") or {}, **(league.get("codes") or {}))
     for tab, rows in tabs.items():
         hm, data = parse_rows(rows)
         if not hm:
@@ -233,20 +286,25 @@ def sync_league(c, league, xlsx, create_match, record_result, now_fn):
         k["tabs"] += 1
         for d in data:
             k["rows"] += 1
+            home, hscore = split_team_cell(d["home"], codes)
+            away, ascore = split_team_cell(d["away"], codes)
+            if not home or not away or home.lower() in PLACEHOLDER_TEAMS or away.lower() in PLACEHOLDER_TEAMS:
+                k["placeholder"] += 1          # e.g. Qualifier / Final with teams still TBD
+                continue
             day = parse_date(d.get("date"))
             if not day:
                 k["skipped"] += 1
                 if len(k["problems"]) < 15:
-                    k["problems"].append("%s / %s: row %s v %s has no readable date" % (comp, tab, d["home"], d["away"]))
+                    k["problems"].append("%s / %s: row %s v %s has no readable date" % (comp, tab, home, away))
                 continue
-            tm, tz = parse_time(d.get("time")), league.get("tz") or TZ.get(comp)
+            tm, tz = parse_time(d.get("time")), hm.get("_tz") or league.get("tz") or TZ.get(league["league"])
             if tm and tz:
                 start = "%sT%s%s" % (day.isoformat(), tm.strftime("%H:%M:%S"), tz)
                 tnote = ""
             else:
                 start = day.isoformat() + "T00:00:00+00:00"
                 tnote = " Start time not supplied in the sheet." if not tm else " Local time zone not fixed for this league; time kept as date only."
-            key = row_key(league["sheet_id"], tab, {**d, "date": day.isoformat()})
+            key = row_key(league["sheet_id"], tab, {**d, "home": home, "away": away, "date": day.isoformat()})
             raw = json.dumps({x: str(v) if v is not None else None for x, v in d.items()}, sort_keys=True)
             h = hashlib.sha256(raw.encode()).hexdigest()
             prev = c.execute("SELECT local_id, payload_hash FROM data_provider_syncs WHERE provider='owner_sheets' AND provider_entity='match' AND provider_id=?",
@@ -254,43 +312,87 @@ def sync_league(c, league, xlsx, create_match, record_result, now_fn):
             if prev and prev[1] == h:
                 k["unchanged"] += 1
                 continue
+            if dry_run:
+                k["updated" if prev else "created"] += 1
+                k.setdefault("would_change", []).append("%s %s: %s v %s" % ("update" if prev else "new", d.get("match_no") or day, home, away))
+                continue
             season = d.get("season") or (tab if re.fullmatch(r"(19|20)\d\d(/\d\d)?", str(tab).strip()) else str(day.year))
             src = "Owner Google Sheet '%s' (tab '%s'); user-supplied, not independently verified.%s" % (comp, tab, tnote)
             if prev:
                 mid = prev[0]
-                c.execute("UPDATE matches SET start_utc=?, match_no=COALESCE(?,match_no), source=?, updated_at=? WHERE id=?",
-                          (start, d.get("match_no"), src, now_fn(), mid))
+                c.execute("UPDATE matches SET start_utc=?, match_no=COALESCE(?,match_no), updated_at=? WHERE id=?",
+                          (start, d.get("match_no"), now_fn(), mid))
                 k["updated"] += 1
             else:
-                r = create_match({"competition": comp, "season": str(season), "home": str(d["home"]), "away": str(d["away"]), "start_utc": start,
+                r = create_match({"competition": comp, "season": str(season), "home": home, "away": away, "start_utc": start,
                                   "venue": d.get("venue"), "format": league.get("format", "T20"), "match_no": d.get("match_no"),
                                   "source": src, "data_origin": "imported", "provider": "owner_sheets", "provider_id": key})
+                if r.get("status") == "rejected":
+                    k["skipped"] += 1
+                    k["problems"].append("%s: %s v %s rejected: %s" % (comp, home, away, r.get("error")))
+                    continue
                 mid = r["match_id"]
                 k["created" if r["status"] == "created" else "updated"] += 1
             c.execute("UPDATE data_provider_syncs SET payload_hash=?, synced_at=? WHERE provider='owner_sheets' AND provider_entity='match' AND provider_id=?",
                       (h, now_fn(), key))
-            m = c.execute("SELECT home_team_id, away_team_id FROM matches WHERE id=?", (mid,)).fetchone()
+            m = c.execute("SELECT home_team_id, away_team_id, status FROM matches WHERE id=?", (mid,)).fetchone()
             ids = {"H": m[0], "A": m[1]}
-            ts = side(d.get("toss"), d["home"], d["away"])
+            label = "match %s %s v %s" % (d.get("match_no") or "?", home, away)
+            ts = side(d.get("toss"), home, away)
             if ts:
                 dec = str(d.get("decision") or "").strip().lower()
                 dec = "bat" if dec.startswith("bat") else "bowl" if dec.startswith(("bowl", "field")) else None
-                old = c.execute("SELECT winner_team_id, decision FROM toss_results WHERE match_id=?", (mid,)).fetchone()
-                if not old or old[0] != ids[ts] or (dec and old[1] != dec):
+                old = c.execute("SELECT winner_team_id, decision, source FROM toss_results WHERE match_id=?", (mid,)).fetchone()
+                if old and not _owned(old[2]) and old[0] != ids[ts]:
+                    k["conflicts"].append("%s: toss %s in sheet, %s from %s (kept)" % (label, d.get("toss"), old[0], old[2]))
+                elif not old or old[0] != ids[ts] or (dec and old[1] != dec):
                     c.execute("""INSERT INTO toss_results(match_id,winner_team_id,decision,source,verified_at) VALUES(?,?,?,?,?)
                                  ON CONFLICT(match_id) DO UPDATE SET winner_team_id=excluded.winner_team_id, decision=excluded.decision,
                                  source=excluded.source, verified_at=excluded.verified_at""", (mid, ids[ts], dec, src, now_fn()))
                     k["toss"] += 1
-            ws = side(d.get("winner"), d["home"], d["away"])
-            rword = RESULT_WORDS.get(str(d.get("result") or d.get("winner") or "").strip().lower())
+            # user-reported innings totals from the team cells (shown as reported, never as a verified scorecard)
+            for code, sc in (("H", hscore), ("A", ascore)):
+                if sc:
+                    old = c.execute("SELECT runs, wickets, overs FROM reported_scores WHERE match_id=? AND team_id=?", (mid, ids[code])).fetchone()
+                    if not old or tuple(old) != (sc["runs"], sc["wickets"], sc["overs"]):
+                        c.execute("""INSERT INTO reported_scores(match_id,team_id,runs,wickets,overs,status,source,synced_at) VALUES(?,?,?,?,?,'USER_REPORTED',?,?)
+                                     ON CONFLICT(match_id,team_id) DO UPDATE SET runs=excluded.runs, wickets=excluded.wickets, overs=excluded.overs,
+                                     source=excluded.source, synced_at=excluded.synced_at""", (mid, ids[code], sc["runs"], sc["wickets"], sc["overs"], src, now_fn()))
+                        k["scores"] += 1
+            # owner's original picks: first value kept, every later edit logged
+            pick = {"toss_pick": d.get("pick_toss"), "win_pick": d.get("pick_win"), "toss_mark": d.get("pick_toss_mark"),
+                    "win_mark": d.get("pick_win_mark"), "notes": d.get("notes")}
+            pick = {f: (None if str(v or "").strip() in ("", "—", "-") else str(v).strip()) for f, v in pick.items()}
+            if any(pick.values()):
+                old = c.execute("SELECT * FROM sheet_picks WHERE match_id=?", (mid,)).fetchone()
+                if not old:
+                    c.execute("INSERT INTO sheet_picks(match_id,toss_pick,win_pick,toss_mark,win_mark,notes,source,first_seen_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                              (mid, pick["toss_pick"], pick["win_pick"], pick["toss_mark"], pick["win_mark"], pick["notes"], src, now_fn(), now_fn()))
+                    k["picks"] += 1
+                else:
+                    for f, v in pick.items():
+                        if old[f] != v:
+                            c.execute("INSERT INTO sheet_pick_history(match_id,field,old_value,new_value,changed_at) VALUES(?,?,?,?,?)", (mid, f, old[f], v, now_fn()))
+                            if f in ("toss_pick", "win_pick") and old[f]:
+                                continue        # the original pick is never replaced
+                            c.execute("UPDATE sheet_picks SET %s=?, updated_at=? WHERE match_id=?" % f, (v, now_fn(), mid))
+            # result: WIN column = winner code; RESULT column may hold the margin ("7 wickets") or a word (Pending / No result / Tie)
+            res_cell = str(d.get("result") or "").strip()
+            margin = d.get("margin") or (res_cell if MARGIN_RE.match(res_cell) else None)
+            if res_cell.lower() in ("pending", "live", "upcoming", "scheduled", "tbd"):
+                continue                           # never treat a pending match as completed
+            ws = side(d.get("winner"), home, away)
+            rword = RESULT_WORDS.get(res_cell.lower()) or RESULT_WORDS.get(str(d.get("winner") or "").strip().lower())
             rt = "win" if ws else rword
             if rt:
-                old = c.execute("SELECT result_type, winner_team_id, margin FROM match_results WHERE match_id=?", (mid,)).fetchone()
-                new = (rt, ids[ws] if ws and rt in ("win", "tie_super_over") else None, d.get("margin"))
                 if rt == "tie_super_over" and not ws:
                     continue   # super over winner not stated: leave the result unrecorded rather than guess
-                if not old or tuple(old) != new:
-                    record_result({"match_id": mid, "result_type": rt, "winner_team_id": new[1], "margin": d.get("margin"),
+                old = c.execute("SELECT result_type, winner_team_id, margin, source FROM match_results WHERE match_id=?", (mid,)).fetchone()
+                new = (rt, ids[ws] if ws and rt in ("win", "tie_super_over") else None, margin)
+                if old and not _owned(old[3]) and (old[0], old[1]) != new[:2]:
+                    k["conflicts"].append("%s: sheet says %s, %s recorded %s/%s (kept)" % (label, d.get("winner") or res_cell, old[3], old[0], old[1]))
+                elif not old or tuple(old[:3]) != new:
+                    record_result({"match_id": mid, "result_type": rt, "winner_team_id": new[1], "margin": margin,
                                    "source": src, "reason": "owner sheet updated" if old else None})
                     k["results"] += 1
     return k
