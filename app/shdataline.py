@@ -47,7 +47,7 @@ def _matches(opener):
 
 def _balls(mid, opener):
     import urllib.error
-    q = urllib.request.quote(str(mid), safe="")
+    q = urllib.request.quote(str(mid), safe=":")      # ids like "cd:abc" stay readable for servers that do not decode the path
     try:
         return _list(_get("/v1/matches/%s/balls" % q, opener), "balls")
     except urllib.error.HTTPError as e:
