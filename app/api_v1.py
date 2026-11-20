@@ -116,6 +116,17 @@ def match_out(r):
     return d
 
 STALE_MIN = 30
+_LEN_H = {"T10": 3, "The Hundred": 4, "T20": 5, "T20I": 5, "ODI": 10, "List A": 10, "Test": 5 * 24, "First-class": 4 * 24}
+
+def _past_end(d):
+    """Scheduled match whose normal playing time is over (start + format length): show 'Result awaited', never a made-up result."""
+    try:
+        st = datetime.datetime.fromisoformat(str(d.get("start_utc")).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if not st.tzinfo:
+        st = st.replace(tzinfo=datetime.timezone.utc)
+    return datetime.datetime.now(datetime.timezone.utc) > st + datetime.timedelta(hours=_LEN_H.get(d.get("format") or "", 10))
 
 def annotate(c, items):
     """Add an honest data_status to each match: what we actually have for it, and from where."""
@@ -136,6 +147,8 @@ def annotate(c, items):
         ls = live.get(d["id"])
         if d.get("data_origin") == "demo":
             st = ("demo", "Demo data")
+        elif d["status"] == "scheduled" and _past_end(d):
+            st = ("awaiting_result", "Result awaited · not yet confirmed by a source")   # time alone never decides a result
         elif d["status"] == "scheduled":
             st = ("upcoming", "Upcoming")
         elif d["status"] == "live":
@@ -994,6 +1007,25 @@ def series_detail(c, cid):
             "points_table": pts, "points_rule": "Win 2, tie/no result 1. NRR from recorded innings (all-out sides charged the full quota); blank when innings are not recorded.",
             "top_batters": top_bat, "top_bowlers": top_bowl}
 
+def db_storage(c):
+    """Where the SQLite file lives and whether that place survives a redeploy (a mounted disk), plus when this database was created."""
+    path = os.path.abspath(os.getenv("SH_PREDICTION_DB", "data/prediction.sqlite3"))
+    d, mount = os.path.dirname(path), None
+    while d and d != "/":
+        if os.path.ismount(d):
+            mount = d
+            break
+        d = os.path.dirname(d)
+    first = None
+    try:
+        first = c.execute("SELECT MIN(applied_at) FROM schema_migrations").fetchone()[0]
+    except Exception:
+        pass
+    size = os.path.getsize(path) if os.path.exists(path) else None
+    return {"path": path, "on_mounted_disk": bool(mount), "mount": mount, "created_at": first, "size_mb": round(size / 1048576, 1) if size else None,
+            "verdict": "persistent disk" if mount else "NOT persistent: this file is lost on every redeploy/restart (attach a Render disk and set SH_PREDICTION_DB to a path on it)"}
+
+
 def live_status(c):
     """Public health of the live pipeline (no keys, no admin data): is the fast loop running, are scorecards/balls arriving per live match."""
     import cricketdata, scheduler
@@ -1004,8 +1036,24 @@ def live_status(c):
            "hits_today": cricketdata.hits_used(c) if A else None, "loop": dict(scheduler.LIVE_STATE), "matches": []}
     import shdataline
     out["sh_data_line"] = dict(shdataline.STATE, configured=shdataline.configured())
+    if shdataline.configured():
+        out["sh_data_line"]["auth_check"] = shdataline.ping()
     if out["loop"].get("last_ok"):
         out["loop"]["seconds_since_ok"] = age(out["loop"]["last_ok"])
+    out["database"] = db_storage(c)
+    if c.execute("SELECT 1 FROM sqlite_master WHERE name='collector_jobs'").fetchone():
+        out["jobs"] = [{"job": j["name"], "enabled": bool(j["enabled"]), "last_status": j["last_status"], "last_run_at": j["last_run_at"],
+                        "last_error": re.sub(r"apikey=[^&\s]+", "apikey=***", j["last_error"] or "")[:200] or None, "consecutive_failures": j["consecutive_failures"]}
+                       for j in c.execute("SELECT * FROM collector_jobs ORDER BY name")]
+    counts = {}
+    for k, q in (("matches", "SELECT COUNT(*) FROM matches WHERE data_origin<>'demo'"), ("results", "SELECT COUNT(*) FROM match_results"),
+                 ("scheduled_past_end", None)):
+        if q:
+            try:
+                counts[k] = c.execute(q).fetchone()[0]
+            except Exception:
+                counts[k] = None
+    out["counts"] = counts
     if not c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():
         return out
     has_upd = c.execute("SELECT 1 FROM sqlite_master WHERE name='score_updates'").fetchone()

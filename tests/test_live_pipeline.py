@@ -276,23 +276,60 @@ class TwoProvidersMerge(unittest.TestCase):
                 def __init__(s, o): s.o = o
                 def read(s): return json.dumps(s.o).encode()
             seen = []
-            def opener(req, timeout):
-                seen.append(req.headers.get("Authorization"))
-                if req.full_url.endswith("/api/v1/matches"):
-                    return R({"matches": [{"match_id": "dl-1", "status": "live", "teams": ["Sydney Thunder Women", "Brisbane Heat Women"], "source": "x"},
-                                          {"match_id": "dl-2", "status": "live", "teams": ["Nowhere XI", "Elsewhere XI"], "source": "x"}]})
-                return R({"balls": [{"innings": 1, "over_number": 0, "ball_number": b["ball"], "runs_bat": b["runs"], "extras": 0, "wicket": b["wicket"],
-                                     "source": "x", "source_event_id": str(i)} for i, b in enumerate(self.SH)]})
+            def opener(req, timeout):                  # the deployed SH Data Line contract (sh_data_api.py)
+                seen.append(req.headers.get("X-api-key"))
+                if req.full_url.endswith("/v1/matches"):
+                    return R({"items": [{"id": "dl-1", "status": "live", "home_team": "Sydney Thunder Women", "away_team": "Brisbane Heat Women", "competition": "WBBL", "source": "x"},
+                                        {"id": "dl-2", "status": "live", "home_team": "Nowhere XI", "away_team": "Elsewhere XI", "competition": "x", "source": "x"},
+                                        {"id": "dl-3", "status": "scheduled", "home_team": "Brisbane Heat", "away_team": "Sydney Thunder", "competition": "BBL", "source": "x"}]})
+                return R({"items": [{"innings": 1, "event_id": str(i), "over_number": 0, "ball_number": b["ball"], "runs": b["runs"], "extras": 0, "wicket": int(b["wicket"]),
+                                     "source": "x", "data": {}} for i, b in enumerate(self.SH)]})
             r = shdataline.sync(c, lambda: "2026-11-20T09:00:00+00:00", opener)
-            self.assertEqual((r["linked"], r["seen"], r["new_sh_balls"], r["conflicts"]), (1, 2, 1, 1), r)   # women's match, not the men's
+            self.assertEqual((r["linked"], r["seen"], r["new_sh_balls"], r["conflicts"]), (1, 3, 1, 1), r)   # scheduled one skipped; women's match, not the men's
             self.assertEqual(shdataline.STATE["unlinked"], ["Nowhere XI v Elsewhere XI"])
             self.assertEqual(len(json.loads(c.execute("SELECT balls_json FROM ext_match_detail WHERE match_id=6").fetchone()[0])), 4)
             self.assertEqual([p[2]["wicket"] for p in pubs if p[1] == "delivery"], [True])                 # only the new SH ball goes live
             shdataline.sync(c, lambda: "t2", opener)
             self.assertEqual(len([p for p in pubs if p[1] == "delivery"]), 1)                              # repeat poll: nothing twice
-            self.assertTrue(all(h == "Bearer secret-k" for h in seen))
+            self.assertTrue(seen and all(h == "secret-k" for h in seen))
             self.assertIsNone(c.execute("SELECT 1 FROM ext_match_detail WHERE match_id=5").fetchone())
         finally:
             live.publish = orig
             for k in ("SH_DATA_API_URL", "SH_DATA_API_KEY"):
                 os.environ.pop(k, None)
+
+
+class NoLockAcrossNetwork(unittest.TestCase):
+    """'database is locked': no write transaction may stay open while waiting on an outside service."""
+    def test_photo_lookups_release_the_write_lock(self):
+        import tempfile, threading, time, photos
+        path = tempfile.mktemp(suffix=".sqlite3")
+        a = sqlite3.connect(path); a.row_factory = sqlite3.Row; a.execute("PRAGMA journal_mode=WAL")
+        a.execute("CREATE TABLE other(x)"); a.commit()
+        result = {}
+        def other_writer():
+            time.sleep(0.6)                                  # while the 2nd lookup is waiting on the network
+            b = sqlite3.connect(path, timeout=0.3)
+            try:
+                b.execute("INSERT INTO other VALUES(1)"); b.commit(); result["ok"] = True
+            except sqlite3.OperationalError as e:
+                result["ok"] = str(e)
+            b.close()
+        th = threading.Thread(target=other_writer); th.start()
+        slow = lambda url: (time.sleep(0.5), {"query": {"search": []}})[1]
+        photos.get_many(a, ["Player One", "Player Two"], lambda: "2026-11-20T00:00:00+00:00", fetch=slow)
+        th.join()
+        self.assertIs(result.get("ok"), True, result)
+
+    def test_insufficient_history_shows_no_percentage(self):
+        import insights
+        src = Path(insights.__file__).read_text()
+        self.assertIn('"insufficient": insufficient', src)
+
+    def test_result_awaited_after_playing_time(self):
+        import api_v1, datetime as dt
+        old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=4)).isoformat()
+        soon = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)).isoformat()
+        self.assertTrue(api_v1._past_end({"start_utc": old, "format": "T10"}))
+        self.assertFalse(api_v1._past_end({"start_utc": soon, "format": "T10"}))
+        self.assertFalse(api_v1._past_end({"start_utc": old, "format": "ODI"}))

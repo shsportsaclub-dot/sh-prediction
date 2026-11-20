@@ -62,6 +62,7 @@ def fetch(c, cfg, now_fn, opener=urllib.request.urlopen):
     feeds = cfg.get("feeds") or DEFAULT_FEEDS
     got, notes = 0, []
     for f in feeds:
+        c.commit()                                     # no open write transaction while waiting on the network
         try:
             raw = opener(urllib.request.Request(f["url"], headers={"User-Agent": "SH-PREDICTION-News/1.0"}), timeout=20).read()
             for x in parse_rss(raw, f["name"])[:40]:

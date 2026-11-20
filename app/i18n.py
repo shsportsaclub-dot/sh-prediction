@@ -1203,3 +1203,20 @@ for _code, _vals in _VC.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+# Honest states: no verified history for a prediction; match time over but no confirmed result yet
+KEYS15 = ["ag.insufficient", "st.awaiting"]
+_HN = {"en": ["Not enough verified data yet for a prediction.", "Result awaited"],
+ "hi": ["भविष्यवाणी के लिए अभी पर्याप्त सत्यापित डेटा नहीं है।", "परिणाम की प्रतीक्षा"],
+ "te": ["అంచనాకు ఇంకా సరిపడా ధృవీకరించిన డేటా లేదు.", "ఫలితం కోసం ఎదురుచూపు"],
+ "ta": ["கணிப்புக்கு இன்னும் போதுமான சரிபார்க்கப்பட்ட தரவு இல்லை.", "முடிவு எதிர்பார்க்கப்படுகிறது"],
+ "kn": ["ಮುನ್ಸೂಚನೆಗೆ ಇನ್ನೂ ಸಾಕಷ್ಟು ಪರಿಶೀಲಿತ ಮಾಹಿತಿ ಇಲ್ಲ.", "ಫಲಿತಾಂಶಕ್ಕಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ"],
+ "bn": ["পূর্বাভাসের জন্য এখনও যথেষ্ট যাচাই করা তথ্য নেই।", "ফলাফলের অপেক্ষা"],
+ "mr": ["अंदाजासाठी अजून पुरेसा पडताळलेला डेटा नाही.", "निकालाची प्रतीक्षा"],
+ "ur": ["پیش گوئی کے لیے ابھی کافی تصدیق شدہ ڈیٹا نہیں۔", "نتیجے کا انتظار"],
+ "es": ["Aún no hay datos verificados suficientes para un pronóstico.", "Resultado pendiente"]}
+for _code, _vals in _HN.items():
+    _d = dict(zip(KEYS15, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)

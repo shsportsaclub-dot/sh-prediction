@@ -95,7 +95,7 @@ class OwnerSheets(unittest.TestCase):
         self.assertIn("Start time not supplied", m2["source"])
         self.assertIsNone(m2["toss_decision"])                                                     # blank decision stays unknown
         m3 = T.call("/api/v1/matches/%d" % match_by("owner_sheets", "SHEETT10:2026:03"))[1]
-        self.assertEqual((m3["status"], m3["result_type"], m3["data_status"]), ("scheduled", None, "upcoming"))
+        self.assertEqual((m3["status"], m3["result_type"], m3["data_status"]), ("scheduled", None, "awaiting_result"))   # date passed, no confirmed result: never "upcoming", never invented
         # second run: nothing changed -> no duplicates, nothing rewritten
         again = run("owner_sheets_sync", fake)["summary"]["leagues"]["SH Sheet T10 Test"]
         self.assertEqual((again["created"], again["unchanged"]), (0, 3))

@@ -262,6 +262,7 @@ const NA=()=>'<p class="muted">'+esc(t("data.na"))+'</p>';
 const STG={pre_match:"ag.pre_match",post_toss:"ag.post_toss",playing_xi:"ag.playing_xi"};
 window.mcAgent=async(m,box)=>{if(!box)return;let d;try{d=await I(m,"agent")}catch(e){return}
  const H=d.headline,L=d.live;if(!H&&!L){box.innerHTML=d.note?'<div class="agent"><b><img class="shlogo" src="/sh-prediction-icon.png" alt="SH">'+esc(t("ag.title"))+'</b><p class="muted">'+esc(d.note)+'</p></div>':"";return}
+ if(d.insufficient&&!L){box.innerHTML='<div class="agent"><div class="ag-top"><span class="shh"><img class="shlogo" src="/sh-prediction-icon.png" alt="SH"><b>'+esc(t("ag.title"))+'</b></span><small class="muted">'+esc(t(STG[H.stage]))+'</small></div><p class="muted" style="margin:6px 0 0">'+esc(t("ag.insufficient"))+'</p></div>';return}
  const p=L||H,hp=p.home_win_probability,ap=p.away_win_probability;
  const pick=H?(H.predicted_team||""):(hp>=50?m.home.name:m.away.name);
  const sn=x=>window.shortName?shortName(x):(x.short_code||x.name);

@@ -73,6 +73,7 @@ def get_many(c, names, now_fn, fetch=None, max_lookups=6):
                       (k, n, (p or {}).get("url"), (p or {}).get("page"), (p or {}).get("license"), (p or {}).get("author"),
                        (p or {}).get("source") or "Wikimedia Commons (no free photo found)", now_fn()))
             r = c.execute("SELECT * FROM player_photos WHERE name_key=?", (k,)).fetchone()
+            c.commit()                                 # never hold the write lock across the next outside lookup
         if r:
             out[n] = {x: r[x] for x in ("url", "page", "license", "author", "source")} if r["url"] else None
     return out

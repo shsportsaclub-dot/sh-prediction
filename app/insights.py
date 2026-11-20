@@ -1019,7 +1019,10 @@ def agent(c, r, provider_detail, now_fn, xi_fn=None):
     for s in snaps.values():
         s["predicted_team"] = tm(s["predicted_team_id"])
     order = [s for s in STAGES if s in snaps]
-    return {"stages": [snaps[s] for s in order], "live": live,
+    head = snaps[order[-1]] if order else None
+    insufficient = bool(head and not live and not (head.get("history_matches_used") or 0))
+    return {"stages": [snaps[s] for s in order], "live": live, "insufficient": insufficient,
+            "insufficient_note": "Not enough verified match history for these two teams yet, so SH shows no percentage instead of a guessed 50-50." if insufficient else None,
             "headline": snaps[order[-1]] if order else None,
             "result": {"type": res[0], "winner": tm(res[1]), "source": res[2]} if res else None,
             "verification": "Model output from verified match history; not a guarantee. Each stage is saved once and never changed.",

@@ -1,6 +1,8 @@
 """SH DATA LINE connector (SH's own data service).
 
 Turned on by Render environment variables: SH_DATA_API_URL and SH_DATA_API_KEY (SH_DATA_PROVIDER=off turns it off).
+SH_DATA_API_KEY must hold the same secret as SH Data Line's SH_API_KEY. Contract (sh_data_api.py): GET /v1/matches and
+/v1/matches/<id>/balls with header X-API-Key, answers {"items": [...]}. The older /api/v1 + Bearer form is also accepted.
 Reads SH Data Line's matches and balls, links each match to the SH PREDICTION match with the same two teams
 (live or within a day), and hands the balls to the ball merge agent together with CricketData's balls.
 The key is only read on the server and never sent to the browser.
@@ -20,10 +22,58 @@ def configured():
 
 
 def _get(path, opener):
+    k = os.environ["SH_DATA_API_KEY"]
     req = urllib.request.Request(os.environ["SH_DATA_API_URL"].rstrip("/") + path,
-                                 headers={"Authorization": "Bearer " + os.environ["SH_DATA_API_KEY"], "Accept": "application/json",
-                                          "User-Agent": "SH-PREDICTION/1.0"})
+                                 headers={"X-API-Key": k, "Authorization": "Bearer " + k, "Accept": "application/json", "User-Agent": "SH-PREDICTION/1.0"})
     return json.loads(opener(req, timeout=15).read())
+
+
+def _list(j, *names):
+    for n in ("items",) + names:
+        if isinstance((j or {}).get(n), list):
+            return j[n]
+    return []
+
+
+def _matches(opener):
+    import urllib.error
+    try:
+        return _list(_get("/v1/matches", opener), "matches")
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        return _list(_get("/api/v1/matches", opener), "matches")
+
+
+def _balls(mid, opener):
+    import urllib.error
+    q = urllib.request.quote(str(mid), safe="")
+    try:
+        return _list(_get("/v1/matches/%s/balls" % q, opener), "balls")
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        return _list(_get("/api/v1/matches/%s/balls" % q, opener), "balls")
+
+
+_PING = {}
+
+
+def ping(opener=urllib.request.urlopen):
+    """Authenticated check used by the status page: reachable + key accepted (no data shown). Cached 60 s."""
+    import time
+    if _PING.get("at", 0) > time.time() - 60:
+        return _PING["v"]
+    _PING.update(at=time.time(), v=_ping(opener))
+    return _PING["v"]
+
+
+def _ping(opener):
+    try:
+        j = _get("/v1/coverage", opener)
+        return {"ok": True, "matches": j.get("matches"), "live_matches": j.get("live_matches")}
+    except Exception as e:
+        return {"ok": False, "error": re.sub(r"(Bearer|X-API-Key:?) \S+", r"\1 ***", str(e))[:160]}
 
 
 def _n(s):
@@ -51,12 +101,17 @@ def _find_local(c, teams):
 
 
 def to_balls(rows):
+    """Data Line ball rows -> SH ball rows. 'runs' there is the batter's runs (older form: runs_bat), 'extras' the extra runs."""
     out = []
     for b in rows or []:
-        ext = b.get("extra_type") or b.get("extra") or None
-        out.append({"n": None, "inning": int(b.get("innings") or 1), "over": int(b.get("over_number") or 0), "ball": int(b.get("ball_number") or 0),
-                    "runs": int(b.get("runs_bat") or 0) + int(b.get("extras") or 0), "batter": b.get("batter"), "bowler": b.get("bowler"),
-                    "wicket": bool(b.get("wicket")), "extra": ext, "src": "sh"})
+        d = b.get("data") if isinstance(b.get("data"), dict) else {}
+        if b.get("over_number") is None or b.get("ball_number") is None:
+            continue                                   # a ball without over/ball cannot be placed: skipped, never guessed
+        ext = b.get("extra_type") or d.get("extra_type") or b.get("extra") or d.get("extra") or None
+        bat = b.get("runs_bat", b.get("runs", 0))
+        out.append({"n": None, "inning": int(b.get("innings") or 1), "over": int(b.get("over_number")), "ball": int(b.get("ball_number")),
+                    "runs": int(bat or 0) + int(b.get("extras") or 0), "batter": b.get("batter"), "bowler": b.get("bowler"),
+                    "wicket": bool(b.get("wicket")), "extra": ext, "src": "sh", "observed_at": b.get("observed_at")})
     return out
 
 
@@ -67,19 +122,22 @@ def sync(c, now_fn, opener=urllib.request.urlopen):
     if not configured():
         return {"skipped": "SH Data Line not configured"}
     try:
-        ms = (_get("/api/v1/matches", opener) or {}).get("matches") or []
+        ms = _matches(opener)
         STATE.update(matches_seen=len(ms), unlinked=[])
         linked, totals = 0, {"duplicates": 0, "conflicts": 0, "new_sh_balls": 0}
         for m in ms:
-            if str(m.get("status", "")).lower() in ("finished", "completed", "result", "abandoned"):
-                continue
-            mid = _find_local(c, m.get("teams") or [])
+            if str(m.get("status", "")).lower() in ("finished", "completed", "result", "abandoned", "cancelled", "postponed", "scheduled"):
+                continue                                   # balls only for matches in play
+            teams = m.get("teams") or [t for t in (m.get("home_team"), m.get("away_team")) if t]
+            dl_id = m.get("id") or m.get("match_id")
+            mid = _find_local(c, teams)
             if not mid:
-                STATE["unlinked"].append(" v ".join(m.get("teams") or [])[:80]); continue
+                STATE["unlinked"].append(" v ".join(teams)[:80]); continue
             linked += 1
             c.execute("INSERT OR IGNORE INTO data_provider_syncs(provider,provider_entity,provider_id,local_table,local_id,synced_at) VALUES('shdataline','match',?,'matches',?,?)",
-                      (str(m["match_id"]), mid, now_fn()))
-            sh = to_balls((_get("/api/v1/matches/%s/balls" % urllib.request.quote(str(m["match_id"]), safe=""), opener) or {}).get("balls"))
+                      (str(dl_id), mid, now_fn()))
+            c.commit()                                     # no open write transaction while waiting on the network
+            sh = to_balls(_balls(dl_id, opener))
             row = c.execute("SELECT balls_json FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()
             if not row:
                 c.execute("INSERT INTO ext_match_detail(match_id,source) VALUES(?,'shdataline')", (mid,)); row = {"balls_json": None}

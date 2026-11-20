@@ -24,14 +24,14 @@ class LegacyConn(sqlite3.Connection):
  def executescript(self,sql):return super().executescript(self._m(sql))
 def db():
  os.makedirs(os.path.dirname(os.path.abspath(DB)),exist_ok=True)
- c=sqlite3.connect(DB,timeout=10,factory=LegacyConn);c.row_factory=sqlite3.Row
+ c=sqlite3.connect(DB,timeout=30,factory=LegacyConn);c.row_factory=sqlite3.Row
  # v1 owns the "predictions" table name. Until an admin runs the migration, the v0 table keeps its old
  # name and the classic screens keep working through this name mapping (no schema change on page load).
  if not getattr(db,"wal",False):
   # WAL lets readers (SSE, feeds) work while the scorer, importer or media worker writes
   try:sqlite3.Connection.execute(c,"PRAGMA journal_mode=WAL");db.wal=True
   except sqlite3.OperationalError:pass
- sqlite3.Connection.execute(c,"PRAGMA busy_timeout=10000")
+ sqlite3.Connection.execute(c,"PRAGMA busy_timeout=30000")
  c.lp="predictions" if "fixture_id" in {r[1] for r in sqlite3.Connection.execute(c,"PRAGMA table_info(predictions)")} else "legacy_predictions"
  c.executescript("""CREATE TABLE IF NOT EXISTS fixtures(id INTEGER PRIMARY KEY,competition TEXT NOT NULL,season TEXT NOT NULL,home TEXT NOT NULL,away TEXT NOT NULL,start_utc TEXT NOT NULL,source TEXT NOT NULL,UNIQUE(competition,season,home,away,start_utc));
  CREATE TABLE IF NOT EXISTS legacy_predictions(id INTEGER PRIMARY KEY,fixture_id INTEGER UNIQUE NOT NULL,toss_pick TEXT,winner_pick TEXT,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',approved_at TEXT);
