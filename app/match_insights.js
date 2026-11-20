@@ -173,12 +173,12 @@ window.mcTab.live=async m=>{const pd=m.provider_detail;if(!pd||!pd.scorecard||!p
  const same=(a,b)=>a&&b&&(a===b||String(a).split(" ").slice(-1)[0]===String(b).split(" ").slice(-1)[0]);
  const bw=(li.bowling||[]).find(b=>same(b.name,lb.bowler))||(li.bowling||[]).slice(-1)[0];
  const sr=b=>b.b?(100*(b.r||0)/b.b).toFixed(1):"—";
- return ovStrip(x)+'<div class="card lv"><table class="simple lvt"><thead><tr><th>'+esc(t("an.player"))+'</th><th>R (B)</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody>'+
+ return '<div class="card lv"><table class="simple lvt"><thead><tr><th>'+esc(t("an.player"))+'</th><th>R (B)</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody>'+
   bats.map(b=>'<tr><td><b>'+esc(b.name||"")+'</b>'+(same(b.name,lb.batter)?' 🏏':'')+'</td><td><b>'+(b.r??0)+'</b> ('+(b.b??0)+')</td><td>'+(b.fours??0)+'</td><td>'+(b.sixes??0)+'</td><td>'+sr(b)+'</td></tr>').join("")+'</tbody></table>'+
   '<div class="dl lvp"><span>'+esc(t("ins.pship"))+': <b>'+(x&&x.partnership?x.partnership.runs+' ('+x.partnership.balls+')':"—")+'</b></span><span class="muted">'+esc(t("ins.last_wkt"))+': '+(x&&x.last_wicket?esc(x.last_wicket.name)+(x.last_wicket.runs!=null?' '+x.last_wicket.runs+' ('+x.last_wicket.balls+')':''):"—")+'</span></div>'+
   (bw?'<table class="simple lvt"><thead><tr><th>'+esc(t("an.bowl"))+'</th><th>W-R</th><th>Ov</th><th>Econ</th></tr></thead><tbody><tr><td><b>'+esc(bw.name||"")+'</b></td><td><b>'+(bw.w??0)+'-'+(bw.r??0)+'</b></td><td>'+esc(String(bw.o??"—"))+'</td><td>'+(bw.eco??"—")+'</td></tr></tbody></table>':'')+
   '</div><p class="muted">'+esc(t("ins.source"))+': '+esc(pd.source)+'</p>'};
-window.mcTabBefore.commentary=async m=>{if(m.status!=="live")return "";try{return ovStrip(await I(m,"live"))}catch(e){return ""}};
+
 
 /* ---------------- Scorecard: one innings at a time, with a switcher and "yet to bat" */
 const baseScore=window.mcTab.scorecard;

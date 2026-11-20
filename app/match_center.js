@@ -50,29 +50,46 @@ function badge(team){const base=String(team.name||"").toLowerCase().replace(/\s+
  const code=(team.short_code||String(team.name||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3)).toUpperCase();
  let h=0;for(const ch of String(team.name||""))h=(h*31+ch.charCodeAt(0))%360;
  return '<span class="fl txt" aria-hidden="true" style="background:hsl('+h+' 60% 32%)">'+esc(code)+'</span>'}
+/* short names: approved code, else the usual cricket code for a country, else initials (UAE Bulls -> UB) */
+const CODES={"india":"IND","australia":"AUS","england":"ENG","new zealand":"NZ","south africa":"SA","pakistan":"PAK","sri lanka":"SL","bangladesh":"BAN",
+ "west indies":"WI","afghanistan":"AFG","ireland":"IRE","zimbabwe":"ZIM","netherlands":"NED","scotland":"SCO","nepal":"NEP","united arab emirates":"UAE","uae":"UAE",
+ "oman":"OMA","united states of america":"USA","usa":"USA","united states":"USA","canada":"CAN","namibia":"NAM","kenya":"KEN","uganda":"UGA","rwanda":"RWA",
+ "papua new guinea":"PNG","hong kong":"HK","singapore":"SIN","malaysia":"MAL","thailand":"THA","japan":"JPN","italy":"ITA","germany":"GER","jersey":"JER",
+ "sweden":"SWE","switzerland":"SUI","türkiye":"TUR","turkey":"TUR","denmark":"DEN","bahrain":"BHR","qatar":"QAT","kuwait":"KUW","saudi arabia":"KSA","nigeria":"NGA","tanzania":"TAN"};
+window.shortName=function(team){if(team.short_code)return team.short_code;const n=String(team.name||"").trim(),w=/\bwomen\b/i.test(n);
+ const base=n.toLowerCase().replace(/\s+(women|men|u-?19|u-?23)$/,"").trim();if(CODES[base])return CODES[base]+(w?"-W":"");
+ const words=base.split(/\s+/).filter(x=>x&&!/^(women|men|cricket|club|team|xi)$/.test(x));
+ const s=words.length>1?words.map(x=>x[0]).join("").slice(0,4):(words[0]||n).slice(0,3);return s.toUpperCase()+(w?"-W":"")};
 window.mcBoard=function(m){const pd=PD(m),L=m.live_score;let lines=[],cr="",ev="";
  if(pd){pd.scorecard.forEach(i=>{if(i.total)lines.push({t:teamShort(m,i.inning),r:i.total.r,w:i.total.w,o:i.total.o})});const li=lastInn(pd.scorecard);if(li&&li.total)cr=crr(li.total.r,li.total.o);
   const lb=(pd.balls||[]).slice(-1)[0];if(lb&&m.status==="live")ev=lb.wicket?"WICKET":lb.runs===6?"SIX":lb.runs===4?"FOUR":""}
  else if(L&&L.innings&&L.innings.length){L.innings.forEach(i=>lines.push({t:teamShort(m,i.inning),r:i.r,w:i.w,o:i.o}));const li=L.innings[L.innings.length-1];cr=crr(li.r,li.o)}
  else if(m.reported_scores&&m.reported_scores.length){m.reported_scores.forEach(s=>lines.push({t:s.team,r:s.runs,w:s.wickets,o:s.overs||"—",rep:1}))}
- const code=x=>x.short_code||x.name;
- const toss=m.toss_winner_id?code(m.toss_winner_id===m.home.id?m.home:m.away)+" opt to "+(m.toss_decision||"—"):"";
- const status=(L&&L.status_text)||(m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" won"+(m.margin?" by "+m.margin:"")):m.result_type.replace(/_/g," ")):"")||toss||(m.status==="scheduled"?new Date(m.start_utc).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"");
+ const sn=shortName,full=x=>x.name;
+ const toss=m.toss_winner_id?full(m.toss_winner_id===m.home.id?m.home:m.away)+" opt to "+(m.toss_decision||"—"):"";
+ const res=m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" won"+(m.margin?" by "+m.margin:"")):m.result_type.replace(/_/g," ")):"";
+ const status=res||[(L&&L.status_text)||"",toss&&!(L&&L.status_text&&/opt/i.test(L.status_text))?toss:""].filter(Boolean).join(" - ")||(m.status==="scheduled"?new Date(m.start_utc).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"");
  const cur=lines[lines.length-1];
  const quota={T10:60,T20:120,"The Hundred":100,ODI:300,"List A":300}[m.format];const cells=[];
  if(cr)cells.push(["CRR",cr]);
- if(lines.length>=2&&quota){const tgt=lines[0].r+1,used=oversToBalls(lines[1].o),need=tgt-lines[1].r,left=quota-used;cells.push([t("mc.target"),tgt]);if(m.status==="live"&&need>0&&left>0)cells.push(["RRR",(need*6/left).toFixed(2)])}
- else if(lines.length===1&&quota&&m.status==="live")cells.push([t("mc.overs_left"),((quota-oversToBalls(lines[0].o))/6).toFixed(1)]);
+ if(lines.length>=2&&quota){const tgt=lines[0].r+1,used=oversToBalls(lines[1].o),need=tgt-lines[1].r,left=quota-used;if(m.status==="live"&&need>0&&left>0){cells.push(["RRR",(need*6/left).toFixed(2)]);cells.push([t("mc.target"),tgt])}}
  let lead="";if(!quota&&lines.length>=2){const tot={};lines.forEach(x=>tot[x.t]=(tot[x.t]||0)+x.r);const c2=cur.t,o2=Object.keys(tot).find(k=>k!==c2);if(o2!=null){const d=tot[c2]-tot[o2];lead=c2+" "+t(d>=0?"mc.lead_by":"mc.trail_by")+" "+Math.abs(d)}}
- if(lead)cells.push(["",lead]);
- const inn=cur?lines.filter(x=>x.t===cur.t).length:0;
- return '<div class="board" aria-live="polite"><div class="bt"><span>'+esc(m.home.name+" vs "+m.away.name+(m.match_no?", "+(/^\d+$/.test(m.match_no)?"Match "+m.match_no:m.match_no):"")+", "+m.competition)+'</span><span>'+esc(status)+'</span></div>'+
-  '<div class="bm"><div class="tm">'+badge(m.home)+'<span>'+esc(code(m.home))+'</span></div><div class="sc">'+
-  (cur?'<div>'+esc(cur.t)+(inn?" · "+(inn===1?"1st":inn===2?"2nd":inn+"th")+" Inn":"")+'</div><b>'+cur.r+'-'+cur.w+'</b><small>('+esc(String(cur.o))+')</small>'+(cur.rep?'<div>USER_REPORTED</div>':''):'<b>vs</b>')+
-  (ev?'<div><span class="ev ev-'+ev.toLowerCase()+'">'+ev+'</span></div>':'')+'</div><div class="tm">'+badge(m.away)+'<span>'+esc(code(m.away))+'</span></div></div>'+
-  (cells.length?'<div class="bb">'+cells.map(([a,b])=>'<span>'+(a?esc(a)+' ':'')+'<b>'+esc(String(b))+'</b></span>').join("")+'</div>':'')+
-  (lines.length>1?'<div class="bl2">'+lines.slice(0,-1).map(x=>esc(x.t)+" "+x.r+"-"+x.w+" ("+esc(String(x.o))+")").join(" · ")+'</div>':'')+
-  '<div class="bl2"><span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span> '+(pd&&pd.scorecard_at?esc("Updated "+ago(pd.scorecard_at)+" · "+pd.source):L?esc("Updated "+ago(L.fetched_at)+" · "+L.source):"")+'</div></div>'};
+ // title once: the full match + series name, exactly as the series lists it
+ const title=m.home.name+" vs "+m.away.name+(m.match_no?", "+(/^\d+$/.test(m.match_no)?"Match "+m.match_no:m.match_no):"")+", "+m.competition;
+ return '<div class="board" aria-live="polite"><div class="bt"><span>'+esc(title)+'</span><span>'+esc(status)+'</span></div>'+
+  '<div class="bm"><div class="tm">'+badge(m.home)+'<span>'+esc(sn(m.home))+'</span></div><div class="sc">'+
+  (cur?'<b>'+cur.r+'-'+cur.w+'</b><small>('+esc(String(cur.o))+')</small>':'<b>vs</b>')+(ev?'<div><span class="ev ev-'+ev.toLowerCase()+'">'+ev+'</span></div>':'')+
+  '</div><div class="tm">'+badge(m.away)+'<span>'+esc(sn(m.away))+'</span></div></div>'+
+  '<div class="bb"><i></i>'+(cells.length?cells.map(([a,b])=>'<span>'+esc(a)+' <b>'+esc(String(b))+'</b></span>').join(""):'<span>'+esc(m.format)+'</span>')+'<i></i></div>'+
+  (lead||lines.length>1?'<div class="bl2">'+[lead].concat(lines.slice(0,-1).map(x=>esc(x.t)+" "+x.r+"-"+x.w+" ("+esc(String(x.o))+")")).filter(Boolean).join(" · ")+'</div>':'')+'</div>'+
+  '<div class="mc-meta"><span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span> '+(cur&&cur.rep?'USER_REPORTED · ':'')+(pd&&pd.scorecard_at?esc("Updated "+ago(pd.scorecard_at)+" · "+pd.source):L?esc("Updated "+ago(L.fetched_at)+" · "+L.source):"")+'</div>'};
+/* ball-by-ball strip under the board: every received ball, newest at the right, scrolled into view */
+window.mcBalls=function(m){const pd=PD(m);const B=(pd&&pd.balls)||[];if(!B.length)return "";
+ const byOv=[];B.forEach(b=>{const k=b.inning+"|"+b.over;let o=byOv[byOv.length-1];if(!o||o.k!==k){o={k,over:b.over,balls:[]};byOv.push(o)}o.balls.push(b)});
+ const chipOf=b=>{const x=String(b.extra||"").toLowerCase();const v=b.wicket?"W":(x==="wd"||x==="wide"?"wd":x==="nb"||x==="noball"?"nb":(x==="lb"||x==="legbyes")?(b.runs||0)+"lb":(x==="b"||x==="byes")?(b.runs||0)+"b":String(b.runs||0));
+  const cls=b.wicket?"bw":b.runs>=6&&!x?"b6":b.runs===4&&!x?"b4":(b.runs||0)>0?"b1":"b0";return '<span class="bl '+cls+'">'+esc(v)+'</span>'};
+ const id="bs"+m.id;setTimeout(()=>{const s=document.getElementById(id);if(s)s.scrollLeft=s.scrollWidth},50);
+ return '<div class="balls" id="'+id+'" aria-label="Ball by ball">'+byOv.slice(-12).map(o=>'<span class="ov"><small>Ov '+(o.over+1)+'</small>'+o.balls.map(chipOf).join("")+'<em>= '+o.balls.reduce((a,b)=>a+(b.runs||0),0)+'</em></span>').join("")+'</div>'};
 
 function batTable(inn){return '<table class="simple sc"><thead><tr><th>Batter</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody>'+
  inn.batting.map(b=>'<tr><td><b>'+esc(b.name||"")+'</b><div class="muted dis">'+esc(b.dismissal||"")+'</div></td><td><b>'+(b.r??"—")+'</b></td><td>'+(b.b??"—")+'</td><td>'+(b.fours??"—")+'</td><td>'+(b.sixes??"—")+'</td><td>'+(b.sr??"—")+'</td></tr>').join("")+'</tbody></table>'}
