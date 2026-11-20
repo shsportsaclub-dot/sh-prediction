@@ -309,6 +309,8 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
         elif data is not None:
             new_sc = norm_scorecard(data)
             old_sc = json.loads(row["scorecard_json"]) if row["scorecard_json"] else None
+            if old_sc is not None and new_sc != old_sc:
+                backfill_updates(c, mid)        # before this snapshot is kept, so it is not counted twice
             _store_raw(c, pid, "scorecard", data, now_fn)
             c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(new_sc), now_fn(), mid))
             last = new_sc[-1]["total"] if new_sc and new_sc[-1].get("total") else None
@@ -457,13 +459,41 @@ def derive_updates(old_sc, new_sc):
     return out
 
 
-def store_updates(c, mid, ups, now_fn):
-    import live
+def _updates_table(c):
     c.execute("""CREATE TABLE IF NOT EXISTS score_updates(id INTEGER PRIMARY KEY, match_id INTEGER NOT NULL REFERENCES matches(id), overs TEXT, score TEXT,
                  kind TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL)""")
+
+
+def store_updates(c, mid, ups, now_fn, publish=True):
+    import live
+    _updates_table(c)
     for u in ups:
         c.execute("INSERT INTO score_updates(match_id,overs,score,kind,text,created_at) VALUES(?,?,?,?,?,?)",
                   (mid, str(u.get("overs") or ""), u.get("score"), u["kind"], u["text"], now_fn()))
-        if u.get("flash"):
+        if publish and u.get("flash"):
             f = dict(u["flash"], commentary=u["text"], over=str(u.get("overs") or ""), source="scorecard", status="PROVIDER_REPORTED")
             live.publish(c, mid, "delivery", f)
+
+
+def backfill_updates(c, mid):
+    """First look at a match with no SH lines yet: replay every scorecard snapshot already kept in source_records
+    (oldest first) so the commentary starts from the first snapshot we fetched, not from the next change. Runs once."""
+    _updates_table(c)
+    if c.execute("SELECT 1 FROM score_updates WHERE match_id=? LIMIT 1", (mid,)).fetchone():
+        return 0
+    r = c.execute("SELECT provider_id FROM data_provider_syncs WHERE provider='cricketdata' AND provider_entity='match' AND local_id=?", (mid,)).fetchone()
+    if not r:
+        return 0
+    prev, n = None, 0
+    for payload, at in c.execute("SELECT payload, fetched_at FROM source_records WHERE provider='cricketdata' AND provider_id=? AND kind='scorecard' ORDER BY id",
+                                 (str(r[0]),)).fetchall():
+        try:
+            sc = norm_scorecard(json.loads(payload))
+        except Exception:
+            continue
+        if prev is not None and sc != prev:
+            ups = derive_updates(prev, sc)
+            store_updates(c, mid, ups, lambda: at, publish=False)
+            n += len(ups)
+        prev = sc
+    return n

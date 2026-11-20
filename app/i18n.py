@@ -1184,3 +1184,22 @@ for _code, _v in _CMW.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {}))["cm.waiting"] = _v
     if _code == "en":
         STRINGS.setdefault("en", {})["cm.waiting"] = _v
+
+# Voice commentary (read aloud) and the pre-match line under the live SH prediction
+KEYS14 = ["vc.read", "vc.on", "vc.off", "vc.four", "vc.six", "vc.wicket", "vc.norun", "vc.runs", "vc.newbat", "vc.innings", "vc.now", "ag.prematch", "ag.live_now"]
+_VC = {
+ "en": ["Read commentary aloud", "Voice on", "Voice off", "Four", "Six", "Wicket", "No run", "runs", "comes in to bat", "innings begins", "now", "Pre-match", "Live win chance"],
+ "hi": ["कमेंट्री सुनाएँ", "आवाज़ चालू", "आवाज़ बंद", "चौका", "छक्का", "विकेट", "कोई रन नहीं", "रन", "बल्लेबाज़ी करने आईं", "पारी शुरू", "अब", "मैच से पहले", "लाइव जीत संभावना"],
+ "te": ["కామెంటరీ వినిపించు", "వాయిస్ ఆన్", "వాయిస్ ఆఫ్", "ఫోర్", "సిక్స్", "వికెట్", "పరుగు లేదు", "పరుగులు", "బ్యాటింగ్‌కు వచ్చారు", "ఇన్నింగ్స్ మొదలైంది", "ఇప్పుడు", "మ్యాచ్ ముందు", "లైవ్ గెలుపు అవకాశం"],
+ "ta": ["வர்ணனையைக் கேள்", "குரல் இயக்கு", "குரல் நிறுத்து", "நான்கு", "ஆறு", "விக்கெட்", "ரன் இல்லை", "ரன்கள்", "பேட்டிங்கிற்கு வருகிறார்", "இன்னிங்ஸ் தொடக்கம்", "இப்போது", "போட்டிக்கு முன்", "நேரலை வெற்றி வாய்ப்பு"],
+ "kn": ["ವೀಕ್ಷಕ ವಿವರಣೆ ಕೇಳಿ", "ಧ್ವನಿ ಆನ್", "ಧ್ವನಿ ಆಫ್", "ಬೌಂಡರಿ", "ಸಿಕ್ಸ್", "ವಿಕೆಟ್", "ರನ್ ಇಲ್ಲ", "ರನ್", "ಬ್ಯಾಟಿಂಗ್‌ಗೆ ಬಂದರು", "ಇನ್ನಿಂಗ್ಸ್ ಆರಂಭ", "ಈಗ", "ಪಂದ್ಯಕ್ಕೂ ಮುನ್ನ", "ಲೈವ್ ಗೆಲುವಿನ ಅವಕಾಶ"],
+ "bn": ["ধারাভাষ্য শুনুন", "ভয়েস চালু", "ভয়েস বন্ধ", "চার", "ছয়", "উইকেট", "কোনো রান নেই", "রান", "ব্যাট করতে এলেন", "ইনিংস শুরু", "এখন", "ম্যাচের আগে", "লাইভ জয়ের সম্ভাবনা"],
+ "mr": ["समालोचन ऐका", "आवाज सुरू", "आवाज बंद", "चौकार", "षटकार", "विकेट", "धाव नाही", "धावा", "फलंदाजीला आल्या", "डाव सुरू", "आता", "सामन्याआधी", "थेट विजयाची शक्यता"],
+ "ur": ["کمنٹری سنیں", "آواز آن", "آواز بند", "چوکا", "چھکا", "وکٹ", "کوئی رن نہیں", "رنز", "بیٹنگ کے لیے آئیں", "اننگز شروع", "اب", "میچ سے پہلے", "لائیو جیت کا امکان"],
+ "es": ["Escuchar comentarios", "Voz activada", "Voz desactivada", "Cuatro", "Seis", "Wicket", "Sin carrera", "carreras", "sale a batear", "comienza la entrada", "ahora", "Antes del partido", "Probabilidad en vivo"]}
+for _code, _vals in _VC.items():
+    assert len(_vals) == len(KEYS14)
+    _d = dict(zip(KEYS14, _vals))
+    (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
+    if _code == "en":
+        STRINGS.setdefault("en", {}).update(_d)

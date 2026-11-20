@@ -162,7 +162,12 @@ def job_sh_agent_snapshots(conn, cfg, opener):
     return {"saved": made}
 
 
-JOBS = {"owner_sheets_sync": job_owner_sheets_sync, "registry_index_sync": job_registry_index_sync,
+def job_sh_news(conn, cfg, opener):
+    import news
+    return news.fetch(conn, cfg, now, opener) if opener else news.fetch(conn, cfg, now)
+
+
+JOBS = {"sh_news": job_sh_news, "owner_sheets_sync": job_owner_sheets_sync, "registry_index_sync": job_registry_index_sync,
         "cricketdata_matches": job_cricketdata_matches, "cricketdata_live": job_cricketdata_live, "cricketdata_detail": job_cricketdata_detail,
         "cricsheet_recent": job_cricsheet_recent, "cricsheet_backfill": job_cricsheet_backfill, "sh_agent_snapshots": job_sh_agent_snapshots}
 NEEDS_DB_FN = {"cricsheet_recent", "cricsheet_backfill"}

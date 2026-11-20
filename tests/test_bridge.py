@@ -590,8 +590,9 @@ class SeriesHomeFilters(unittest.TestCase):
         self.assertTrue(d["top_batters"] and d["results"] and not d["fixtures"])
         self.assertEqual(T.call("/api/v1/series/999999")[0], 404)
         h = T.call("/api/v1/home/dashboard")[1]
-        self.assertIn("Data not available from the current source", h["news_note"])
-        self.assertIsNone(h["news"])
+        self.assertIn("link to the publisher", h["news_note"])
+        self.assertIsInstance(h["news"]["items"], list)                                     # SH reports + RSS headlines (none fetched in tests)
+        self.assertTrue(all(x["kind"] in ("sh_report", "headline") for x in h["news"]["items"]))
 
 
 class AutoUpdate(unittest.TestCase):

@@ -1010,7 +1010,7 @@ def home_dashboard(c):
         GROUP BY m.id ORDER BY posts DESC LIMIT 5""", (since,))) if c.execute("SELECT 1 FROM sqlite_master WHERE name='posts'").fetchone() else []
     return {"upcoming_tournaments": upcoming, "recently_completed": recent, "top_batters_30d": top_bat, "top_bowlers_30d": top_bowl, "trending_matches": trending,
             "rankings": None, "rankings_note": "Data not available from the current source (no licensed rankings feed connected).",
-            "news": None, "news_note": "Data not available from the current source (no licensed news feed connected)."}
+            "news": {"items": __import__("news").feed(c)}, "news_note": "SH reports from our own results, and headlines that link to the publisher."}
 
 # ------------------------------------------------------------------ SH Universal Cricket Data Bridge
 def bridge_status(c):
@@ -1935,8 +1935,14 @@ def match_insights(c, who, method, mid, what, q, body_fn):
         locked = lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled"
         return 200, insights.prediction_xi(c, R, provider_detail, now, locked)
     if part == "updates":
+        try:
+            import cricketdata as _cd
+            if _cd.backfill_updates(c, mid):
+                c.commit()
+        except Exception:
+            pass
         has = c.execute("SELECT 1 FROM sqlite_master WHERE name='score_updates'").fetchone()
-        items = rows(c.execute("SELECT overs, score, kind, text, created_at FROM score_updates WHERE match_id=? ORDER BY id DESC LIMIT 200", (mid,))) if has else []
+        items = rows(c.execute("SELECT id, overs, score, kind, text, created_at FROM score_updates WHERE match_id=? ORDER BY id DESC LIMIT 200", (mid,))) if has else []
         return 200, {"items": items, "note": "SH commentary written from scorecard changes (the source sends no ball-by-ball rows for this match)."}
     if part == "agent":
         xi_fn = lambda: insights.prediction_xi(c, R, provider_detail, now, lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled")

@@ -261,11 +261,11 @@ const I=(m,part)=>api("/matches/"+m.id+"/insights?part="+part);
 const NA=()=>'<p class="muted">'+esc(t("data.na"))+'</p>';
 const STG={pre_match:"ag.pre_match",post_toss:"ag.post_toss",playing_xi:"ag.playing_xi"};
 window.mcAgent=async(m,box)=>{if(!box)return;let d;try{d=await I(m,"agent")}catch(e){return}
- const H=d.headline,L=d.live;if(!H&&!L){box.innerHTML=d.note?'<div class="agent"><b>🧠 '+esc(t("ag.title"))+'</b><p class="muted">'+esc(d.note)+'</p></div>':"";return}
+ const H=d.headline,L=d.live;if(!H&&!L){box.innerHTML=d.note?'<div class="agent"><b><img class="shlogo" src="/sh-prediction-icon.png" alt="SH">'+esc(t("ag.title"))+'</b><p class="muted">'+esc(d.note)+'</p></div>':"";return}
  const p=L||H,hp=p.home_win_probability,ap=p.away_win_probability;
  const pick=H?(H.predicted_team||""):(hp>=50?m.home.name:m.away.name);
  const sn=x=>window.shortName?shortName(x):(x.short_code||x.name);
- box.innerHTML='<div class="agent"><div class="ag-top"><span>🧠 <b>'+esc(t("ag.title"))+'</b></span><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+'</small></div>'+
+ box.innerHTML='<div class="agent"><div class="ag-top"><span class="shh"><img class="shlogo" src="/sh-prediction-icon.png" alt="SH"><b>'+esc(t("ag.title"))+'</b></span><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+'</small></div>'+
   '<div class="ag-bar"><i style="width:'+hp+'%;background:#4fb3ff"></i><i style="width:'+ap+'%;background:#ff8a1f"></i></div>'+
   '<div class="dl ag-pct"><b class="c-home">'+esc(sn(m.home))+' '+Math.round(hp)+'%</b><b class="c-away">'+Math.round(ap)+'% '+esc(sn(m.away))+'</b></div>'+
   '<details><summary class="muted">'+esc(t("ag.why"))+' ▾</summary>'+
@@ -313,6 +313,7 @@ window.mcLive=(m,tab)=>{const on=m.status==="live";
  ["ball","delivery","probability","status"].forEach(k=>ES.addEventListener(k,e=>{if(k==="status")return;
   if(k==="delivery"){let ev={};try{ev=JSON.parse(e.data)}catch(x){}
    // flash first, then the new score is projected into the plate; the rest of the tab refreshes a little later
+   if(window.shVoice)shVoice.event(m.id,ev);
    if(window.mcFlash){ev.after=()=>{if(window.mcBoardRefresh)mcBoardRefresh(m.id)};mcFlash(ev)}clearTimeout(timer);timer=setTimeout(()=>refresh(),6000);return}
   if(window.mcBoardRefresh)mcBoardRefresh(m.id);clearTimeout(timer);timer=setTimeout(()=>refresh(),3000)}));
  ES.onerror=()=>{if(!poll)poll=setInterval(()=>{if(new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash)&&document.visibilityState==="visible")refresh();else{clearInterval(poll);poll=null}},30000)};
@@ -327,3 +328,42 @@ window.mcTab.commentary=async(m,nm)=>{const pd=m.provider_detail;const hasBalls=
  let d;try{d=await api("/matches/"+m.id+"/insights?part=updates")}catch(e){return baseC?baseC(m,nm):null}
  if(!d.items.length)return '<div class="state">'+esc(t("cm.waiting"))+'</div>';
  return '<div class="cm-list">'+d.items.map(x=>'<div class="cm-b'+(x.kind==="wicket"?" cm-w":"")+'"><b class="cm-o">'+esc(x.overs||"")+'</b><span class="bl '+(x.kind==="wicket"?"bw":/^SIX/.test(x.text)?"b6":/FOUR/.test(x.text)?"b4":"b1")+'">'+(x.kind==="wicket"?"W":/^SIX/.test(x.text)?"6":/FOUR/.test(x.text)?"4":"•")+'</span><span>'+esc(x.text)+(x.score?' <small class="muted">'+esc(x.score)+'</small>':'')+'</span></div>').join("")+'</div>'};})();
+
+
+/* Voice: reads the SH commentary aloud in the selected language (device text-to-speech, free, no server cost).
+   Player names stay as written; the event words (Four, Six, Wicket...) are spoken in the chosen language when the phone has that voice, otherwise in English. */
+(function(){const VL={en:"en-IN",hi:"hi-IN",te:"te-IN",ta:"ta-IN",kn:"kn-IN",bn:"bn-IN",mr:"mr-IN",ur:"ur-PK",es:"es-ES"};
+ const has="speechSynthesis" in window;let on=false;try{on=localStorage.getItem("shVoice")==="1"}catch(e){}
+ let lastId=null,lastMid=null,tick=null;
+ const lang=()=>(typeof LANG!=="undefined"?LANG:"en");
+ const curMid=()=>{const x=/^#\/match\/(\d+)/.exec(location.hash);return x?+x[1]:null};
+ function voiceFor(code){if(!has)return null;const vs=speechSynthesis.getVoices(),w=VL[code]||"en-IN";return vs.find(v=>v.lang.replace("_","-")===w)||vs.find(v=>v.lang.slice(0,2)===w.slice(0,2))||null}
+ function phrase(text,score,kind,L){const tt=k=>L==="en"?({"vc.four":"Four","vc.six":"Six","vc.wicket":"Wicket","vc.norun":"No run","vc.runs":"runs","vc.newbat":"comes in to bat","vc.innings":"innings begins","vc.now":"now"})[k]:t(k);
+  const parts=String(text||"").split(/(?<=\.)\s+(?=[A-Z])/);const out=[];let m;
+  for(const s of parts){
+   if((m=/^WICKET! (.+?), (\d+) \((\d+)\)\.?$/.exec(s)))out.push(tt("vc.wicket")+"! "+m[1]+", "+m[2]);
+   else if((m=/^(SIX|FOUR)! (.+?)(?: \(\d+ \w+\))?, now (\d+) \((\d+)\)\.?$/.exec(s)))out.push(tt(m[1]==="SIX"?"vc.six":"vc.four")+"! "+m[2]+", "+tt("vc.now")+" "+m[3]);
+   else if((m=/^(.+?) adds (\d+), now (\d+) \((\d+)\)\.?$/.exec(s)))out.push(m[1]+", "+m[2]+" "+(L==="en"&&m[2]==="1"?"run":tt("vc.runs"))+", "+tt("vc.now")+" "+m[3]);
+   else if(/^No run\.?$/.test(s))out.push(tt("vc.norun"));
+   else if((m=/^(.+?) comes in to bat\.?$/.exec(s)))out.push(m[1]+" "+tt("vc.newbat"));
+   else if((m=/^(.+?) begin their innings\.?$/.exec(s)))out.push(m[1]+" "+tt("vc.innings"));
+   else if((m=/^(\d+) runs? from the last/.exec(s)))out.push(m[1]+" "+tt("vc.runs"));
+   else out.push(s)}
+  const sc=/^(\d+)-(\d+)/.exec(score||"");if(sc&&kind==="wicket")out.push(sc[1]+" "+tt("vc.runs")+", "+sc[2]+" "+tt("vc.wicket"));
+  return out.join(". ")}
+ function say(text,score,kind){if(!has||!text)return;let L=lang(),v=voiceFor(L);if(!v&&L!=="en"){L="en";v=voiceFor("en")}
+  const u=new SpeechSynthesisUtterance(phrase(text,score,kind,L));u.lang=VL[L]||"en-IN";if(v)u.voice=v;u.rate=1.05;speechSynthesis.speak(u)}
+ async function feed(mid,speakLatest){if(!on||!mid)return;let d;try{d=await api("/matches/"+mid+"/insights?part=updates")}catch(e){return}
+  const it=(d.items||[]).filter(x=>x.id!=null);if(!it.length)return;
+  if(lastMid!==mid){lastMid=mid;lastId=it[0].id;if(speakLatest)say(it[0].text,it[0].score,it[0].kind);return}
+  const fresh=it.filter(x=>x.id>lastId).reverse().slice(-3);fresh.forEach(x=>say(x.text,x.score,x.kind));if(fresh.length)lastId=it[0].id}
+ function loop(){clearInterval(tick);if(on)tick=setInterval(()=>{if(document.visibilityState==="visible")feed(curMid())},12000)}
+ window.shVoice={on:()=>on,
+  toggle(btn){on=!on;try{localStorage.setItem("shVoice",on?"1":"0")}catch(e){}
+   if(btn){btn.textContent=on?"🔊":"🔇";btn.classList.toggle("on",on)}
+   if(!has){alert("Voice is not supported on this browser");return}
+   speechSynthesis.cancel();if(on){const L=lang(),u=new SpeechSynthesisUtterance(t("vc.on"));u.lang=VL[L]||"en-IN";const v=voiceFor(L);if(v)u.voice=v;speechSynthesis.speak(u);lastMid=null;feed(curMid(),true)}loop()},
+  event(mid,ev){if(!on)return;if(ev&&ev.source!=="scorecard"&&ev.commentary){say(ev.commentary,null,ev.wicket?"wicket":"");return}setTimeout(()=>feed(mid),1500)},
+  _phrase:phrase};
+ if(has&&speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=()=>{};
+ loop()})();

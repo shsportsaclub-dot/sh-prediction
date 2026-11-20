@@ -158,3 +158,43 @@ class ScorecardCommentary(unittest.TestCase):
         f = self.card(121, 1, "10.4", [("Grace Harris", 44, 26, 3, 4, "c Smith b Bates"), ("Charli Knott", 39, 23, 5, 1, "not out")])
         u = CD.derive_updates(e, f)
         self.assertIsNone(u[0]["flash"])
+
+
+class BackfillAndNews(unittest.TestCase):
+    """Synthetic data only: replay kept scorecard snapshots once; RSS headlines parsed to title + link + publisher."""
+    def test_backfill_replays_snapshots_once(self):
+        import cricketdata as CD
+        c = sqlite3.connect(":memory:"); c.row_factory = sqlite3.Row
+        c.execute("CREATE TABLE matches(id INTEGER PRIMARY KEY)"); c.execute("INSERT INTO matches VALUES(7)")
+        c.execute("CREATE TABLE data_provider_syncs(provider TEXT, provider_entity TEXT, provider_id TEXT, local_id INTEGER)")
+        c.execute("INSERT INTO data_provider_syncs VALUES('cricketdata','match','pid-7',7)")
+        c.execute("CREATE TABLE source_records(id INTEGER PRIMARY KEY, provider TEXT, provider_id TEXT, kind TEXT, payload TEXT, payload_hash TEXT, fetched_at TEXT)")
+        def raw(r, o, h, h4):
+            return {"scorecard": [{"inning": "Heat Inning 1", "batting": [{"batsman": {"name": "A Batter"}, "r": h, "b": 10, "4s": h4, "6s": 0, "dismissal-text": "not out"}],
+                                   "bowling": [], "totals": {"R": r, "W": 0, "O": o}}]}
+        for i, (r, o, h, h4) in enumerate([(10, 1.5, 10, 1), (14, 1.6, 14, 2), (15, 2.1, 15, 2)]):
+            c.execute("INSERT INTO source_records(provider,provider_id,kind,payload,payload_hash,fetched_at) VALUES('cricketdata','pid-7','scorecard',?,?,?)",
+                      (json.dumps(raw(r, o, h, h4)), str(i), "2026-11-20T01:0%d:00+00:00" % i))
+        n = CD.backfill_updates(c, 7)
+        rows = c.execute("SELECT text, created_at FROM score_updates ORDER BY id").fetchall()
+        self.assertGreaterEqual(n, 1)
+        self.assertTrue(any("FOUR" in r[0] for r in rows), [r[0] for r in rows])
+        self.assertEqual(CD.backfill_updates(c, 7), 0)     # only once
+
+    def test_rss_headlines(self):
+        import news
+        xml = b"""<?xml version="1.0"?><rss xmlns:media="http://search.yahoo.com/mrss/"><channel>
+          <item><title>Test side win series</title><link>https://example.org/a</link><description>&lt;p&gt;Short teaser.&lt;/p&gt;</description>
+          <pubDate>Fri, 20 Nov 2026 01:00:00 GMT</pubDate><media:thumbnail url="https://example.org/i.jpg"/></item>
+          <item><title>No link</title></item></channel></rss>"""
+        items = news.parse_rss(xml, "Publisher")
+        self.assertEqual(len(items), 1)
+        self.assertEqual((items[0]["title"], items[0]["summary"], items[0]["source"], items[0]["image"]), ("Test side win series", "Short teaser.", "Publisher", "https://example.org/i.jpg"))
+        self.assertTrue(items[0]["published_at"].startswith("2026-11-20T01:00"))
+        c = sqlite3.connect(":memory:")
+        class R:
+            def __init__(s, b): s.b = b
+            def read(s): return s.b
+        out = news.fetch(c, {"feeds": [{"name": "Publisher", "url": "https://example.org/rss"}], "keep_days": 100000}, lambda: "2026-11-20T02:00:00+00:00", lambda req, timeout: R(xml))
+        self.assertEqual(out["new"], 1)
+        self.assertEqual(news.fetch(c, {"feeds": [{"name": "Publisher", "url": "x"}], "keep_days": 100000}, lambda: "t", lambda req, timeout: R(xml))["new"], 0)

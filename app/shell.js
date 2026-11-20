@@ -74,7 +74,7 @@ SCREENS.home=async function(el){
    '<div class="card"><h3>'+esc(t("home.recent_series"))+'</h3>'+lst(d.recently_completed,x=>'<a class="dl" href="#/series/'+x.id+'"><b>'+esc(x.name)+'</b><span class="muted">'+x.matches+' matches</span></a>')+'</div>'+
    '<div class="card"><h3>'+esc(t("home.top_performers"))+'</h3>'+lst(d.top_batters_30d,x=>'<div class="dl"><b>'+esc(x.name)+'</b><span>'+x.runs+' runs · '+x.matches+' m</span></div>')+lst(d.top_bowlers_30d,x=>'<div class="dl"><b>'+esc(x.name)+'</b><span>'+x.wickets+' wkts · '+x.matches+' m</span></div>')+'</div>'+
    '<div class="card"><h3>'+esc(t("home.rankings"))+'</h3><p class="muted">'+esc(d.rankings_note)+'</p></div></div>';
-  $("#news").innerHTML='<div class="card"><p class="muted">'+esc(d.news_note)+'</p><p class="muted">Match previews and reports written by SH from our own data are planned; third-party articles need a licence.</p></div>'}catch(e){$("#dash").innerHTML=NA();$("#news").innerHTML=NA()}
+  $("#news").innerHTML=d.news&&d.news.items&&d.news.items.length?d.news.items.slice(0,5).map(x=>window.newsCard(x)).join("")+'<a class="btn" href="#/news">'+esc(t("home.news"))+' ›</a>':'<div class="state">'+esc(t("data.na"))+'</div>'}catch(e){$("#dash").innerHTML=NA();$("#news").innerHTML=NA()}
 };
 
 /* ---------------- Matches with the same filters */
@@ -92,8 +92,10 @@ window.secbar=page=>{const b=document.getElementById("secbar");if(!b)return;cons
  const cur=page==="series"?"series":page==="news"?"news":page==="matches"?({live:"live",upcoming:"schedule",results:"archives"}[mf]||""):"";
  b.innerHTML=SECS.map(([k,l,href,f])=>'<a href="'+href+'" data-mf="'+f+'" class="'+(k===cur?"on":"")+'">'+esc(t(l))+'</a>').join("");
  b.querySelectorAll("a[data-mf]").forEach(a=>a.onclick=()=>{if(a.dataset.mf)sessionStorage.setItem("shp_mf",a.dataset.mf);if(location.hash===a.getAttribute("href")){route();return false}})};
+const newsCard=x=>{const ext=/^https?:/.test(x.link||"");return '<a class="card news-i" href="'+esc(x.link||"#")+'"'+(ext?' target="_blank" rel="noopener"':'')+'>'+(x.image?'<img src="'+esc(x.image)+'" alt="" loading="lazy">':'')+'<div><b>'+esc(x.title||"")+'</b>'+(x.summary?'<p class="muted">'+esc(x.summary)+'</p>':'')+'<small class="muted">'+(x.kind==="sh_report"?'<img class="shlogo" src="/sh-prediction-icon.png" alt="SH" style="width:16px;height:16px">SH':esc(x.source||""))+(x.published_at?' · '+fmtTime(x.published_at):'')+(ext?' ↗':'')+'</small></div></a>'};
+window.newsCard=newsCard;
 SCREENS.news=async el=>{el.innerHTML='<h2>'+esc(t("home.news"))+'</h2><div id="news">'+loading()+'</div>';
- try{const d=await api("/home/dashboard");const n=d.news;$("#news").innerHTML=n&&n.items&&n.items.length?n.items.map(x=>'<div class="card"><b>'+esc(x.title||"")+'</b><p class="muted">'+esc(x.summary||"")+'</p></div>').join(""):'<div class="state">'+esc(d.news_note||t("data.na"))+'</div>'}catch(e){errorS($("#news"),e,()=>SCREENS.news(el))}};
+ try{const d=await api("/home/dashboard");const n=d.news;$("#news").innerHTML=n&&n.items&&n.items.length?n.items.map(newsCard).join(""):'<div class="state">'+esc(d.news_note||t("data.na"))+'</div>'}catch(e){errorS($("#news"),e,()=>SCREENS.news(el))}};
 document.addEventListener("click",e=>{const b=e.target.closest(".sp[aria-disabled=true]");if(b){e.preventDefault();b.classList.add("shake");setTimeout(()=>b.classList.remove("shake"),500)}});
 
 /* ---------------- Series list and series page */

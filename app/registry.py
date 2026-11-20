@@ -101,6 +101,7 @@ JOBS = {
     "cricketdata_live": (15, 1, {"daily_budget": 60, "max_live_matches": 3}),
     "cricsheet_recent": (1440, 1, {"files": ["recently_added_7_json.zip"]}),
     "sh_agent_snapshots": (10, 1, {"hours_ahead": 36}),
+    "sh_news": (30, 1, {"feeds": [{"name": "BBC Sport", "url": "https://feeds.bbci.co.uk/sport/cricket/rss.xml"}], "keep_days": 10}),
     "cricsheet_backfill": (360, 1, {"priority": ["ipl_json.zip", "wpl_json.zip", "bbl_json.zip", "wbb_json.zip", "npl_json.zip"],
                                     "skip": ["all_json.zip"], "done": []}),
 }
