@@ -108,7 +108,7 @@ window.mcTabBefore=window.mcTabBefore||{};
 const ROLES=[["wicket_keeper","pxi.wk"],["batter","pxi.bat"],["all_rounder","pxi.ar"],["bowler","pxi.bowl"]];
 function pitchView(m,players,key){return '<div class="pxi-pitch">'+ROLES.map(([r,l])=>{const ps=players.filter(p=>p.role===r);if(!ps.length)return "";
   return '<div class="pxi-row"><div class="pxi-rl">'+esc(t(l))+'</div><div class="pxi-ps">'+ps.map(p=>{const home=p.team_id===m.home.id,v=p[key];
-   return '<div class="pxi-p"><div class="pxi-av '+(home?"h":"a")+'">'+esc(p.name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase())+(p.captain?'<i class="pxi-c">C</i>':p.vice_captain?'<i class="pxi-c vc">VC</i>':'')+'</div>'+
+   return '<div class="pxi-p"><div class="pxi-av '+(home?"h":"a")+'" data-ph="'+esc(p.name)+'">'+esc(p.name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase())+(p.captain?'<i class="pxi-c">C</i>':p.vice_captain?'<i class="pxi-c vc">VC</i>':'')+'</div>'+
     '<div class="pxi-n">'+esc((w=>w.length>1&&w[w.length-1].length<=2?w.slice(-2).join(" "):w[w.length-1])(p.name.split(/\s+/)))+'</div><div class="pxi-pts">'+(v==null?"—":(+v).toFixed(1))+'</div></div>'}).join("")+'</div></div>'}).join("")+'</div>'}
 async function predictionXI(m){let d;try{d=await I(m,"prediction_xi")}catch(e){return ""}
  if(!d.available)return sec(esc(t("pxi.title")),'<div class="state">'+esc(d.reason)+'</div>');
@@ -174,9 +174,9 @@ window.mcTab.live=async m=>{const pd=m.provider_detail;if(!pd||!pd.scorecard||!p
  const bw=(li.bowling||[]).find(b=>same(b.name,lb.bowler))||(li.bowling||[]).slice(-1)[0];
  const sr=b=>b.b?(100*(b.r||0)/b.b).toFixed(1):"—";
  return '<div class="card lv"><table class="simple lvt"><thead><tr><th>'+esc(t("an.player"))+'</th><th>R (B)</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody>'+
-  bats.map(b=>'<tr><td><b>'+esc(b.name||"")+'</b>'+(same(b.name,lb.batter)?' 🏏':'')+'</td><td><b>'+(b.r??0)+'</b> ('+(b.b??0)+')</td><td>'+(b.fours??0)+'</td><td>'+(b.sixes??0)+'</td><td>'+sr(b)+'</td></tr>').join("")+'</tbody></table>'+
+  bats.map(b=>'<tr><td>'+phAvatar(b.name)+'<b>'+esc(b.name||"")+'</b>'+(same(b.name,lb.batter)?' 🏏':'')+'</td><td><b>'+(b.r??0)+'</b> ('+(b.b??0)+')</td><td>'+(b.fours??0)+'</td><td>'+(b.sixes??0)+'</td><td>'+sr(b)+'</td></tr>').join("")+'</tbody></table>'+
   '<div class="dl lvp"><span>'+esc(t("ins.pship"))+': <b>'+(x&&x.partnership?x.partnership.runs+' ('+x.partnership.balls+')':"—")+'</b></span><span class="muted">'+esc(t("ins.last_wkt"))+': '+(x&&x.last_wicket?esc(x.last_wicket.name)+(x.last_wicket.runs!=null?' '+x.last_wicket.runs+' ('+x.last_wicket.balls+')':''):"—")+'</span></div>'+
-  (bw?'<table class="simple lvt"><thead><tr><th>'+esc(t("an.bowl"))+'</th><th>W-R</th><th>Ov</th><th>Econ</th></tr></thead><tbody><tr><td><b>'+esc(bw.name||"")+'</b></td><td><b>'+(bw.w??0)+'-'+(bw.r??0)+'</b></td><td>'+esc(String(bw.o??"—"))+'</td><td>'+(bw.eco??"—")+'</td></tr></tbody></table>':'')+
+  (bw?'<table class="simple lvt"><thead><tr><th>'+esc(t("an.bowl"))+'</th><th>W-R</th><th>Ov</th><th>Econ</th></tr></thead><tbody><tr><td>'+phAvatar(bw.name)+'<b>'+esc(bw.name||"")+'</b></td><td><b>'+(bw.w??0)+'-'+(bw.r??0)+'</b></td><td>'+esc(String(bw.o??"—"))+'</td><td>'+(bw.eco??"—")+'</td></tr></tbody></table>':'')+
   '</div><p class="muted">'+esc(t("ins.source"))+': '+esc(pd.source)+'</p>'};
 
 
@@ -304,10 +304,12 @@ window.mcTab.results=async m=>{let ag=null,tp=null,pts=null,fan=null;
 
 /* live refresh without reloading: Server-Sent Events for live matches, with a 30-second fallback when the stream drops */
 let ES=null,ESmid=null,timer=null,poll=null;
-window.mcLive=(m,tab)=>{const on=m.status==="live";if(!on||!window.EventSource){if(ES&&ESmid!==m.id){ES.close();ES=null;ESmid=null}return}
+window.mcLive=(m,tab)=>{const on=m.status==="live";
+ if(on&&window.mcFlash&&window._mcFlashed!==m.id){window._mcFlashed=m.id;const B=(m.provider_detail&&m.provider_detail.balls)||[];const lb=B[B.length-1];if(lb)setTimeout(()=>mcFlash({runs:lb.runs,extra:lb.extra,wicket:lb.wicket,batter:lb.batter}),600)}if(!on||!window.EventSource){if(ES&&ESmid!==m.id){ES.close();ES=null;ESmid=null}return}
  const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(!new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash))return;const y=scrollY;route();setTimeout(()=>scrollTo(0,y),400)},1500)};
  if(ES&&ESmid===m.id)return;if(ES)ES.close();ESmid=m.id;ES=new EventSource("/api/v1/matches/"+m.id+"/stream");
- ["ball","delivery","probability","status"].forEach(k=>ES.addEventListener(k,e=>{if(k!=="status")refresh()}));
+ ["ball","delivery","probability","status"].forEach(k=>ES.addEventListener(k,e=>{if(k==="status")return;
+  if(k==="delivery"){try{if(window.mcFlash)mcFlash(JSON.parse(e.data))}catch(x){}clearTimeout(timer);timer=setTimeout(()=>refresh(),2700);return}refresh()}));
  ES.onerror=()=>{if(!poll)poll=setInterval(()=>{if(new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash)&&document.visibilityState==="visible")refresh();else{clearInterval(poll);poll=null}},30000)};
  ES.onopen=()=>{if(poll){clearInterval(poll);poll=null}}};
 window.addEventListener("hashchange",()=>{if(ES&&ESmid&&!new RegExp("^#/match/"+ESmid+"(/|$)").test(location.hash)){ES.close();ES=null;ESmid=null}});

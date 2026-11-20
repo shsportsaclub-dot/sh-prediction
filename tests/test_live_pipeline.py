@@ -96,3 +96,36 @@ class ProviderBalls(unittest.TestCase):
         self.assertNotIn("no run", ev[0]["commentary"].lower())                             # a leg bye is not a dot ball
         self.assertTrue(ev[1]["wicket"])
         self.assertEqual(ev[0]["status"], "PROVIDER_REPORTED")
+
+
+class PlayerPhotos(unittest.TestCase):
+    """Wikimedia lookups are faked here (no network in tests)."""
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import test_v1 as T
+        cls.T = T
+        T._migrate_once()
+
+    def fake(self, lic):
+        def f(url):
+            if "en.wikipedia.org" in url:
+                return {"query": {"pages": {"1": {"index": 1, "title": "Henry Nicholls", "description": "New Zealand cricketer", "pageimage": "HN.jpg",
+                                                   "thumbnail": {"source": "https://upload.wikimedia.org/x/240px-HN.jpg"}}}}}
+            return {"query": {"pages": {"-1": {"imageinfo": [{"extmetadata": {"LicenseShortName": {"value": lic}, "Artist": {"value": "<a>Some Photographer</a>"}}}]}}}}
+        return f
+
+    def test_free_licence_only_and_cached(self):
+        import photos, schema
+        c = self.T.db()
+        out = photos.get_many(c, ["Henry Nicholls"], schema.now, fetch=self.fake("CC BY-SA 4.0"))
+        self.assertEqual((out["Henry Nicholls"]["license"], out["Henry Nicholls"]["author"]), ("CC BY-SA 4.0", "Some Photographer"))
+        calls = []
+        photos.get_many(c, ["Henry Nicholls"], schema.now, fetch=lambda u: calls.append(u))       # cached: no outside call
+        self.assertEqual(calls, [])
+        out = photos.get_many(c, ["Nathan Smith"], schema.now, fetch=self.fake("Fair use"))       # surname mismatch / non-free: none
+        self.assertIsNone(out["Nathan Smith"])
+        c.execute("DELETE FROM player_photos")
+        out = photos.get_many(c, ["Henry Nicholls"], schema.now, fetch=self.fake("Non-free media"))
+        self.assertIsNone(out["Henry Nicholls"])
+        c.close()

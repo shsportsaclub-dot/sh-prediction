@@ -17,7 +17,7 @@ function freshLive(m){
  return !Number.isFinite(fetched)||Date.now()-fetched<=1800000;
 }
 function liveCard(m){const I=inningsOf(m),R=rrr(m),isLive=freshLive(m);
- const side=(team)=>{const x=I&&I.filter(i=>i.team===team.name||i.team===team.short_code).slice(-1)[0];return '<div class="lc-team"><b>'+esc(short(team))+'</b><span class="lc-sc">'+(x?x.r+'-'+x.w+' <small>('+esc(String(x.o))+')</small>':'')+'</span></div>'};
+ const side=(team)=>{const x=I&&I.filter(i=>i.team===team.name||i.team===team.short_code).slice(-1)[0];return '<div class="lc-team"><span class="lc-nm">'+(window.ballBadge?'<span class="lc-ball">'+ballBadge(team,26)+'</span>':'')+'<b>'+esc(short(team))+'</b></span><span class="lc-sc">'+(x?x.r+'-'+x.w+' <small>('+esc(String(x.o))+')</small>':'')+'</span></div>'};
  const status=m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+' won'+(m.margin?' by '+m.margin:'')):m.result_type.replace("_"," ")):(m.live_score&&m.live_score.status_text)||(m.status==="scheduled"?fmtTime(m.start_utc):m.status);
  return '<a class="lcard '+(isLive?"is-live":"")+'" href="#/match/'+m.id+'"><div class="lc-top"><span class="lc-comp">'+esc(m.competition)+'</span>'+(isLive?'<span class="live-dot">LIVE</span>':'')+'</div>'+
   '<div class="muted lc-meta">'+esc([m.match_no,m.format].filter(Boolean).join(" · "))+'</div>'+side(m.home)+side(m.away)+

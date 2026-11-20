@@ -1962,6 +1962,20 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
         raise ApiError(404, "NOT_FOUND", "unknown endpoint")
     if len(P) == 3 and P[0] == "matches" and P[2] in ("insights", "fan-poll", "discussions"):
         return match_insights(c, who, method, int_id(P[1], "match id"), P[2], q, body_fn)
+    if method == "GET" and P == ["players", "photos"]:
+        import photos
+        names = [x.strip() for x in (qv(q, "names") or "").split("|") if x.strip()]
+        return 200, {"photos": photos.get_many(c, names, now), "note": "Free-licence photos from Wikimedia Commons with author and licence; owner-approved photos first."}
+    if method == "POST" and P == ["admin", "players", "photo"]:
+        if not is_admin(who):
+            raise ApiError(403, "FORBIDDEN", "admin only")
+        import photos
+        d = body_fn() or {}
+        if not str(d.get("url", "")).startswith("https://") or not d.get("name") or not d.get("license"):
+            raise bad("name, https url and license are required")
+        photos.approve(c, d["name"], d["url"], d["license"], d.get("author"), now)
+        audit(c, who["actor"], "player.photo", "player", 0, {"name": d["name"], "license": d["license"]})
+        return 200, {"status": "saved"}
     if method == "POST" and P == ["admin", "sheets", "reconcile"]:
         if not is_admin(who):
             raise ApiError(403, "FORBIDDEN", "admin only")

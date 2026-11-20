@@ -897,7 +897,16 @@ def _ball_bowled(c, r, pd):
     if c.execute("SELECT 1 FROM ball_events WHERE match_id=? LIMIT 1", (r["id"],)).fetchone():
         return True
     if pd and (pd.get("scorecard") or []):
-        return any((i.get("total") or {}).get("o") not in (None, 0, "0", "0.0") for i in pd["scorecard"])
+        if any((i.get("total") or {}).get("o") not in (None, 0, "0", "0.0") for i in pd["scorecard"]) or \
+           any((b.get("b") or 0) > 0 for i in pd["scorecard"] for b in i.get("batting") or []) or \
+           any(_balls(w.get("o")) > 0 for i in pd["scorecard"] for w in i.get("bowling") or []):
+            return True
+    if pd and pd.get("balls"):
+        return True
+    ls = c.execute("SELECT innings_json FROM live_scores WHERE match_id=?", (r["id"],)).fetchone() if \
+        c.execute("SELECT 1 FROM sqlite_master WHERE name='live_scores'").fetchone() else None
+    if ls and any(_balls(x.get("o")) > 0 for x in json.loads(ls[0] or "[]")):
+        return True
     return r["status"] in ("completed",)
 
 def agent_capture(c, r, provider_detail, now_fn, xi_fn=None):
@@ -940,6 +949,53 @@ def agent_capture(c, r, provider_detail, now_fn, xi_fn=None):
             put("playing_xi", p)
     return made
 
+def _innings_now(c, r, pd):
+    """Current innings totals [(batting side 'home'/'away'/None, runs, wkts, balls)] from the live score row, else the provider scorecard."""
+    out = []
+    ls = c.execute("SELECT innings_json FROM live_scores WHERE match_id=?", (r["id"],)).fetchone() if \
+        c.execute("SELECT 1 FROM sqlite_master WHERE name='live_scores'").fetchone() else None
+    rows_ = json.loads(ls[0]) if ls and ls[0] else []
+    src = "live score"
+    if not rows_ and pd and pd.get("scorecard"):
+        src = "scorecard"
+        for i in pd["scorecard"]:
+            t = i.get("total") or {}
+            if t.get("r") is None:
+                bat = i.get("batting") or []
+                t = {"r": sum(b.get("r") or 0 for b in bat) + ((i.get("extras") or {}).get("total") or 0),
+                     "w": sum(1 for b in bat if b.get("dismissal") and not re.search(r"not out|batting", b["dismissal"], re.I)),
+                     "o": _ovs(sum(_balls(b.get("o")) for b in i.get("bowling") or []))}
+            rows_.append({"inning": i.get("inning"), "r": t.get("r"), "w": t.get("w"), "o": t.get("o")})
+    hn, an = (r["home_name"] or "").lower(), (r["away_name"] or "").lower()
+    for x in rows_:
+        n = re.sub(r"\s*inning\s*\d+$", "", str(x.get("inning") or ""), flags=re.I).strip().lower()
+        side = "home" if n in (hn, (r["home_short"] or "~").lower()) else "away" if n in (an, (r["away_short"] or "~").lower()) else None
+        out.append((side, int(x.get("r") or 0), int(x.get("w") or 0), _balls(x.get("o"))))
+    return out, src
+
+def live_from_score(c, r, pd, snaps):
+    """SH live win % from the current score (runs, wickets, balls, target) with the saved pre-match view as the prior. Limited-overs only."""
+    quota = QUOTA.get(r["format"])
+    inns, src = _innings_now(c, r, pd)
+    if not quota or not inns or inns[-1][0] is None:
+        return None
+    base = (snaps.get("playing_xi") or snaps.get("post_toss") or snaps.get("pre_match") or {}).get("home_win_probability")
+    if base is None:
+        try:
+            base = engine.predict_match(c, r["id"])["home_win_probability"]
+        except Exception:
+            base = 50.0
+    k = len(inns)
+    side, runs, wk, balls = inns[-1]
+    if k >= 2 and inns[0][0] is None:
+        return None
+    lp = engine.live_probability(r["format"], min(k, 2), runs, min(wk, 10), min(balls, quota), target=(inns[0][1] + 1) if k >= 2 else None,
+                                 max_balls=quota, prematch_home=base, batting_is_home=side == "home")
+    bat = lp["batting_team_win_probability"]
+    home = bat if side == "home" else round(100 - bat, 1)
+    return {"home_win_probability": home, "away_win_probability": round(100 - home, 1), "after_over": _ovs(balls), "innings": min(k, 2),
+            "source": "SH model from the %s (%d-%d in %s overs)" % (src, runs, wk, _ovs(balls))}
+
 def agent(c, r, provider_detail, now_fn, xi_fn=None):
     agent_capture(c, r, provider_detail, now_fn, xi_fn)
     snaps = {x["stage"]: dict(json.loads(x["payload_json"]), stage=x["stage"], model=x["model"], created_at=x["created_at"])
@@ -951,6 +1007,8 @@ def agent(c, r, provider_detail, now_fn, xi_fn=None):
             w = g["win_probability"][-1]
             live = {"home_win_probability": w["home"], "away_win_probability": round(100 - w["home"], 1), "after_over": w["over"], "innings": w["innings"],
                     "source": g.get("source")}
+        else:
+            live = live_from_score(c, r, provider_detail(c, r["id"]), snaps)
     res = c.execute("SELECT result_type, winner_team_id, source FROM match_results WHERE match_id=?", (r["id"],)).fetchone()
     for s in snaps.values():
         if res and res[0] == "win":

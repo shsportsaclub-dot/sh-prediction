@@ -45,11 +45,26 @@ const FLAGS={"india":"🇮🇳","australia":"🇦🇺","england":"🏴\u{E0067}\
  "ghana":"🇬🇭","cameroon":"🇨🇲","mozambique":"🇲🇿","malawi":"🇲🇼","eswatini":"🇸🇿","lesotho":"🇱🇸","gibraltar":"🇬🇮","isle of man":"🇮🇲","cyprus":"🇨🇾","greece":"🇬🇷",
  "czech republic":"🇨🇿","hungary":"🇭🇺","romania":"🇷🇴","bulgaria":"🇧🇬","serbia":"🇷🇸","croatia":"🇭🇷","slovenia":"🇸🇮","estonia":"🇪🇪","luxembourg":"🇱🇺","malta":"🇲🇹","israel":"🇮🇱",
  "iran":"🇮🇷","bermuda":"🇧🇲","cayman islands":"🇰🇾","bahamas":"🇧🇸","belize":"🇧🇿","costa rica":"🇨🇷","panama":"🇵🇦","peru":"🇵🇪","chile":"🇨🇱","colombia":"🇨🇴","south korea":"🇰🇷"};
-function badge(team){const base=String(team.name||"").toLowerCase().replace(/\s+(women|men|u-?19|u-?23|a|xi|emerging)$/,"").replace(/\s+(women|men)$/,"").trim();
- const f=FLAGS[base];if(f)return '<span class="fl" aria-hidden="true">'+f+'</span>';
- const code=(team.short_code||String(team.name||"").split(/\s+/).map(w=>w[0]).join("").slice(0,3)).toUpperCase();
+/* SH Team Ball Badge: the owner's approved PNG when one is in /badges, otherwise a generated SH ball (team colour leather, gold seam,
+   gold short name). Original SH artwork only; never an official team logo. */
+const BALL_COL={"india":"#1f4fbf","australia":"#d9a400","england":"#1d3a8a","new zealand":"#1b1b1b","south africa":"#007a4d","pakistan":"#0b6b3a",
+ "sri lanka":"#1d3fa8","bangladesh":"#006a4e","west indies":"#7b1e3a","afghanistan":"#1d4fa8","ireland":"#169b62","zimbabwe":"#c40000","netherlands":"#ff6f00",
+ "scotland":"#1d3fa8","nepal":"#c8102e","united arab emirates":"#00732f","uae":"#00732f","sweden":"#006aa7","switzerland":"#c8102e","türkiye":"#d50a17","turkey":"#d50a17",
+ "oman":"#c8102e","usa":"#1d3a8a","canada":"#c8102e","namibia":"#003580","uganda":"#1b1b1b","kenya":"#006600","rwanda":"#00a1de","italy":"#0066cc"};
+window.BADGES=window.BADGES||new Set();fetch("/badges/manifest.json").then(r=>r.json()).then(j=>(j.badges||[]).forEach(x=>BADGES.add(x))).catch(()=>{});
+const slug=n=>String(n||"").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+window.ballBadge=function(team,size){size=size||52;const s=slug(team.name);
+ if(BADGES.has(s+".png")||BADGES.has(s+".webp"))return '<img class="bbadge" src="/badges/'+(BADGES.has(s+".png")?s+".png":s+".webp")+'" width="'+size+'" height="'+size+'" alt="">';
+ const base=String(team.name||"").toLowerCase().replace(/\s+(women|men|u-?19|u-?23)$/,"").trim();
  let h=0;for(const ch of String(team.name||""))h=(h*31+ch.charCodeAt(0))%360;
- return '<span class="fl txt" aria-hidden="true" style="background:hsl('+h+' 60% 32%)">'+esc(code)+'</span>'}
+ const col=BALL_COL[base]||"hsl("+h+" 62% 34%)",code=shortName(team).replace(/-W$/,""),fs=code.length<=2?34:code.length===3?28:22,id="g"+s.slice(0,20)+size;
+ return '<svg class="bbadge" width="'+size+'" height="'+size+'" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="'+id+'" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".35" stop-color="'+col+'"/><stop offset="1" stop-color="#000" stop-opacity=".9"/></radialGradient></defs>'+
+  '<circle cx="50" cy="50" r="47" fill="'+col+'"/><circle cx="50" cy="50" r="47" fill="url(#'+id+')"/>'+
+  '<path d="M30 6 C14 30 14 70 30 94" fill="none" stroke="#e9c46a" stroke-width="2.4"/><path d="M38 4 C22 30 22 70 38 96" fill="none" stroke="#e9c46a" stroke-width="2.4"/>'+
+  '<path d="M34 5 C18 30 18 70 34 95" fill="none" stroke="#f4d58d" stroke-width="5" stroke-dasharray="1.6 3.2"/>'+
+  '<text x="60" y="'+(52+fs/3)+'" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="'+fs+'" fill="#f6d77a" stroke="#5a3b00" stroke-width="1.2" paint-order="stroke">'+esc(code)+'</text>'+
+  '<ellipse cx="38" cy="24" rx="16" ry="8" fill="#fff" opacity=".18"/></svg>'};
+function badge(team){return '<span class="fl ball">'+ballBadge(team,54)+'</span>'}
 /* short names: approved code, else the usual cricket code for a country, else initials (UAE Bulls -> UB) */
 const CODES={"india":"IND","australia":"AUS","england":"ENG","new zealand":"NZ","south africa":"SA","pakistan":"PAK","sri lanka":"SL","bangladesh":"BAN",
  "west indies":"WI","afghanistan":"AFG","ireland":"IRE","zimbabwe":"ZIM","netherlands":"NED","scotland":"SCO","nepal":"NEP","united arab emirates":"UAE","uae":"UAE",
@@ -61,10 +76,15 @@ window.shortName=function(team){if(team.short_code)return team.short_code;const 
  const words=base.split(/\s+/).filter(x=>x&&!/^(women|men|cricket|club|team|xi)$/.test(x));
  const s=words.length>1?words.map(x=>x[0]).join("").slice(0,4):(words[0]||n).slice(0,3);return s.toUpperCase()+(w?"-W":"")};
 window.mcBoard=function(m){const pd=PD(m),L=m.live_score;let lines=[],cr="",ev="";
- if(pd){pd.scorecard.forEach(i=>{if(i.total)lines.push({t:teamShort(m,i.inning),r:i.total.r,w:i.total.w,o:i.total.o})});const li=lastInn(pd.scorecard);if(li&&li.total)cr=crr(li.total.r,li.total.o);
-  const lb=(pd.balls||[]).slice(-1)[0];if(lb&&m.status==="live")ev=lb.wicket?"WICKET":lb.runs===6?"SIX":lb.runs===4?"FOUR":""}
- else if(L&&L.innings&&L.innings.length){L.innings.forEach(i=>lines.push({t:teamShort(m,i.inning),r:i.r,w:i.w,o:i.o}));const li=L.innings[L.innings.length-1];cr=crr(li.r,li.o)}
- else if(m.reported_scores&&m.reported_scores.length){m.reported_scores.forEach(s=>lines.push({t:s.team,r:s.runs,w:s.wickets,o:s.overs||"—",rep:1}))}
+ // score source order: live score line, then the provider scorecard totals (or totals worked out from the batting card), then user-reported scores
+ if(L&&L.innings&&L.innings.length)L.innings.forEach(i=>lines.push({t:teamShort(m,i.inning),r:i.r,w:i.w,o:i.o}));
+ if(!lines.length&&pd)pd.scorecard.forEach(i=>{let T=i.total;if(!T||T.r==null){const bat=i.batting||[];if(!bat.length)return;
+   T={r:bat.reduce((a,b)=>a+(+b.r||0),0)+((i.extras&&+i.extras.total)||0),w:bat.filter(b=>b.dismissal&&!/not out|batting/i.test(b.dismissal)).length,
+      o:(n=>Math.floor(n/6)+"."+(n%6))((i.bowling||[]).reduce((a,b)=>a+oversToBalls(b.o),0))}}
+  lines.push({t:teamShort(m,i.inning),r:T.r,w:T.w,o:T.o})});
+ if(!lines.length&&m.reported_scores&&m.reported_scores.length)m.reported_scores.forEach(s=>lines.push({t:s.team,r:s.runs,w:s.wickets,o:s.overs||"—",rep:1}));
+ if(lines.length){const li=lines[lines.length-1];cr=crr(li.r,li.o)}
+ if(pd){const lb=(pd.balls||[]).slice(-1)[0];if(lb&&m.status==="live")ev=lb.wicket?"WICKET":lb.runs===6?"SIX":lb.runs===4?"FOUR":""}
  const sn=shortName,full=x=>x.name;
  const toss=m.toss_winner_id?full(m.toss_winner_id===m.home.id?m.home:m.away)+" opt to "+(m.toss_decision||"—"):"";
  const res=m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" won"+(m.margin?" by "+m.margin:"")):m.result_type.replace(/_/g," ")):"";
@@ -76,12 +96,13 @@ window.mcBoard=function(m){const pd=PD(m),L=m.live_score;let lines=[],cr="",ev="
  let lead="";if(!quota&&lines.length>=2){const tot={};lines.forEach(x=>tot[x.t]=(tot[x.t]||0)+x.r);const c2=cur.t,o2=Object.keys(tot).find(k=>k!==c2);if(o2!=null){const d=tot[c2]-tot[o2];lead=c2+" "+t(d>=0?"mc.lead_by":"mc.trail_by")+" "+Math.abs(d)}}
  // title once: the full match + series name, exactly as the series lists it
  const title=m.home.name+" vs "+m.away.name+(m.match_no?", "+(/^\d+$/.test(m.match_no)?"Match "+m.match_no:m.match_no):"")+", "+m.competition;
- return '<div class="board" aria-live="polite"><div class="bt"><span>'+esc(title)+'</span><span>'+esc(status)+'</span></div>'+
+ return '<div class="board" aria-live="polite"><div class="bt"><span>'+esc(title)+'</span></div>'+
   '<div class="bm"><div class="tm">'+badge(m.home)+'<span>'+esc(sn(m.home))+'</span></div><div class="sc">'+
   (cur?'<b>'+cur.r+'-'+cur.w+'</b><small>('+esc(String(cur.o))+')</small>':'<b>vs</b>')+(ev?'<div><span class="ev ev-'+ev.toLowerCase()+'">'+ev+'</span></div>':'')+
   '</div><div class="tm">'+badge(m.away)+'<span>'+esc(sn(m.away))+'</span></div></div>'+
   '<div class="bb"><i></i>'+(cells.length?cells.map(([a,b])=>'<span>'+esc(a)+' <b>'+esc(String(b))+'</b></span>').join(""):'<span>'+esc(m.format)+'</span>')+'<i></i></div>'+
-  (lead||lines.length>1?'<div class="bl2">'+[lead].concat(lines.slice(0,-1).map(x=>esc(x.t)+" "+x.r+"-"+x.w+" ("+esc(String(x.o))+")")).filter(Boolean).join(" · ")+'</div>':'')+'</div>'+
+  (lead||lines.length>1?'<div class="bl2">'+[lead].concat(lines.slice(0,-1).map(x=>esc(x.t)+" "+x.r+"-"+x.w+" ("+esc(String(x.o))+")")).filter(Boolean).join(" · ")+'</div>':'')+
+  (status?'<div class="bst">'+esc(status)+'</div>':'')+'</div>'+
   '<div class="mc-meta"><span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span> '+(cur&&cur.rep?'USER_REPORTED · ':'')+(pd&&pd.scorecard_at?esc("Updated "+ago(pd.scorecard_at)+" · "+pd.source):L?esc("Updated "+ago(L.fetched_at)+" · "+L.source):"")+'</div>'};
 /* ball-by-ball strip under the board: every received ball, newest at the right, scrolled into view */
 window.mcBalls=function(m){const pd=PD(m);const B=(pd&&pd.balls)||[];if(!B.length)return "";
@@ -168,3 +189,31 @@ window.mcTabAfter={
    (v.lowest_all_out?'<dt>Lowest all out</dt><dd>'+v.lowest_all_out.runs+' ('+v.lowest_all_out.overs+' ov) by '+esc(v.lowest_all_out.team)+'</dd>':'')+'</dl>':'<p class="muted">No completed '+esc(m.format)+' matches at this venue in our database yet.</p>')+'<p class="muted">'+esc(m.history.note)+'</p></div>'})()
 };
 })();
+
+/* Board flash: each ball event shows its own animation on the score plate for ~2.5 s, then the score returns.
+   Every event type has a different look and movement (SH originals). */
+window.mcFlash=function(ev){const box=document.querySelector(".board .sc")||document.querySelector(".board");if(!box||!ev)return;
+ const x=String(ev.extra||"").toLowerCase(),r=+ev.runs||0;let k,txt,sub="";
+ if(ev.wicket){k="wkt";txt="WICKET";sub=ev.batter?String(ev.batter):""}
+ else if(/^(wd|wide)/.test(x)){k="xtra";txt="WIDE"}else if(/^(nb|no_?ball)/.test(x)){k="xtra";txt="NO BALL"}
+ else if(/^(lb|leg_?bye|legbyes)/.test(x)){k="xtra";txt=r>1?r+" LEG BYES":"LEG BYE"}else if(/^(b|bye|byes)$/.test(x)){k="xtra";txt=r>1?r+" BYES":"BYE"}
+ else if(r>=6){k="six";txt="SIX"}else if(r===4){k="four";txt="FOUR"}else if(r>0){k="run";txt=r===1?"SINGLE":r+" RUNS"}else{k="dot";txt="DOT BALL"}
+ let fx=box.querySelector(".fx");if(fx)fx.remove();fx=document.createElement("div");fx.className="fx fx-"+k;fx.setAttribute("role","status");
+ const stumps='<svg class="fx-stumps" viewBox="0 0 60 60"><rect x="14" y="18" width="4" height="40" rx="1" fill="#f5e6c8"/><rect x="28" y="18" width="4" height="40" rx="1" fill="#f5e6c8"/><rect x="42" y="18" width="4" height="40" rx="1" fill="#f5e6c8"/><rect class="bail b1" x="14" y="14" width="16" height="3" rx="1.5" fill="#ffd23f"/><rect class="bail b2" x="30" y="14" width="16" height="3" rx="1.5" fill="#ffd23f"/></svg>';
+ const run=k==="run"?'<div class="fx-pitch"><i class="c1"></i><b class="fx-ballrun" style="--n:'+Math.min(r,3)+'"></b><i class="c2"></i></div>':"";
+ fx.innerHTML=(k==="six"?'<div class="fx-rays"></div>':"")+(k==="four"?'<div class="fx-sweep"></div>':"")+(k==="wkt"?stumps:"")+(k==="dot"?'<div class="fx-ring"></div>':"")+
+  '<div class="fx-t">'+esc(txt)+'</div>'+(sub?'<div class="fx-s">'+esc(sub)+'</div>':"")+run;
+ box.appendChild(fx);box.classList.remove("shake");if(k==="wkt"){void box.offsetWidth;box.classList.add("shake")}
+ setTimeout(()=>{fx.classList.add("out");setTimeout(()=>fx.remove(),400)},2500)};
+
+/* player photos: any element with data-ph="<player name>" gets a free-licence photo (Wikimedia Commons) when one exists;
+   otherwise the initials stay. Author and licence are in the tooltip. */
+(function(){const cache={},pending=new Set();let tm=null;
+ const apply=root=>(root||document).querySelectorAll("[data-ph]").forEach(el=>{const p=cache[el.dataset.ph];if(p&&p.url&&!el.dataset.done){el.dataset.done=1;
+  el.style.backgroundImage="url('"+p.url.replace(/'/g,"%27")+"')";el.classList.add("has-ph");el.title=el.dataset.ph+" — photo: "+p.author+", "+p.license+" ("+p.source+")"}});
+ const run=()=>{const need=[...document.querySelectorAll("[data-ph]")].map(e=>e.dataset.ph).filter(n=>!(n in cache)&&!pending.has(n));
+  const names=[...new Set(need)].slice(0,12);if(!names.length){apply();return}names.forEach(n=>pending.add(n));
+  api("/players/photos?names="+encodeURIComponent(names.join("|"))).then(d=>{names.forEach(n=>{cache[n]=(d.photos||{})[n]||null;pending.delete(n)});apply();if(need.length>names.length)setTimeout(run,800)})
+   .catch(()=>names.forEach(n=>pending.delete(n)))};
+ new MutationObserver(()=>{clearTimeout(tm);tm=setTimeout(run,400)}).observe(document.getElementById("main")||document.body,{childList:true,subtree:true});
+ window.phAvatar=(name,cls)=>'<span class="ph '+(cls||"")+'" data-ph="'+esc(name||"")+'">'+esc(String(name||"?").split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase())+'</span>';})();

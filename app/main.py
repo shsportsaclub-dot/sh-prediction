@@ -201,6 +201,14 @@ class H(BaseHTTPRequestHandler):
    b=(Path(__file__).parent/"sh-original-blueprint.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-prediction-welcome.html":
    b=(Path(__file__).parent/"sh-prediction-welcome.html").read_bytes();self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
+  if p.startswith("/badges/"):
+   # SH team ball badges committed to the repository (no user uploads here)
+   name=p[len("/badges/"):]
+   if not re.fullmatch(r"[a-z0-9-]{1,80}\.(png|webp|json)",name or ""):return self.sendj(404,{"error":"not found"})
+   f=Path(__file__).parent/"badges"/name
+   if not f.is_file():return self.sendj(404,{"error":"not found"})
+   b=f.read_bytes();ct={"png":"image/png","webp":"image/webp","json":"application/json"}[name.rsplit(".",1)[1]]
+   self.send_response(200);self.send_header("Content-Type",ct);self.send_header("Cache-Control","public, max-age=3600");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/sh-prediction-icon.png":
    b=(Path(__file__).parent/"sh-prediction-icon.png").read_bytes();self.send_response(200);self.send_header("Content-Type","image/png");self.send_header("Cache-Control","public, max-age=86400");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/icon.svg":
