@@ -140,11 +140,11 @@ def annotate(c, items):
             st = ("upcoming", "Upcoming")
         elif d["status"] == "live":
             if n and bsrc not in ("cricsheet",):
-                st = ("live_ball_by_ball", "Live · ball-by-ball (SH scoring)")
+                st = ("live_ball_by_ball", "Live · ball-by-ball")
             elif d["id"] in ext_fresh:
-                st = ("live_scorecard", "Live · scorecard (%s)" % ls["source"] if ls else "Live · scorecard")
+                st = ("live_scorecard", "Live · scorecard")
             elif ls and ls["fetched_at"] >= cutoff:
-                st = ("live_score_only", "Live · score only (%s)" % ls["source"])
+                st = ("live_score_only", "Live · score only")
             elif ls:
                 st = ("delayed", "Delayed · last update %s UTC" % ls["fetched_at"][11:16])
             else:
@@ -438,7 +438,7 @@ def provider_commentary(c, mid, q):
     return {"items": items[offset:offset + limit], "total": len(items), "limit": limit, "offset": offset,
             "language": lang if lang in commentary_engine.languages() else "en",
             "language_note": None if lang in commentary_engine.languages() else "Commentary is generated in English for this language for now.",
-            "note": "Written by SH PREDICTION from CricketData ball rows (runs, extras, wickets). Updated %s." % ((r[1] or "")[11:16] + " UTC"),
+            "note": "SH PREDICTION commentary. Updated %s." % ((r[1] or "")[11:16] + " UTC"),
             "source": "CricketData.org"}
 
 def commentary(c, mid, q):
@@ -1934,6 +1934,10 @@ def match_insights(c, who, method, mid, what, q, body_fn):
     if part == "prediction_xi":
         locked = lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled"
         return 200, insights.prediction_xi(c, R, provider_detail, now, locked)
+    if part == "updates":
+        has = c.execute("SELECT 1 FROM sqlite_master WHERE name='score_updates'").fetchone()
+        items = rows(c.execute("SELECT overs, score, kind, text, created_at FROM score_updates WHERE match_id=? ORDER BY id DESC LIMIT 200", (mid,))) if has else []
+        return 200, {"items": items, "note": "SH commentary written from scorecard changes (the source sends no ball-by-ball rows for this match)."}
     if part == "agent":
         xi_fn = lambda: insights.prediction_xi(c, R, provider_detail, now, lambda c2, m2: prediction_window(c2, m2)["pre_match"] != "open" or m2["status"] != "scheduled")
         return 200, insights.agent(c, R, provider_detail, now, xi_fn)
@@ -1945,7 +1949,7 @@ def match_insights(c, who, method, mid, what, q, body_fn):
             raise ApiError(400, "BAD_REQUEST", str(e))
     if part == "tipsters":
         return 200, insights.tipsters(c, R, prediction_window(c, r))
-    raise ApiError(400, "BAD_REQUEST", "part must be info, fantasy, graphs, live, points, tipsters, series_stats, prediction_xi or agent")
+    raise ApiError(400, "BAD_REQUEST", "unknown part")
 
 def need_user(who):
     if not who or not who.get("user_id"):

@@ -1176,3 +1176,11 @@ for _code, _vals in _SEC.items():
     (EN if _code == "en" else STRINGS.setdefault(_code, {})).update(_d)
     if _code == "en":
         STRINGS.setdefault("en", {}).update(_d)
+
+_CMW = {"en": "Commentary appears here as the match moves on.", "hi": "मैच आगे बढ़ने पर कमेंट्री यहाँ दिखेगी।", "te": "మ్యాచ్ సాగుతున్న కొద్దీ కామెంటరీ ఇక్కడ కనిపిస్తుంది.",
+ "ta": "போட்டி நகரும்போது வர்ணனை இங்கே தோன்றும்.", "kn": "ಪಂದ್ಯ ಮುಂದುವರಿದಂತೆ ವೀಕ್ಷಕ ವಿವರಣೆ ಇಲ್ಲಿ ಕಾಣುತ್ತದೆ.", "bn": "ম্যাচ এগোলে ধারাভাষ্য এখানে দেখা যাবে।",
+ "mr": "सामना पुढे जाईल तसे समालोचन येथे दिसेल.", "ur": "میچ آگے بڑھنے پر کمنٹری یہاں نظر آئے گی۔", "es": "Los comentarios aparecen aquí a medida que avanza el partido."}
+for _code, _v in _CMW.items():
+    (EN if _code == "en" else STRINGS.setdefault(_code, {}))["cm.waiting"] = _v
+    if _code == "en":
+        STRINGS.setdefault("en", {})["cm.waiting"] = _v

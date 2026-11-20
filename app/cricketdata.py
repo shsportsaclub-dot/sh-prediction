@@ -313,10 +313,12 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
             c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(new_sc), now_fn(), mid))
             last = new_sc[-1]["total"] if new_sc and new_sc[-1].get("total") else None
             prev = old_sc[-1]["total"] if old_sc and old_sc[-1].get("total") else None
+            # SH commentary from scorecard changes (works even when the source sends no ball-by-ball rows)
+            if old_sc is not None and new_sc != old_sc:
+                store_updates(c, mid, derive_updates(old_sc, new_sc), now_fn)
             if last and last != prev:
                 import live
-                live.publish(c, mid, "ball", {"score": "%s-%s" % (last["r"], last["w"]), "overs": last["o"], "source": "CricketData",
-                                              "commentary": "Score update from CricketData"})
+                live.publish(c, mid, "ball", {"score": "%s-%s" % (last["r"], last["w"]), "overs": last["o"], "source": "scorecard"})
         else:
             mnotes.append(err)
         if age(row["squad_at"]) >= cfg.get("squad_every_min", 120):
@@ -387,3 +389,81 @@ def publish_new_balls(c, mid, balls, now_fn):
     if sent:
         live.wake()
     return sent
+
+
+def _ob(o):
+    s = str(o if o is not None else "0").split(".")
+    try:
+        return int(float(s[0] or 0)) * 6 + (int(s[1]) if len(s) > 1 and s[1] else 0)
+    except ValueError:
+        return 0
+
+
+def derive_updates(old_sc, new_sc):
+    """SH's own commentary lines from two scorecard snapshots (used when the source sends no ball-by-ball rows).
+    Only facts in the two cards are used: runs, balls, 4s, 6s, dismissals, bowler figures. Nothing is invented."""
+    out = []
+    if not new_sc:
+        return out
+    olds = {i.get("inning"): i for i in (old_sc or [])}
+    for inn in new_sc:
+        o = olds.get(inn.get("inning"))
+        if o is None:
+            if old_sc is not None:
+                out.append({"kind": "innings", "text": "%s begin their innings." % re.sub(r"\s*inning\s*\d+$", "", str(inn.get("inning") or ""), flags=re.I),
+                            "flash": None})
+            continue
+        nt, ot = inn.get("total") or {}, o.get("total") or {}
+        nb_bat = {b.get("name"): b for b in inn.get("batting") or [] if b.get("name")}
+        ob_bat = {b.get("name"): b for b in o.get("batting") or [] if b.get("name")}
+        dballs = sum((b.get("b") or 0) for b in nb_bat.values()) - sum((b.get("b") or 0) for b in ob_bat.values())
+        lines, flash = [], None
+        wickets = []
+        for name, b in nb_bat.items():
+            p = ob_bat.get(name)
+            out_now = bool(b.get("dismissal")) and not re.search(r"not out|batting", b.get("dismissal") or "", re.I)
+            out_before = p and p.get("dismissal") and not re.search(r"not out|batting", p.get("dismissal") or "", re.I)
+            if out_now and not out_before:
+                wickets.append("WICKET! %s %s, %d (%d)." % (name, b.get("dismissal"), b.get("r") or 0, b.get("b") or 0))
+                continue
+            if not p:
+                if not out_now:
+                    lines.append("%s comes in to bat." % name)
+                continue
+            d4 = (b.get("fours") or 0) - (p.get("fours") or 0)
+            d6 = (b.get("sixes") or 0) - (p.get("sixes") or 0)
+            dr = (b.get("r") or 0) - (p.get("r") or 0)
+            if d6 > 0:
+                lines.append("SIX! %s%s, now %d (%d)." % (name, " (%d sixes)" % d6 if d6 > 1 else "", b.get("r") or 0, b.get("b") or 0))
+            if d4 > 0:
+                lines.append("FOUR! %s%s, now %d (%d)." % (name, " (%d fours)" % d4 if d4 > 1 else "", b.get("r") or 0, b.get("b") or 0))
+            if dr > 0 and not d4 and not d6:
+                lines.append("%s adds %d, now %d (%d)." % (name, dr, b.get("r") or 0, b.get("b") or 0))
+        score = "%s-%s (%s)" % (nt.get("r"), nt.get("w"), nt.get("o")) if nt.get("r") is not None else ""
+        dr_tot = (nt.get("r") or 0) - (ot.get("r") or 0) if nt.get("r") is not None and ot.get("r") is not None else None
+        dball_tot = _ob(nt.get("o")) - _ob(ot.get("o")) if nt.get("o") is not None and ot.get("o") is not None else dballs
+        if wickets:
+            flash = {"wicket": True, "batter": wickets[0].split("WICKET! ")[1].split(" ")[0]}
+        elif dball_tot == 1 and dr_tot is not None:
+            sixes = any(l.startswith("SIX") for l in lines); fours = any(l.startswith("FOUR") for l in lines)
+            flash = {"runs": 6} if sixes and dr_tot >= 6 else {"runs": 4} if fours and dr_tot >= 4 else {"runs": dr_tot}
+        if not lines and not wickets and dball_tot == 1 and dr_tot == 0:
+            lines.append("No run.")
+        elif not lines and not wickets and dr_tot:
+            lines.append("%d run%s from the last %s." % (dr_tot, "" if dr_tot == 1 else "s", "ball" if dball_tot == 1 else "%d balls" % dball_tot if dball_tot > 1 else "update"))
+        if wickets or lines:
+            out.append({"kind": "wicket" if wickets else "score", "overs": nt.get("o"), "score": score,
+                        "text": " ".join(wickets + lines), "flash": flash})
+    return out
+
+
+def store_updates(c, mid, ups, now_fn):
+    import live
+    c.execute("""CREATE TABLE IF NOT EXISTS score_updates(id INTEGER PRIMARY KEY, match_id INTEGER NOT NULL REFERENCES matches(id), overs TEXT, score TEXT,
+                 kind TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL)""")
+    for u in ups:
+        c.execute("INSERT INTO score_updates(match_id,overs,score,kind,text,created_at) VALUES(?,?,?,?,?,?)",
+                  (mid, str(u.get("overs") or ""), u.get("score"), u["kind"], u["text"], now_fn()))
+        if u.get("flash"):
+            f = dict(u["flash"], commentary=u["text"], over=str(u.get("overs") or ""), source="scorecard", status="PROVIDER_REPORTED")
+            live.publish(c, mid, "delivery", f)

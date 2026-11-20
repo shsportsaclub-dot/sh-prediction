@@ -114,7 +114,7 @@ window.mcBoard=function(m){const pd=PD(m),L=m.live_score;let lines=[],cr="",ev="
   '<div class="bb"><i></i>'+(cells.length?cells.map(([a,b])=>'<span>'+esc(a)+' <b>'+esc(String(b))+'</b></span>').join(""):'<span>'+esc(m.format)+'</span>')+'<i></i></div>'+
   (lead||lines.length>1?'<div class="bl2">'+[lead].concat(lines.slice(0,-1).map(x=>esc(x.t)+" "+x.r+"-"+x.w+" ("+esc(String(x.o))+")")).filter(Boolean).join(" · ")+'</div>':'')+
   boardPlayers(m,pd)+(status?'<div class="bst">'+esc(status)+'</div>':'')+'</div>'+
-  '<div class="mc-meta"><span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span> '+(cur&&cur.rep?'USER_REPORTED · ':'')+(pd&&pd.scorecard_at?esc("Updated "+ago(pd.scorecard_at)+" · "+pd.source):L?esc("Updated "+ago(L.fetched_at)+" · "+L.source):"")+'</div>'};
+  '<div class="mc-meta">'+(cur&&cur.rep?'USER_REPORTED · ':'')+(pd&&pd.scorecard_at?esc("Updated "+ago(pd.scorecard_at)):L?esc("Updated "+ago(L.fetched_at)):"")+'</div>'};
 /* batters at the crease and the current bowler, inside the board (SH style) */
 function boardPlayers(m,pd){if(!pd||!pd.scorecard||!pd.scorecard.length||m.status!=="live")return "";
  const li=pd.scorecard[pd.scorecard.length-1],B=pd.balls||[],lb=B[B.length-1]||{};
@@ -137,12 +137,12 @@ function batTable(inn){return '<table class="simple sc"><thead><tr><th>Batter</t
 function bowlTable(inn){return '<table class="simple sc"><thead><tr><th>Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr></thead><tbody>'+
  inn.bowling.map(b=>'<tr><td><b>'+esc(b.name||"")+'</b>'+((b.wd||b.nb)?'<div class="muted dis">'+(b.wd?b.wd+" wd ":"")+(b.nb?b.nb+" nb":"")+'</div>':'')+'</td><td>'+esc(String(b.o??"—"))+'</td><td>'+(b.m??"—")+'</td><td>'+(b.r??"—")+'</td><td><b>'+(b.w??"—")+'</b></td><td>'+(b.eco??"—")+'</td></tr>').join("")+'</tbody></table>'}
 const extrasTxt=e=>{if(!e)return "—";const k=["b","lb","w","nb","p"].filter(x=>e[x]!=null);const tot=e.total!=null?e.total:k.reduce((a,x)=>a+(+e[x]||0),0);return tot+(k.length?' ('+k.map(x=>x+" "+e[x]).join(", ")+')':'')};
-const srcNote=pd=>'<p class="muted">Source: '+esc(pd.source)+' · '+esc(pd.rule)+'</p>'+(pd.notes&&pd.notes.length?'<p class="muted">Not available: '+pd.notes.map(esc).join(" · ")+'</p>':'');
+const srcNote=pd=>'';   // no provider names on screen (owner, 20 Nov 2026)
 
 const localTime=u=>{try{return new Date(u).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return u}};
 function scoreOnly(m){const L=m.live_score;if(!L||!L.innings||!L.innings.length)return null;
  return '<div class="card"><h3>Score</h3>'+L.innings.map(i=>'<div class="row"><b class="grow">'+esc(teamShort(m,i.inning))+'</b><span class="mc-score">'+i.r+'-'+i.w+'</span> <span class="muted">('+esc(String(i.o))+' ov)</span></div>').join("")+
-  (L.status_text?'<p><b>'+esc(L.status_text)+'</b></p>':'')+'<p class="muted">Score line from '+esc(L.source)+', updated '+ago(L.fetched_at)+'. Batter-by-batter detail appears when the full scorecard for this match is received.</p></div>'}
+  (L.status_text?'<p><b>'+esc(L.status_text)+'</b></p>':'')+'<p class="muted">Updated '+ago(L.fetched_at)+'. Batter-by-batter detail appears when the full scorecard for this match is received.</p></div>'}
 window.mcTab={
  live:async m=>{const pd=PD(m);if(!pd||m.status!=="live"&&!pd.featured){if((m.data_status||"").indexOf("ball_by_ball")<0&&m.live_score)return scoreOnly(m);return null}   // our own ball-by-ball keeps the original Live tab
   const li=lastInn(pd.scorecard),notOut=li.batting.filter(b=>/not out/i.test(b.dismissal||"")),cur=li.bowling.slice(-1);
@@ -156,7 +156,7 @@ window.mcTab={
    '<dl class="kv"><dt>Extras</dt><dd>'+esc(extrasTxt(i.extras))+'</dd><dt>Total</dt><dd>'+(i.total?i.total.r+'-'+i.total.w+' ('+esc(String(i.total.o))+' ov)':'—')+'</dd></dl>'+(i.bowling.length?bowlTable(i):'')+'</div>').join("")+srcNote(pd)},
  xi:async m=>{const pd=m.provider_detail;if(!pd||!pd.squads||!pd.squads.length)return null;
   return '<div class="sq-grid">'+pd.squads.map(t=>'<div class="card"><h3>'+esc(t.team||"")+'</h3>'+t.players.map(p=>'<div class="sq-p"><span class="av">'+esc((p.name||"?").split(" ").map(x=>x[0]).join("").slice(0,2))+'</span><span><b>'+esc(p.name||"")+'</b><div class="muted">'+esc(p.role||"")+'</div></span></div>').join("")+'</div>').join("")+'</div>'+
-   '<p class="muted">Squads from '+esc(pd.source)+(pd.squads_at?' · updated '+ago(pd.squads_at):'')+'. Final XI is confirmed at the toss.</p>'},
+   '<p class="muted">'+(pd.squads_at?'Updated '+ago(pd.squads_at)+'.':'')+' Final XI is confirmed at the toss.</p>'},
  graphs:async m=>{const pd=m.provider_detail;if(!pd||!pd.runs_per_over||!pd.runs_per_over.length||(m.data_status||"").indexOf("ball_by_ball")>=0)return null;
   later(()=>{const cv=document.getElementById("mh");if(!cv)return;const x=cv.getContext("2d"),d=pd.runs_per_over,max=Math.max(6,...d.map(v=>v.runs));x.clearRect(0,0,cv.width,cv.height);
    const w=cv.width/d.length;d.forEach((v,i)=>{const hh=(v.runs/max)*(cv.height-24);x.fillStyle=v.inning==="0"||v.inning==="1"?"#2d7ff9":"#ff8a1f";x.fillRect(i*w+3,cv.height-18-hh,w-6,hh);x.fillStyle="#9aa";x.font="10px sans-serif";x.fillText(String(v.over),i*w+w/2-4,cv.height-4)})});
@@ -201,7 +201,7 @@ window.mcTab.commentary=async m=>{const j=await api("/matches/"+m.id+"/commentar
   box.querySelectorAll("[data-cf]").forEach(x=>x.onclick=()=>{f=x.dataset.cf;draw()});draw()});
  return '<div id="'+id+'"><div class="chips">'+[["all","home.all"],["hl","mc.highlights"],["overs","mc.overs"],["w","W"],["4","4s"],["6","6s"]].map(([k,l])=>'<button data-cf="'+k+'">'+esc(l.indexOf(".")>0?t(l):l)+'</button>').join("")+'</div><div class="card cm-list"></div>'+
   (j.language_note?'<p class="muted">'+esc(j.language_note)+'</p>':'')+'<p class="muted">'+esc(j.note||"")+'</p></div>'};
-window.mcTab.info=async m=>matchDetails(m)+'<p class="muted">Source: '+esc(m.source)+'</p>'+(m.attribution?'<p class="muted">'+esc(m.attribution.text)+' · <a href="'+esc(m.attribution.url)+'" rel="noopener" target="_blank">licence</a></p>':'');
+window.mcTab.info=async m=>matchDetails(m)+(m.attribution?'<p class="muted">'+esc(m.attribution.text)+' · <a href="'+esc(m.attribution.url)+'" rel="noopener" target="_blank">licence</a></p>':'');
 window.mcTabAfter={
  info:m=>(function(){const v=m.history&&m.history.venue;if(!v)return "";
   return '<div class="card"><h3>Venue stats · '+esc(v.name)+'</h3>'+(v.matches?'<dl class="kv"><dt>Matches</dt><dd>'+v.matches+'</dd><dt>Avg 1st innings</dt><dd>'+v.avg_first_innings+'</dd><dt>Avg 2nd innings</dt><dd>'+v.avg_second_innings+'</dd>'+

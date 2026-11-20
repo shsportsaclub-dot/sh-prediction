@@ -135,7 +135,7 @@ window.mcTabBefore.fantasy=async m=>{const ss=(await predictionXI(m))+(await ser
    document.body.appendChild(s);s.onclick=e=>{if(e.target===s||e.target.closest("[data-x]"))s.remove()}}});
  return ss+'<div id="'+id+'"><div class="mcard dl"><span><b>'+d.leaderboard.teams+'</b> '+esc(t("ins.teams_playing"))+'</span><a href="javascript:void 0" data-lb>'+esc(t("ins.leaderboard"))+' ›</a></div>'+
   sec(esc(t("ins.top_points"))+(d.live?' <span class="tag" style="color:#ff6b6b">● LIVE</span>':''),'<div class="fp-cards">'+d.players.slice(0,8).map((p,i)=>'<button class="fp-card'+(p.team===lab(m,"away")||p.team===m.away.name?" aw":"")+'" data-fp="'+i+'"><small>'+esc(p.team||"")+'</small><b>'+esc(p.name)+'</b><strong>'+p.points.toFixed(1)+'</strong> <small style="display:inline">pts</small></button>').join("")+'</div>',
-   '<a href="javascript:void 0" data-all>'+esc(t("ins.see_all"))+' ›</a>')+'<p class="muted">'+esc(d.rules_note)+' '+esc(t("ins.dots"))+': '+esc(d.dot_balls)+'. '+esc(t("ins.source"))+': '+esc(d.source)+'</p></div>'};
+   '<a href="javascript:void 0" data-all>'+esc(t("ins.see_all"))+' ›</a>')+'<p class="muted">'+esc(d.rules_note)+'</p></div>'};
 const EVL={announced:"ins.ev_announced",runs:"ins.ev_runs",fours:"4's",sixes:"6's",sr:"SR",milestone:"25/50/75/100",duck:"ins.ev_duck",dots:"ins.ev_dots",wickets:"ins.ev_wickets",lbw_bowled:"LBW/Bowled",haul:"ins.ev_haul",maidens:"ins.ev_maidens",economy:"ins.ev_economy",catches:"ins.ev_catches",three_catch:"ins.ev_3catch",stumpings:"ins.ev_stumpings",run_outs:"ins.ev_runouts"};
 function fpSheet(i,m){const d=window._fp;if(!d)return;const p=d.players[i];document.querySelectorAll(".sheet").forEach(x=>x.remove());
  const s=document.createElement("div");s.className="sheet";
@@ -177,7 +177,7 @@ window.mcTab.live=async m=>{const pd=m.provider_detail;if(!pd||!pd.scorecard||!p
   bats.map(b=>'<tr><td>'+phAvatar(b.name)+'<b>'+esc(b.name||"")+'</b>'+(same(b.name,lb.batter)?' 🏏':'')+'</td><td><b>'+(b.r??0)+'</b> ('+(b.b??0)+')</td><td>'+(b.fours??0)+'</td><td>'+(b.sixes??0)+'</td><td>'+sr(b)+'</td></tr>').join("")+'</tbody></table>'+
   '<div class="dl lvp"><span>'+esc(t("ins.pship"))+': <b>'+(x&&x.partnership?x.partnership.runs+' ('+x.partnership.balls+')':"—")+'</b></span><span class="muted">'+esc(t("ins.last_wkt"))+': '+(x&&x.last_wicket?esc(x.last_wicket.name)+(x.last_wicket.runs!=null?' '+x.last_wicket.runs+' ('+x.last_wicket.balls+')':''):"—")+'</span></div>'+
   (bw?'<table class="simple lvt"><thead><tr><th>'+esc(t("an.bowl"))+'</th><th>W-R</th><th>Ov</th><th>Econ</th></tr></thead><tbody><tr><td>'+phAvatar(bw.name)+'<b>'+esc(bw.name||"")+'</b></td><td><b>'+(bw.w??0)+'-'+(bw.r??0)+'</b></td><td>'+esc(String(bw.o??"—"))+'</td><td>'+(bw.eco??"—")+'</td></tr></tbody></table>':'')+
-  '</div><p class="muted">'+esc(t("ins.source"))+': '+esc(pd.source)+'</p>'};
+  '</div>'};
 
 
 /* ---------------- Scorecard: one innings at a time, with a switcher and "yet to bat" */
@@ -228,7 +228,7 @@ window.mcTab.graphs=async m=>{let d;try{d=await I(m,"graphs")}catch(e){return nu
   b.querySelectorAll("[data-h]").forEach(x=>x.onclick=()=>show(+x.dataset.h));show(d.innings.length-1)});
  out+=sec(esc(t("mc.history")),'<div id="'+id+'"><div class="inn-sw">'+d.innings.map((i,k)=>'<button data-h="'+k+'">'+esc(nameOf(i.side)||(t("ins.innings")+" "+i.innings))+'</button>').join("")+'</div>'+
   d.innings.map(i=>'<div class="ohl">'+i.overs.slice().reverse().map(o=>'<details class="ovh-d"><summary class="ovh"><span>'+o.over+' '+esc(t("ins.over"))+'</span><span>'+esc(nameOf(i.side))+' <b>'+o.total+'/'+o.total_wickets+'</b> <small class="muted">(+'+o.runs+')</small></span></summary><div class="ovchips">'+o.balls.map(chip).join("")+'</div></details>').join("")+'</div>').join("")+'</div>');
- return out+'<p class="muted">'+esc(t("ins.source"))+': '+esc(d.source)+(d.note?' · '+esc(d.note):'')+'</p>'};
+ return out+(d.note?'<p class="muted">'+esc(d.note)+'</p>':'')};
 })();
 /* ---------------- Tipster reports: a slow upward scroll under Live (and under Info before the match) */
 (function(){
@@ -264,12 +264,14 @@ window.mcAgent=async(m,box)=>{if(!box)return;let d;try{d=await I(m,"agent")}catc
  const H=d.headline,L=d.live;if(!H&&!L){box.innerHTML=d.note?'<div class="agent"><b>🧠 '+esc(t("ag.title"))+'</b><p class="muted">'+esc(d.note)+'</p></div>':"";return}
  const p=L||H,hp=p.home_win_probability,ap=p.away_win_probability;
  const pick=H?(H.predicted_team||""):(hp>=50?m.home.name:m.away.name);
- box.innerHTML='<details class="agent"><summary class="ag-top"><span>🧠 <b>'+esc(t("ag.title"))+'</b> · <b>'+esc(pick)+'</b> '+Math.round(Math.max(hp,ap))+'%</span><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+' ▾</small></summary>'+
+ const sn=x=>window.shortName?shortName(x):(x.short_code||x.name);
+ box.innerHTML='<div class="agent"><div class="ag-top"><span>🧠 <b>'+esc(t("ag.title"))+'</b></span><small class="muted">'+esc(L?t("ag.live"):t(STG[H.stage]))+'</small></div>'+
   '<div class="ag-bar"><i style="width:'+hp+'%;background:#4fb3ff"></i><i style="width:'+ap+'%;background:#ff8a1f"></i></div>'+
-  '<div class="dl"><b class="c-home">'+esc(m.home.short_code||m.home.name)+' '+hp+'%</b><b class="c-away">'+ap+'% '+esc(m.away.short_code||m.away.name)+'</b></div>'+
+  '<div class="dl ag-pct"><b class="c-home">'+esc(sn(m.home))+' '+Math.round(hp)+'%</b><b class="c-away">'+Math.round(ap)+'% '+esc(sn(m.away))+'</b></div>'+
+  '<details><summary class="muted">'+esc(t("ag.why"))+' ▾</summary>'+
   (H?'<div class="muted">'+esc(t("ag.confidence"))+': '+esc(H.confidence_level||"—")+' · '+esc(H.model)+' · '+esc(new Date(H.created_at).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</div>':'')+
   '<div class="ag-stages">'+d.stages.map(s=>'<span class="'+(s.outcome||"")+'">'+esc(t(STG[s.stage]))+': '+esc(s.predicted_team||"")+' '+s.confidence+'%'+(s.outcome==="correct"?" ✓":s.outcome==="incorrect"?" ✗":"")+'</span>').join("")+(L?'<span>'+esc(t("ag.live"))+': '+esc(t("ins.over"))+' '+L.after_over+'</span>':'')+'</div>'+
-  '<p class="muted" style="margin:6px 0 0">'+esc(d.verification)+' <a href="#/match/'+m.id+'/prediction">'+esc(t("ag.why"))+' ›</a></p></details>'};
+  '<p class="muted" style="margin:6px 0 0">'+esc(d.verification)+' <a href="#/match/'+m.id+'/prediction">'+esc(t("ag.why"))+' ›</a></p></details></div>'};
 
 /* Playing XI: our tables first, then the XI / squad the source sent; captain and keeper marked when the source says so */
 const baseXI=window.mcTab.xi;
@@ -277,7 +279,7 @@ window.mcTab.xi=async m=>{if((m.playing_xi&&m.playing_xi.length)||(m.squads&&m.s
  const sq=m.provider_detail&&m.provider_detail.squads;if(!sq||!sq.length)return '<div class="state">'+esc(t("pxi.from_squad"))+' — '+esc(t("data.na"))+'</div>';
  const conf=sq.every(x=>(x.players||[]).length<=12);
  const roleTag=r=>{r=(r||"").toLowerCase();return /wk|keeper/.test(r)?"WK":/allrounder|all-rounder/.test(r.replace(/\s/g,""))?"AR":/bowl/.test(r)?"BOWL":r?"BAT":""};
- return '<p class="muted">'+esc(t(conf?"pxi.from_xi":"pxi.from_squad"))+' · '+esc(t("ins.source"))+': CricketData.org (PROVIDER_REPORTED)</p>'+sq.map(T=>{const ps=T.players||[];
+ return '<p class="muted">'+esc(t(conf?"pxi.from_xi":"pxi.from_squad"))+'</p>'+sq.map(T=>{const ps=T.players||[];
   return '<div class="card"><h3>'+esc(T.team)+' <small class="muted">'+ps.length+'</small></h3><table class="simple"><tbody>'+ps.map((p,i)=>{const cap=/\(c\)|captain/i.test((p.name||"")+" "+(p.role||""));
    return '<tr'+(conf&&i>=11?' class="muted"':'')+'><td>'+(i+1)+'</td><td><b>'+esc(String(p.name||"").replace(/\s*\((c|wk|c & wk)\)/ig,""))+'</b>'+(cap?' <span class="tag">C</span>':'')+(roleTag(p.role)==="WK"?' <span class="tag">WK</span>':'')+(conf&&i>=11?' <span class="tag">'+esc(t("xi.sub"))+'</span>':'')+'</td><td class="muted">'+esc(p.role||"—")+'</td></tr>'}).join("")+'</tbody></table></div>'}).join("")};
 
@@ -287,7 +289,7 @@ window.mcTab.results=async m=>{let ag=null,tp=null,pts=null,fan=null;
  const src=(m.result_source||m.source||"");const st=/^Owner Google Sheet/.test(m.result_source||"")?"USER_REPORTED":/CricketData/i.test(m.result_source||"")?"PROVIDER_REPORTED":m.result_type?"VERIFIED":"PENDING";
  let out='<div class="card"><h3>'+esc(t("mc.results"))+'</h3>'+(m.result_type?'<div class="ag-pick" style="font-size:20px;font-weight:800">'+esc(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" "+t("rs.won")+(m.margin?" · "+m.margin:"")):m.result_type.replace(/_/g," "))+'</div>'
   :'<div class="state">'+esc(t(m.status==="live"?"rs.in_progress":"rs.pending"))+'</div>')+
-  '<p class="muted">'+esc(t("rs.status"))+': <span class="tag">'+st+'</span>'+(m.result_source?' · '+esc(m.result_source):'')+'</p>'+
+  '<p class="muted">'+esc(t("rs.status"))+': <span class="tag">'+st+'</span></p>'+
   (m.reported_scores&&m.reported_scores.length?'<p>'+m.reported_scores.map(s=>'<b>'+esc(s.team)+'</b> '+s.runs+'/'+s.wickets+(s.overs?' ('+esc(s.overs)+')':'')).join(" · ")+' <span class="tag">USER_REPORTED</span></p>':'')+
   '<p class="muted">'+esc(t("rs.potm"))+': '+esc(t("data.na"))+'</p></div>';
  if(fan&&fan.players&&fan.players.length&&m.status!=="scheduled"){const P=fan.players;const by=(f)=>P.slice().sort((a,b)=>f(b)-f(a))[0];
@@ -317,3 +319,11 @@ window.mcLive=(m,tab)=>{const on=m.status==="live";
  ES.onopen=()=>{if(poll){clearInterval(poll);poll=null}}};
 window.addEventListener("hashchange",()=>{if(ES&&ESmid&&!new RegExp("^#/match/"+ESmid+"(/|$)").test(location.hash)){ES.close();ES=null;ESmid=null}});
 })();
+
+/* Commentary when the source sends no ball-by-ball rows: SH lines written from scorecard changes, newest first */
+(function(){const baseC=window.mcTab.commentary;
+window.mcTab.commentary=async(m,nm)=>{const pd=m.provider_detail;const hasBalls=pd&&pd.balls&&pd.balls.length;
+ if(hasBalls||!pd)return baseC?baseC(m,nm):null;
+ let d;try{d=await api("/matches/"+m.id+"/insights?part=updates")}catch(e){return baseC?baseC(m,nm):null}
+ if(!d.items.length)return '<div class="state">'+esc(t("cm.waiting"))+'</div>';
+ return '<div class="cm-list">'+d.items.map(x=>'<div class="cm-b'+(x.kind==="wicket"?" cm-w":"")+'"><b class="cm-o">'+esc(x.overs||"")+'</b><span class="bl '+(x.kind==="wicket"?"bw":/^SIX/.test(x.text)?"b6":/FOUR/.test(x.text)?"b4":"b1")+'">'+(x.kind==="wicket"?"W":/^SIX/.test(x.text)?"6":/FOUR/.test(x.text)?"4":"•")+'</span><span>'+esc(x.text)+(x.score?' <small class="muted">'+esc(x.score)+'</small>':'')+'</span></div>').join("")+'</div>'};})();

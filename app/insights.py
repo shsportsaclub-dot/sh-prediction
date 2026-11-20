@@ -193,7 +193,7 @@ def info(c, r, team_family, fetch=None):
                  "recent": [_match_card(c, m) for m in ms[:5]]}
         venue["weather"] = weather(c, vname["name"], vname["city"], fetch=fetch)
     out["venue"] = venue
-    out["note"] = "From completed %s matches in the SH database (Cricsheet, owner sheets, SH scoring, provider results). Demo data excluded." % fmt
+    out["note"] = "From completed %s matches in the SH database. Demo data excluded." % fmt
     return out
 
 
@@ -454,7 +454,7 @@ def _over_rows(c, r, pd):
             pass
         sidek = "home" if name and name == hn else "away" if name and name == an else None
         out.append((idx + 1, sidek, [cur[k][o] for o in sorted(cur[k])], first[k] == (0, 1)))
-    return out, "CricketData.org ball-by-ball"
+    return out, "live ball-by-ball"
 
 def graphs(c, r, pd):
     inns, src = _over_rows(c, r, pd)
@@ -740,7 +740,7 @@ def series_stats(c, r, provider_detail, cat="fantasy", last=None, venue=False, v
             "teams": teams, "items": rows_[:limit], "recent": recent, "matches_used": len(used),
             "qualification": {"sr": "at least %d balls faced" % MIN_SR_BALLS, "econ": "at least %s overs bowled" % _ovs(min_econ)}.get(cat),
             "empty": "No matching statistics" if not rows_ else None,
-            "note": "From %d completed match(es) of this series with a scorecard (CricketData.org or the SH database). Last 5 = each player's own last 5 matches." % len(used)}
+            "note": "From %d completed match(es) of this series with a scorecard. Last 5 = each player's own last 5 matches." % len(used)}
 
 
 # ------------------------------------------------------------------ SH Prediction XI (dream-team style, free to play)

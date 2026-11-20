@@ -129,3 +129,32 @@ class PlayerPhotos(unittest.TestCase):
         out = photos.get_many(c, ["Henry Nicholls"], schema.now, fetch=self.fake("Non-free media"))
         self.assertIsNone(out["Henry Nicholls"])
         c.close()
+
+
+class ScorecardCommentary(unittest.TestCase):
+    """No ball rows from the source: SH lines and board flashes from two scorecard snapshots (synthetic cards)."""
+    def card(self, r, w, o, bats, bowl=None):
+        return [{"inning": "Heat Inning 1", "total": {"r": r, "w": w, "o": o},
+                 "batting": [{"name": n, "r": rr, "b": bb, "fours": f, "sixes": s, "dismissal": d} for n, rr, bb, f, s, d in bats],
+                 "bowling": bowl or []}]
+
+    def test_four_six_wicket_and_dot(self):
+        import cricketdata as CD
+        a = self.card(100, 0, "9.3", [("Grace Harris", 34, 23, 2, 3, "not out"), ("Charli Knott", 28, 19, 4, 1, "not out")])
+        b = self.card(104, 0, "9.4", [("Grace Harris", 38, 24, 3, 3, "not out"), ("Charli Knott", 28, 19, 4, 1, "not out")])
+        u = CD.derive_updates(a, b)
+        self.assertTrue(u[0]["text"].startswith("FOUR! Grace Harris"))
+        self.assertEqual(u[0]["flash"], {"runs": 4})
+        c = self.card(110, 0, "9.5", [("Grace Harris", 44, 25, 3, 4, "not out"), ("Charli Knott", 28, 19, 4, 1, "not out")])
+        self.assertEqual(CD.derive_updates(b, c)[0]["flash"], {"runs": 6})
+        d = self.card(110, 1, "9.6", [("Grace Harris", 44, 26, 3, 4, "c Smith b Bates"), ("Charli Knott", 28, 19, 4, 1, "not out")])
+        u = CD.derive_updates(c, d)
+        self.assertEqual(u[0]["kind"], "wicket"); self.assertTrue(u[0]["flash"]["wicket"])
+        self.assertIn("c Smith b Bates, 44 (26)", u[0]["text"])
+        e = self.card(110, 1, "10.1", [("Grace Harris", 44, 26, 3, 4, "c Smith b Bates"), ("Charli Knott", 28, 20, 4, 1, "not out")])
+        u = CD.derive_updates(d, e)
+        self.assertEqual((u[0]["text"], u[0]["flash"]), ("No run.", {"runs": 0}))
+        # several balls between two looks: a summary line, no flash (we cannot tell which ball did what)
+        f = self.card(121, 1, "10.4", [("Grace Harris", 44, 26, 3, 4, "c Smith b Bates"), ("Charli Knott", 39, 23, 5, 1, "not out")])
+        u = CD.derive_updates(e, f)
+        self.assertIsNone(u[0]["flash"])
