@@ -1,1 +1,29 @@
-{"badges": []}
+{
+ "badges": [
+  "country-australia.webp",
+  "country-bangladesh.webp",
+  "country-bermuda.webp",
+  "country-canada.webp",
+  "country-england.webp",
+  "country-hong-kong.webp",
+  "country-india.webp",
+  "country-ireland.webp",
+  "country-malaysia.webp",
+  "country-namibia.webp",
+  "country-nepal.webp",
+  "country-netherlands.webp",
+  "country-new-zealand.webp",
+  "country-oman.webp",
+  "country-pakistan.webp",
+  "country-png.webp",
+  "country-scotland.webp",
+  "country-singapore.webp",
+  "country-south-africa.webp",
+  "country-sri-lanka-alternate.webp",
+  "country-sri-lanka.webp",
+  "country-uae.webp",
+  "country-west-indies.webp",
+  "country-zimbabwe.webp"
+ ],
+ "source": "SH country ball artwork copied from shsportsaclub-dot/mename-shs-backend public/emblems (generated SH artwork, not official board logos; checksums match data/identity-assets.json). Official IPL franchise logos were NOT copied."
+}

@@ -51,9 +51,20 @@ const BALL_COL={"india":"#1f4fbf","australia":"#d9a400","england":"#1d3a8a","new
  "sri lanka":"#1d3fa8","bangladesh":"#006a4e","west indies":"#7b1e3a","afghanistan":"#1d4fa8","ireland":"#169b62","zimbabwe":"#c40000","netherlands":"#ff6f00",
  "scotland":"#1d3fa8","nepal":"#c8102e","united arab emirates":"#00732f","uae":"#00732f","sweden":"#006aa7","switzerland":"#c8102e","türkiye":"#d50a17","turkey":"#d50a17",
  "oman":"#c8102e","usa":"#1d3a8a","canada":"#c8102e","namibia":"#003580","uganda":"#1b1b1b","kenya":"#006600","rwanda":"#00a1de","italy":"#0066cc"};
-window.BADGES=window.BADGES||new Set();fetch("/badges/manifest.json").then(r=>r.json()).then(j=>(j.badges||[]).forEach(x=>BADGES.add(x))).catch(()=>{});
+window.BADGES=window.BADGES||new Set(["country-australia.webp","country-bangladesh.webp","country-bermuda.webp","country-canada.webp","country-england.webp","country-hong-kong.webp","country-india.webp","country-ireland.webp","country-malaysia.webp","country-namibia.webp","country-nepal.webp","country-netherlands.webp","country-new-zealand.webp","country-oman.webp","country-pakistan.webp","country-png.webp","country-scotland.webp","country-singapore.webp","country-south-africa.webp","country-sri-lanka.webp","country-sri-lanka-alternate.webp","country-uae.webp","country-west-indies.webp","country-zimbabwe.webp"]);fetch("/badges/manifest.json").then(r=>r.json()).then(j=>(j.badges||[]).forEach(x=>BADGES.add(x))).catch(()=>{});
 const slug=n=>String(n||"").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-window.ballBadge=function(team,size){size=size||52;const s=slug(team.name);
+/* owner's SH country ball artwork (from the Scoring Heroes asset set): name / code -> file */
+const EMB={"india":"india","ind":"india","australia":"australia","aus":"australia","england":"england","eng":"england","new zealand":"new-zealand","nz":"new-zealand",
+ "pakistan":"pakistan","pak":"pakistan","sri lanka":"sri-lanka","sl":"sri-lanka","south africa":"south-africa","sa":"south-africa","rsa":"south-africa",
+ "bangladesh":"bangladesh","ban":"bangladesh","west indies":"west-indies","wi":"west-indies","windies":"west-indies","ireland":"ireland","ire":"ireland",
+ "scotland":"scotland","sco":"scotland","netherlands":"netherlands","ned":"netherlands","canada":"canada","can":"canada","oman":"oman","uae":"uae",
+ "united arab emirates":"uae","namibia":"namibia","nam":"namibia","nepal":"nepal","nep":"nepal","zimbabwe":"zimbabwe","zim":"zimbabwe",
+ "papua new guinea":"png","png":"png","hong kong":"hong-kong","hong kong china":"hong-kong","hk":"hong-kong","malaysia":"malaysia","singapore":"singapore","bermuda":"bermuda"};
+const embFile=team=>{const n=String(team.name||"").toLowerCase().replace(/[’']/g,"").replace(/[_-]/g," ").replace(/\s+/g," ").trim();
+ const b=n.replace(/\s+(?:(?:women|womens|men|mens)(?:\s+(?:a|xi|u\s?19|under\s?19))?|under\s?19|u\s?19|a|xi)$/,"").trim();
+ const id=EMB[n]||EMB[b]||EMB[String(team.short_code||"").toLowerCase()];const f=id?"country-"+id+".webp":null;return f&&BADGES.has(f)?f:null};
+window.ballBadge=function(team,size){size=size||52;const s=slug(team.name);const ef=embFile(team);
+ if(ef)return '<img class="bbadge" src="/badges/'+ef+'" width="'+size+'" height="'+size+'" alt="">';
  if(BADGES.has(s+".png")||BADGES.has(s+".webp"))return '<img class="bbadge" src="/badges/'+(BADGES.has(s+".png")?s+".png":s+".webp")+'" width="'+size+'" height="'+size+'" alt="">';
  const base=String(team.name||"").toLowerCase().replace(/\s+(women|men|u-?19|u-?23)$/,"").trim();
  let h=0;for(const ch of String(team.name||""))h=(h*31+ch.charCodeAt(0))%360;
@@ -102,8 +113,17 @@ window.mcBoard=function(m){const pd=PD(m),L=m.live_score;let lines=[],cr="",ev="
   '</div><div class="tm">'+badge(m.away)+'<span>'+esc(sn(m.away))+'</span></div></div>'+
   '<div class="bb"><i></i>'+(cells.length?cells.map(([a,b])=>'<span>'+esc(a)+' <b>'+esc(String(b))+'</b></span>').join(""):'<span>'+esc(m.format)+'</span>')+'<i></i></div>'+
   (lead||lines.length>1?'<div class="bl2">'+[lead].concat(lines.slice(0,-1).map(x=>esc(x.t)+" "+x.r+"-"+x.w+" ("+esc(String(x.o))+")")).filter(Boolean).join(" · ")+'</div>':'')+
-  (status?'<div class="bst">'+esc(status)+'</div>':'')+'</div>'+
+  boardPlayers(m,pd)+(status?'<div class="bst">'+esc(status)+'</div>':'')+'</div>'+
   '<div class="mc-meta"><span class="tag ds-'+esc(m.data_status)+'">'+esc(m.data_status_label||"")+'</span> '+(cur&&cur.rep?'USER_REPORTED · ':'')+(pd&&pd.scorecard_at?esc("Updated "+ago(pd.scorecard_at)+" · "+pd.source):L?esc("Updated "+ago(L.fetched_at)+" · "+L.source):"")+'</div>'};
+/* batters at the crease and the current bowler, inside the board (SH style) */
+function boardPlayers(m,pd){if(!pd||!pd.scorecard||!pd.scorecard.length||m.status!=="live")return "";
+ const li=pd.scorecard[pd.scorecard.length-1],B=pd.balls||[],lb=B[B.length-1]||{};
+ const same=(a,b)=>a&&b&&(a===b||String(a).split(" ").slice(-1)[0]===String(b).split(" ").slice(-1)[0]);
+ const bats=(li.batting||[]).filter(b=>/not out|batting/i.test(b.dismissal||"")).slice(0,2);const bw=(li.bowling||[]).find(b=>same(b.name,lb.bowler))||(li.bowling||[]).slice(-1)[0];
+ if(!bats.length&&!bw)return "";
+ const nm=n=>esc(String(n||"").replace(/\s*\((c|wk)\)/ig,""));
+ return '<div class="bp">'+bats.map(b=>'<span class="'+(same(b.name,lb.batter)?"on":"")+'">'+nm(b.name)+(same(b.name,lb.batter)?"*":"")+' <b>'+(b.r??0)+'</b><small>('+(b.b??0)+')</small></span>').join("")+
+  (bw?'<span class="bw"><i class="bdot"></i>'+nm(bw.name)+' <b>'+(bw.w??0)+'-'+(bw.r??0)+'</b><small>('+esc(String(bw.o??"0"))+')</small></span>':'')+'</div>'}
 /* ball-by-ball strip under the board: every received ball, newest at the right, scrolled into view */
 window.mcBalls=function(m){const pd=PD(m);const B=(pd&&pd.balls)||[];if(!B.length)return "";
  const byOv=[];B.forEach(b=>{const k=b.inning+"|"+b.over;let o=byOv[byOv.length-1];if(!o||o.k!==k){o={k,over:b.over,balls:[]};byOv.push(o)}o.balls.push(b)});
