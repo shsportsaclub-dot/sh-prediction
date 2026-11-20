@@ -176,6 +176,8 @@ NEEDS_DB_FN = {"cricsheet_recent", "cricsheet_backfill"}
 
 def run_job(db_fn, name, opener=None, force=False):
     """Run one job now (used by the loop and by the admin 'Run now' button). Returns the log row."""
+    import urllib.request
+    opener = opener or urllib.request.urlopen     # production passes no opener: without this every network job failed with "'NoneType' object is not callable"
     conn = db_fn()
     try:
         j = conn.execute("SELECT * FROM collector_jobs WHERE name=?", (name,)).fetchone()

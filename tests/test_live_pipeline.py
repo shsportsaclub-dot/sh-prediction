@@ -333,3 +333,26 @@ class NoLockAcrossNetwork(unittest.TestCase):
         self.assertTrue(api_v1._past_end({"start_utc": old, "format": "T10"}))
         self.assertFalse(api_v1._past_end({"start_utc": soon, "format": "T10"}))
         self.assertFalse(api_v1._past_end({"start_utc": old, "format": "ODI"}))
+
+
+class ProductionJobsUseRealNetwork(unittest.TestCase):
+    """Regression for the production bug: the scheduler calls run_job(db_fn, name) with no opener; jobs must then use
+    urllib (not None). Before the fix every sheet/CricketData job failed with "'NoneType' object is not callable"."""
+    def test_run_job_without_opener(self):
+        import urllib.request
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import test_bridge as TB
+        import scheduler
+        TB.T._migrate_once()
+        calls = []
+        def fake_urlopen(req, timeout=None):
+            calls.append(getattr(req, "full_url", req))
+            raise OSError("network disabled in tests")
+        orig = urllib.request.urlopen
+        urllib.request.urlopen = fake_urlopen
+        try:
+            r = scheduler.run_job(TB.T.db, "registry_index_sync", force=True)
+        finally:
+            urllib.request.urlopen = orig
+        self.assertTrue(calls and "docs.google.com" in calls[0], calls)          # it really tried the network
+        self.assertNotIn("NoneType", r["error"] or "")
