@@ -5,6 +5,7 @@ Jobs live in the collector_jobs table (interval, enabled, config). A failing job
 """
 import datetime
 import json
+import re
 import os
 import threading
 import time
@@ -254,6 +255,9 @@ def loop(db_fn, tick=60):
         time.sleep(tick)
 
 
+LIVE_STATE = {"running": False, "last_ok": None, "last_error": None, "last_error_at": None, "last_result": None}
+
+
 def live_loop(db_fn, opener=None, stop=None):
     """Fast refresh for live CricketData matches when the plan allows it (unlimited: every 10 s; other paid plans: every 60 s).
     The 15-minute/6-minute jobs keep running for the free plan; this loop only acts when the plan is paid."""
@@ -275,13 +279,18 @@ def live_loop(db_fn, opener=None, stop=None):
                             c.commit()
                             last_list = time.time()
                         cfg = json.loads((c.execute("SELECT config_json FROM collector_jobs WHERE name='cricketdata_detail'").fetchone() or ["{}"])[0])
-                        cricketdata.sync_detail(c, cfg, now, opener) if opener else cricketdata.sync_detail(c, cfg, now)
+                        res = cricketdata.sync_detail(c, cfg, now, opener) if opener else cricketdata.sync_detail(c, cfg, now)
                         c.commit()
                         live_mod.wake()
+                        LIVE_STATE.update(running=True, last_ok=now(), last_result={"featured": len(res.get("featured") or []), "hits_today": res.get("hits_used_today"),
+                                                                                    "notes": sorted({n[:160] for f in res.get("featured") or [] for n in f.get("notes") or []})[:8]})
+                    else:
+                        LIVE_STATE.update(running=True, last_result={"skipped": "plan is not paid: the 6-minute job runs instead"})
             finally:
                 c.close()
-        except Exception:
+        except Exception as e:
             traceback.print_exc()
+            LIVE_STATE.update(last_error=re.sub(r"apikey=[^&\s]+", "apikey=***", repr(e))[:300], last_error_at=now())
             wait = 30
         if stop:
             stop.wait(wait)

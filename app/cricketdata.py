@@ -295,61 +295,72 @@ def sync_detail(c, cfg, now_fn, opener=urllib.request.urlopen):
     targets = _detail_targets(c, dict(cfg, max_featured=A["max_featured"]))
     c.execute("UPDATE ext_match_detail SET featured=0")
     for t in targets:
-        mid, pid = t["id"], t["provider_id"]
-        row = c.execute("SELECT * FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()
-        if not row:
-            c.execute("INSERT INTO ext_match_detail(match_id,source) VALUES(?,'cricketdata')", (mid,))
+        mid, pid, mnotes = t["id"], t["provider_id"], []
+        try:
             row = c.execute("SELECT * FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()
-        c.execute("UPDATE ext_match_detail SET featured=1 WHERE match_id=?", (mid,))
-        age = lambda at: 10 ** 9 if not at else (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(at)).total_seconds() / 60
-        mnotes = []
-        data, err = (None, None) if age(row["scorecard_at"]) < A["scorecard_every_min"] - 0.2 else _detail_call(c, "match_scorecard", pid, budget, opener)
-        if data is None and err is None:
-            pass
-        elif data is not None:
-            new_sc = norm_scorecard(data)
-            old_sc = json.loads(row["scorecard_json"]) if row["scorecard_json"] else None
-            if old_sc is not None and new_sc != old_sc:
-                backfill_updates(c, mid)        # before this snapshot is kept, so it is not counted twice
-            _store_raw(c, pid, "scorecard", data, now_fn)
-            c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(new_sc), now_fn(), mid))
-            last = new_sc[-1]["total"] if new_sc and new_sc[-1].get("total") else None
-            prev = old_sc[-1]["total"] if old_sc and old_sc[-1].get("total") else None
-            # SH commentary from scorecard changes (works even when the source sends no ball-by-ball rows)
-            if old_sc is not None and new_sc != old_sc:
-                store_updates(c, mid, derive_updates(old_sc, new_sc), now_fn)
-            if last and last != prev:
-                import live
-                live.publish(c, mid, "ball", {"score": "%s-%s" % (last["r"], last["w"]), "overs": last["o"], "source": "scorecard"})
-        else:
-            mnotes.append(err)
-        if age(row["squad_at"]) >= cfg.get("squad_every_min", 120):
-            data, err = _detail_call(c, "match_squad", pid, budget, opener)
-            if data is not None:
-                c.execute("UPDATE ext_match_detail SET squad_json=?, squad_at=? WHERE match_id=?", (json.dumps(norm_squad(data)), now_fn(), mid))
+            if not row:
+                c.execute("INSERT INTO ext_match_detail(match_id,source) VALUES(?,'cricketdata')", (mid,))
+                row = c.execute("SELECT * FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()
+            c.execute("UPDATE ext_match_detail SET featured=1 WHERE match_id=?", (mid,))
+            age = lambda at: 10 ** 9 if not at else (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(at)).total_seconds() / 60
+            mnotes = []
+            data, err = (None, None) if age(row["scorecard_at"]) < A["scorecard_every_min"] - 0.2 else _detail_call(c, "match_scorecard", pid, budget, opener)
+            if data is None and err is None:
+                pass
+            elif data is not None:
+                new_sc = norm_scorecard(data)
+                old_sc = json.loads(row["scorecard_json"]) if row["scorecard_json"] else None
+                if old_sc is not None and new_sc != old_sc:
+                    try:
+                        backfill_updates(c, mid)    # before this snapshot is kept, so it is not counted twice
+                    except Exception:
+                        pass
+                _store_raw(c, pid, "scorecard", data, now_fn)
+                c.execute("UPDATE ext_match_detail SET scorecard_json=?, scorecard_at=? WHERE match_id=?", (json.dumps(new_sc), now_fn(), mid))
+                last = new_sc[-1]["total"] if new_sc and new_sc[-1].get("total") else None
+                prev = old_sc[-1]["total"] if old_sc and old_sc[-1].get("total") else None
+                # SH commentary from scorecard changes (works even when the source sends no ball-by-ball rows)
+                if old_sc is not None and new_sc != old_sc:
+                    try:
+                        has_balls = bool(json.loads(row["balls_json"] or "[]"))
+                        store_updates(c, mid, derive_updates(old_sc, new_sc), now_fn, publish=not has_balls)
+                    except Exception as e:
+                        mnotes.append("SH commentary: %s" % str(e)[:120])
+                if last and last != prev:
+                    import live
+                    live.publish(c, mid, "ball", {"score": "%s-%s" % (last["r"], last["w"]), "overs": last["o"], "source": "scorecard"})
             else:
                 mnotes.append(err)
-        if age(row["info_at"]) >= cfg.get("info_every_min", 120):
-            data, err = _detail_call(c, "match_info", pid, budget, opener)
-            if data is not None:
-                keep = {k: data.get(k) for k in ("name", "matchType", "status", "venue", "date", "dateTimeGMT", "teams", "tossWinner", "tossChoice",
-                                                 "matchWinner", "series_id", "fantasyEnabled", "bbbEnabled") if k in data}
-                c.execute("UPDATE ext_match_detail SET info_json=?, info_at=? WHERE match_id=?", (json.dumps(keep), now_fn(), mid))
-            else:
-                mnotes.append(err)
-        info = json.loads(c.execute("SELECT info_json FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()[0] or "{}")
-        if cfg.get("balls", True) and info.get("bbbEnabled") is not False and age(row["balls_at"]) >= A["balls_every_min"] - 0.2:
-            data, err = _detail_call(c, "match_bbb", pid, budget, opener)
-            if data is not None:
-                nb = norm_balls(data)
-                c.execute("UPDATE ext_match_detail SET balls_json=?, balls_at=? WHERE match_id=?", (json.dumps(nb), now_fn(), mid))
-                publish_new_balls(c, mid, nb, now_fn)
-            else:
-                mnotes.append(err)
-        elif info.get("bbbEnabled") is False:
-            mnotes.append("match_bbb: provider lists this match with ball-by-ball switched off")
-        c.execute("UPDATE ext_match_detail SET notes_json=? WHERE match_id=?", (json.dumps([n for n in mnotes if n]), mid))
-        c.commit()
+            if age(row["squad_at"]) >= cfg.get("squad_every_min", 120):
+                data, err = _detail_call(c, "match_squad", pid, budget, opener)
+                if data is not None:
+                    c.execute("UPDATE ext_match_detail SET squad_json=?, squad_at=? WHERE match_id=?", (json.dumps(norm_squad(data)), now_fn(), mid))
+                else:
+                    mnotes.append(err)
+            if age(row["info_at"]) >= cfg.get("info_every_min", 120):
+                data, err = _detail_call(c, "match_info", pid, budget, opener)
+                if data is not None:
+                    keep = {k: data.get(k) for k in ("name", "matchType", "status", "venue", "date", "dateTimeGMT", "teams", "tossWinner", "tossChoice",
+                                                     "matchWinner", "series_id", "fantasyEnabled", "bbbEnabled") if k in data}
+                    c.execute("UPDATE ext_match_detail SET info_json=?, info_at=? WHERE match_id=?", (json.dumps(keep), now_fn(), mid))
+                else:
+                    mnotes.append(err)
+            info = json.loads(c.execute("SELECT info_json FROM ext_match_detail WHERE match_id=?", (mid,)).fetchone()[0] or "{}")
+            if cfg.get("balls", True) and info.get("bbbEnabled") is not False and age(row["balls_at"]) >= A["balls_every_min"] - 0.2:
+                data, err = _detail_call(c, "match_bbb", pid, budget, opener)
+                if data is not None:
+                    nb = norm_balls(data)
+                    c.execute("UPDATE ext_match_detail SET balls_json=?, balls_at=? WHERE match_id=?", (json.dumps(nb), now_fn(), mid))
+                    publish_new_balls(c, mid, nb, now_fn)
+                else:
+                    mnotes.append(err)
+            elif info.get("bbbEnabled") is False:
+                mnotes.append("match_bbb: provider lists this match with ball-by-ball switched off")
+            c.execute("UPDATE ext_match_detail SET notes_json=? WHERE match_id=?", (json.dumps([n for n in mnotes if n]), mid))
+            c.commit()
+        except Exception as e:          # one bad match never stops the others
+            c.rollback()
+            mnotes = ["sync error: %s" % re.sub(r"apikey=[^&\s]+", "apikey=***", str(e))[:200]]
         done.append({"match_id": mid, "provider_id": pid, "notes": mnotes})
         notes += mnotes
     return {"featured": done, "hits_used_today": hits_used(c), "plan_limit": A["limit"], "budget": budget, "max_featured": A["max_featured"],

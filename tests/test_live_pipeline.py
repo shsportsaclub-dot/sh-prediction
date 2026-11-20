@@ -198,3 +198,39 @@ class BackfillAndNews(unittest.TestCase):
         out = news.fetch(c, {"feeds": [{"name": "Publisher", "url": "https://example.org/rss"}], "keep_days": 100000}, lambda: "2026-11-20T02:00:00+00:00", lambda req, timeout: R(xml))
         self.assertEqual(out["new"], 1)
         self.assertEqual(news.fetch(c, {"feeds": [{"name": "Publisher", "url": "x"}], "keep_days": 100000}, lambda: "t", lambda req, timeout: R(xml))["new"], 0)
+
+
+class LiveLoopStatus(unittest.TestCase):
+    """Unlimited plan: the fast loop runs, a failing match does not stop the others, /api/v1/live-status reports it (synthetic provider)."""
+    def test_loop_and_status(self):
+        import copy, threading
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import test_bridge as TB
+        import scheduler
+        TB.T._migrate_once(); os.environ["CRICKETDATA_API_KEY"] = "k"
+        try:
+            c = TB.T.db()
+            c.execute("DELETE FROM api_budget")
+            c.execute("INSERT INTO system_settings(key,value,updated_at,updated_by) VALUES('cricketdata_plan_override',?, 'now','t') "
+                      "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps({"mode": "unlimited"}),))
+            c.commit(); c.close()
+            sc = copy.deepcopy(TB.SC)
+            fake = TB.Fake({"/v1/matches": json.dumps(TB.CD_MATCHES).encode(), "currentMatches": json.dumps(TB.CD_MATCHES).encode(),
+                            "match_scorecard": lambda: json.dumps(sc).encode(), "match_squad": json.dumps(TB.SQ).encode(),
+                            "match_info": json.dumps(TB.INFO).encode(), "match_bbb": json.dumps(TB.BBB).encode()})
+            TB.run("cricketdata_matches", fake)
+            stop = threading.Event()
+            th = threading.Thread(target=scheduler.live_loop, args=(TB.T.db, fake, stop), daemon=True); th.start()
+            for _ in range(50):
+                if scheduler.LIVE_STATE.get("last_ok"):
+                    break
+                stop.wait(0.1)
+            stop.set(); th.join(5)
+            st = TB.T.call("/api/v1/live-status")[1]
+            self.assertTrue(st["key_set"] and st["plan_unlimited"])
+            self.assertIsNotNone(st["loop"]["last_ok"], st)
+            m = [x for x in st["matches"] if x["featured"]]
+            self.assertTrue(m and m[0]["balls"] == 3 and m[0]["scorecard_age_s"] is not None, st)
+            self.assertNotIn("apikey", json.dumps(st))
+        finally:
+            os.environ.pop("CRICKETDATA_API_KEY", None); TB.free_plan()

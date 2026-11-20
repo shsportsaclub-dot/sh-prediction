@@ -994,6 +994,31 @@ def series_detail(c, cid):
             "points_table": pts, "points_rule": "Win 2, tie/no result 1. NRR from recorded innings (all-out sides charged the full quota); blank when innings are not recorded.",
             "top_batters": top_bat, "top_bowlers": top_bowl}
 
+def live_status(c):
+    """Public health of the live pipeline (no keys, no admin data): is the fast loop running, are scorecards/balls arriving per live match."""
+    import cricketdata, scheduler
+    now = datetime.datetime.now(datetime.timezone.utc)
+    age = lambda at: None if not at else round((now - datetime.datetime.fromisoformat(at)).total_seconds())
+    A = cricketdata.auto(c, {}) if c.execute("SELECT 1 FROM sqlite_master WHERE name='api_budget'").fetchone() else {}
+    out = {"time": now.isoformat(), "key_set": bool(cricketdata.key()), "plan_paid": A.get("paid"), "plan_unlimited": A.get("unlimited"),
+           "hits_today": cricketdata.hits_used(c) if A else None, "loop": dict(scheduler.LIVE_STATE), "matches": []}
+    if out["loop"].get("last_ok"):
+        out["loop"]["seconds_since_ok"] = age(out["loop"]["last_ok"])
+    if not c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():
+        return out
+    has_upd = c.execute("SELECT 1 FROM sqlite_master WHERE name='score_updates'").fetchone()
+    for r in c.execute("""SELECT d.match_id, d.scorecard_at, d.balls_at, d.balls_json, d.notes_json, d.featured, th.name AS home, ta.name AS away, m.status
+                          FROM ext_match_detail d JOIN matches m ON m.id=d.match_id JOIN teams th ON th.id=m.home_team_id JOIN teams ta ON ta.id=m.away_team_id
+                          WHERE m.status='live' OR d.featured=1 ORDER BY d.match_id DESC LIMIT 25""").fetchall():
+        balls = json.loads(r["balls_json"] or "[]")
+        last = c.execute("SELECT text, created_at FROM score_updates WHERE match_id=? ORDER BY id DESC LIMIT 1", (r["match_id"],)).fetchone() if has_upd else None
+        out["matches"].append({"match_id": r["match_id"], "match": "%s v %s" % (r["home"], r["away"]), "status": r["status"], "featured": bool(r["featured"]),
+                               "scorecard_age_s": age(r["scorecard_at"]), "balls_age_s": age(r["balls_at"]), "balls": len(balls),
+                               "last_ball": ("%s.%s" % (balls[-1].get("over"), balls[-1].get("ball"))) if balls else None,
+                               "sh_commentary_last": dict(last) if last else None, "notes": json.loads(r["notes_json"] or "[]")})
+    return out
+
+
 def home_dashboard(c):
     upcoming = rows(c.execute("""SELECT cp.id, cp.name, MIN(m.start_utc) AS starts, COUNT(*) AS matches FROM matches m JOIN competitions cp ON cp.id=m.competition_id
         WHERE m.status='scheduled' AND m.data_origin<>'demo' GROUP BY cp.id ORDER BY starts LIMIT 8"""))
@@ -2025,6 +2050,8 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
             return 200, series_detail(c, int_id(P[1], "series id"))
         if P == ["home", "dashboard"]:
             return 200, home_dashboard(c)
+        if P == ["live-status"]:
+            return 200, live_status(c)
         if len(P) >= 2 and P[0] == "matches":
             mid = int_id(P[1], "match id")
             if len(P) == 2:
