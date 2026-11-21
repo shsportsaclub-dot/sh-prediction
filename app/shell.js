@@ -87,7 +87,7 @@ SCREENS.matches=async function(el){
  go();let tm;$("#q").oninput=()=>{clearTimeout(tm);tm=setTimeout(go,300)}};
 SCREENS["live-now"]=async el=>{sessionStorage.setItem("shp_mf","live");location.hash="#/matches"};
 /* section bar under the app header: Live Scores / Schedule / Archives / News / Series */
-const SECS=[["live","sec.live","#/matches","live"],["schedule","sec.schedule","#/matches","upcoming"],["archives","sec.archives","#/matches","results"],["news","sec.news","#/news",""],["series","sec.series","#/series",""]];
+const SECS=[["live","sec.live","#/matches","live"],["schedule","sec.schedule","/sports-fixtures",""],["archives","sec.archives","#/matches","results"],["news","sec.news","#/news",""],["series","sec.series","#/series",""]];
 window.secbar=page=>{const b=document.getElementById("secbar");if(!b)return;const mf=sessionStorage.getItem("shp_mf");
  const cur=page==="series"?"series":page==="news"?"news":page==="matches"?({live:"live",upcoming:"schedule",results:"archives"}[mf]||""):"";
  b.innerHTML=SECS.map(([k,l,href,f])=>'<a href="'+href+'" data-mf="'+f+'" class="'+(k===cur?"on":"")+'">'+esc(t(l))+'</a>').join("");

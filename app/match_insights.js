@@ -20,7 +20,7 @@ window.mcTab.info=async m=>{let d;try{d=await I(m,"info")}catch(e){d=null}
  const toss=m.toss_winner_id?'<div class="toss-l">'+esc((m.toss_winner_id===m.home.id?lab(m,"home"):lab(m,"away"))+" "+t("ins.won_toss")+" "+(m.toss_decision==="bat"?t("ins.bat"):t("ins.bowl")))+'</div>':"";
  const pdi=(m.provider_detail&&m.provider_detail.info)||{};
  let out=toss+'<div class="mcard"><div class="mh">'+esc(m.match_no?("Match "+m.match_no):m.format)+'</div><a href="#/series/'+m.competition_id+'"><b>'+esc(m.competition)+' ›</b></a>'+
-  '<dl class="kv" style="margin-top:8px"><dt>📅</dt><dd>'+esc(new Date(m.start_utc).toLocaleString(undefined,{weekday:"long",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</dd><dt>📍</dt><dd>'+esc(m.venue||pdi.venue||"—")+'</dd>'+
+  '<dl class="kv" style="margin-top:8px"><dt>📅</dt><dd>'+esc(window.SHTime.format(m.start_utc,typeof LANG!=="undefined"?LANG:undefined))+'</dd><dt>📍</dt><dd>'+esc(m.venue||pdi.venue||"—")+'</dd>'+
   (m.result_type?'<dt>🏁</dt><dd><b>'+esc(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" won"+(m.margin?" by "+m.margin:"")):m.result_type)+'</b></dd>':'')+'</dl></div>';
  const sq=m.provider_detail&&m.provider_detail.squads;
  out+=sec(esc(t("mc.xi")),'<div class="mcard">'+[m.home,m.away].map(x=>'<a class="dl" href="#/match/'+m.id+'/xi"><b>'+esc(x.name)+'</b><span>'+(sq&&sq.length?"›":esc(t("ins.not_announced")))+'</span></a>').join("")+'</div>');

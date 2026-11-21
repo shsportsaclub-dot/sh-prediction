@@ -27,7 +27,9 @@ jobs:
       - name: Compile server and tests
         run: python -m compileall -q app tests
       - name: Schedule client behaviour
-        run: node tests/fixture_schedule_view_test.cjs
+        run: |
+          node tests/fixture_schedule_view_test.cjs
+          node tests/match_info_timezone_test.cjs
       - name: Full server regression
         run: |
           set -o pipefail
