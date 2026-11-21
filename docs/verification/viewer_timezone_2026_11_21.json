@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-21",
+  "runtime_commit": "f1e4945a1188cb301ed801891117f5a7c45a36a1",
+  "deploy": "dep-dc0qsvbtqb8s73dp4sb0",
+  "status": "live",
+  "local_tests": {
+    "ran": 161,
+    "failures": 0,
+    "seconds": 28.554
+  },
+  "client_test": "Four-country AM/PM, manual timezone preference and reset, country preference and invalid selection passed",
+  "production": {
+    "health_http": 200,
+    "build": "f1e4945a1188",
+    "pakistan": {
+      "http": 200,
+      "timezone": "Asia/Karachi",
+      "source": "phone_country",
+      "countries": 245
+    },
+    "geoip_database": {
+      "rows": 732796,
+      "release": "2026-11",
+      "ready_log_utc": "2026-11-21T14:46:25.276679636Z"
+    },
+    "ui": {
+      "url": "https://sh-prediction.onrender.com/#/account",
+      "country_options": 245,
+      "automatic_option": 1,
+      "verified_labels": [
+        "India (+91)",
+        "Pakistan (+92)",
+        "Bangladesh (+880)",
+        "France (+33)"
+      ],
+      "selected_country_after_reload": "IN"
+    }
+  },
+  "limits": [
+    "Display preference saved on device, not synchronized across accounts/devices",
+    "Country-only geolocation cannot select exact timezone inside multi-zone countries",
+    "Phone country selection does not verify ownership or change authentication",
+    "No sports-source or latency verification implied",
+    "CI status not confirmed: connector lists PR-triggered runs only"
+  ],
+  "test_history": "Initial new test assumed Germany had one IANA zone; observed Berlin and Busingen, corrected test to require no guessed zone. Full 161-test suite passed afterwards."
+}
