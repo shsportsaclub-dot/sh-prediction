@@ -173,6 +173,8 @@ class H(BaseHTTPRequestHandler):
    result['attribution']=viewer_timezone.ATTRIBUTION
    result['countries']=viewer_timezone.PHONE_CODES
    return self.sendj(200,result)
+  if p=="/demo_login.js":
+   b=(Path(__file__).parent/"demo_login.js").read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/viewer_timezone.js":
    b=(Path(__file__).parent/"viewer_timezone.js").read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   sm=re.fullmatch(r"/api/v1/matches/(\d+)/stream",p)

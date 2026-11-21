@@ -225,6 +225,7 @@ nav.tabs a.nav-plus span{display:flex;align-items:center;justify-content:center;
 <main id="main" tabindex="-1" aria-live="polite"></main>
 <div class="muted" style="padding:8px;text-align:center;font-size:11px"><label for="viewer-timezone">Time zone (AM/PM)</label> <select id="viewer-timezone" aria-label="Display time zone"><option value="">Automatic</option></select> · <a href="https://db-ip.com" target="_blank" rel="noopener">IP Geolocation by DB-IP</a></div>
 <script src="/viewer_timezone.js?v=__SH_BUILD__"></script>
+<script src="/demo_login.js?v=__SH_BUILD__"></script>
 <script>
 "use strict";
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
@@ -435,7 +436,7 @@ window.addEventListener("online",route);window.addEventListener("offline",()=>{$
  select.value=window.SHTime.selected;select.onchange=()=>{window.SHTime.select(select.value);route()};
 })();
 (async()=>{setTheme(ls.get("shp_theme")||"dark");await loadLang(LANG);
- window.SHTime.ready.then(()=>{if(document.readyState!=="loading")route()});
+ window.SHTime.ready.then(()=>{if(document.readyState!=="loading"&&!location.hash.startsWith("#/account"))route()});
  if(TOKEN){try{PREF=await api("/me/preferences");if(PREF.language_code!==LANG)await loadLang(PREF.language_code);setTheme(PREF.theme)}catch(e){if(e.status===401){TOKEN="";ls.del("shp_session")}}}
  // draw once, after every screen script (hub_social, match_center, shell) has loaded
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",route,{once:true});else route()})();

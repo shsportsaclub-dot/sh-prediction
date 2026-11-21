@@ -148,6 +148,7 @@ async account(el){
  const f=(id,l,ty)=>'<label>'+esc(t(l))+'<br><input id="'+id+'" '+(ty?'type="'+ty+'"':'')+' style="width:100%" autocomplete="'+(ty==="password"?(mode==="register"?"new-password":"current-password"):"username")+'"></label>';
  el.innerHTML='<h2>'+esc(t(mode==="register"?"acc.register":mode==="reset"?"acc.reset":"acc.login"))+'</h2><div class="card">'+
   '<label>Country / calling code<select id="login-country" aria-label="Country and calling code"><option value="">Automatic (IP/device)</option></select></label><p class="muted">Used for match times. You can change the time zone separately.</p>'+
+  (mode==="login"?'<section class="card"><h3>Mobile demo login</h3><p class="muted">Demo only · OTP appears here · no SMS or phone verification. Sample-data browsing only.</p><label>Mobile number<input id="demo-mobile" type="tel" inputmode="numeric" maxlength="14" autocomplete="off" aria-label="Demo mobile number"></label><button id="demo-generate" type="button">Show demo OTP</button><p id="demo-code" role="status"></p><label>Demo OTP<input id="demo-otp" inputmode="numeric" maxlength="6" autocomplete="off" aria-label="Demo OTP"></label><button id="demo-enter" type="button">Enter demo</button><p id="demo-message" role="status"></p></section><h3>Account login</h3>':'')+
   (mode==="login"?f("lg","acc.username")+f("pw","acc.password","password"):mode==="register"?f("un","acc.username")+f("em","acc.email","email")+f("pw","acc.password","password")+'<p class="muted">10+ characters with upper and lower case letters and a digit.</p>':f("lg","acc.email")+'<button id="sc">'+esc(t("acc.code"))+'</button>'+f("cd","acc.code")+f("pw","acc.password","password"))+
   '<p><button class="primary" id="go">'+esc(t(mode==="register"?"acc.register":mode==="reset"?"acc.reset":"acc.login"))+'</button></p><p id="am" class="muted" role="status"></p><p>'+(mode!=="login"?'<a href="#" data-m="login">'+esc(t("acc.login"))+'</a> · ':'')+(mode!=="register"?'<a href="#" data-m="register">'+esc(t("acc.register"))+'</a> · ':'')+(mode!=="reset"?'<a href="#" data-m="reset">'+esc(t("acc.forgot"))+'</a>':'')+'</p></div>';
  const countrySelect=$("#login-country");
@@ -157,6 +158,10 @@ async account(el){
  for(const entry of entries){const option=document.createElement('option');option.value=entry.cc;option.textContent=entry.name+' ('+entry.code+')';countrySelect.append(option)}countrySelect.value=saved;};
  fillCountries();window.SHTime.ready.then(fillCountries);
  countrySelect.onchange=()=>{window.SHTime.selectCountry(countrySelect.value)};
+ if($("#demo-generate")){
+  $("#demo-generate").onclick=()=>{try{const code=window.SHTime.countries[countrySelect.value]||'';const otp=window.SHDemoLogin.generate(code,$("#demo-mobile").value.trim());$("#demo-code").textContent='Demo OTP: '+otp+' · valid for 5 minutes';$("#demo-otp").value='';$("#demo-message").textContent='';}catch(e){$("#demo-message").textContent=e.message}};
+  $("#demo-enter").onclick=()=>{if(!window.SHDemoLogin.verify($("#demo-otp").value.trim()))$("#demo-message").textContent='Incorrect or expired demo OTP';};
+ }
  document.querySelectorAll("[data-m]").forEach(a=>a.onclick=e=>{e.preventDefault();sessionStorage.setItem("shp_acc",a.dataset.m);SCREENS.account(el)});
  const am=$("#am"),post=(p,b)=>api(p,{method:"POST",body:JSON.stringify(b)});
  if($("#sc"))$("#sc").onclick=async()=>{try{await post("/auth/request-password-reset",{login:$("#lg").value.trim()});am.textContent="If the account exists, a code was emailed."}catch(e){am.textContent=e.message}};

@@ -1,0 +1,14 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const values=new Map();let now=0;
+const window={crypto:{getRandomValues:a=>{a[0]=123456;return a}},localStorage:{setItem:(k,v)=>values.set(k,v)},location:{hash:''}};
+vm.runInNewContext(fs.readFileSync('app/demo_login.js','utf8'),{window,Date:{now:()=>now},Uint32Array});
+assert.throws(()=>window.SHDemoLogin.generate('','1234567890'));
+assert.throws(()=>window.SHDemoLogin.generate('+91','not-a-number'));
+assert.throws(()=>window.SHDemoLogin.generate('+91','12345678901234'));
+const code=window.SHDemoLogin.generate('+91','9876543210');
+assert.equal(code,'123456');assert.equal(window.SHDemoLogin.verify('000000'),false);
+assert.equal(window.SHDemoLogin.verify(code),true);
+assert.equal(values.get('shp_demo'),'1');assert.equal(values.has('shp_session'),false);
+assert.equal(window.location.hash,'#/matches');assert.equal(window.SHDemoLogin.verify(code),false);
+window.SHDemoLogin.generate('+92','3001234567');now=300001;assert.equal(window.SHDemoLogin.verify(code),false);
+console.log('PASS: demo-only OTP flow, expiry, consumption and no authentication token');
