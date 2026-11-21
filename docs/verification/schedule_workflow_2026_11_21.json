@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-21",
+  "runtime_commit": "ab6954457344a46a08157387a154190d7f3e8be8",
+  "feature_commit": "a51dd9ecc566c5da9eb6bcf689537dbb4013206f",
+  "deployment": {
+    "id": "dep-dc0u2aec6qcc73bvn54g",
+    "status": "live",
+    "finished_at": "2026-11-21T18:22:14.569118Z"
+  },
+  "ci": {
+    "id": 44935076568,
+    "conclusion": "success"
+  },
+  "backend_tests": {
+    "run": 166,
+    "result": "passed"
+  },
+  "client_tests": {
+    "command": "node tests/fixture_schedule_view_test.cjs",
+    "result": "passed",
+    "covers": [
+      "Timezone local-day boundaries",
+      "DST repeat hours",
+      "Exact T10/T20/IT20/Test separation",
+      "Unknown times and formats",
+      "Verified live-state filtering",
+      "Search, sport, competition and date intersections",
+      "Date validation and grouping"
+    ]
+  },
+  "browser": {
+    "verified_url": "https://sh-prediction.onrender.com/sports-fixtures",
+    "tabs": {
+      "all": 9,
+      "live": 0,
+      "upcoming": 9,
+      "results": 0
+    },
+    "viewer_dates": [
+      "Sat, Nov 28, 2026",
+      "Sun, Nov 29, 2026",
+      "Mon, Nov 30, 2026"
+    ],
+    "date_2026_11_28": {
+      "Asia_Kolkata": 6,
+      "UTC": 5
+    },
+    "search_bayern": {
+      "matches": 1,
+      "fixture": "Hamburger SV vs FC Bayern München"
+    },
+    "match_info": {
+      "opened": true,
+      "unavailable_format_and_venue_not_invented": true
+    },
+    "today_empty_state": true,
+    "browser_back_restored_nine": true,
+    "url_filters_shareable": true,
+    "sport_competition_unknown_format_filters_verified": true,
+    "keyboard_tab_navigation_verified": true,
+    "date_picker_verified": true,
+    "timezone_restored": "Automatic",
+    "reset_restored_nine": true
+  },
+  "review": {
+    "important_findings": 0,
+    "minor_keyboard_focus_issue_fixed": true,
+    "selector_accessibility_labels_fixed_after_browser_test": true
+  },
+  "reference": {
+    "purpose": "Functional navigation reference only, no reference-site data collection or copied graphics",
+    "urls": [
+      "https://www.cricbuzz.com/cricket-schedule/upcoming-series/international",
+      "https://www.cricbuzz.com/cricket-match/live-scores"
+    ]
+  },
+  "coverage": {
+    "available_records": 9,
+    "sport": "S002 Football",
+    "source": "OpenLigaDB via SH DATA LINE",
+    "scope": "One Bundesliga matchday",
+    "new_source_acquisition": false,
+    "live_action_verified": false,
+    "cricket_feed_expansion": false
+  },
+  "remaining": [
+    "Independent live cricket acquisition",
+    "Broader sports/competition fixture sources",
+    "Future matchday expansion",
+    "Production backup/recovery acceptance"
+  ]
+}
