@@ -1,6 +1,17 @@
 # Prediction storage cutover — 21 November 2026
 
-## Observed production state
+
+## Completed production cutover — 21 November 2026
+
+The existing Prediction service is now paid runtime `0.5c-512mb` with a 1 GB disk `dsk-dc0ni067bikc73bb85bg` mounted at `/var/data` ($0.25/month additional, explicitly owner-approved). `SH_PREDICTION_DB=/var/data/prediction.sqlite3` and `SH_MEDIA_DIR=/var/data/media` are active. The older observed-state section below is retained as history, not current runtime state.
+
+Two private off-service backup receipts were finalized. The final frozen snapshot (52,150,272 bytes; SHA-256 `d22540ab4179d37270392b6159aff75ffc90d8c98dc39b149baedefaf97e90c6`) was downloaded independently and passed SQLite integrity. Maintenance blocked public writes; a SQLite write lock protected the final source snapshot until disk cutover. No media files required transfer. The checksum-matched database was restored, then a separate configuration redeploy verified that every original match ID survived: 1,474 retained, zero missing. A separate pristine recovery file on the disk is independently stored and checksum-verified.
+
+Final deployment `dep-dc0nkbh7lnhs7397g7ig` is LIVE on tested commit `a2a27977`; public `/health` and `/api/v1/live-status` return 200, the latter reports mounted persistence, and anonymous admin inbox access returns 403. Maintenance is disabled. [Machine-readable acceptance](verification/storage_cutover_2026_11_21.json) records the evidence. The inspected deployment log's 503 request occurred during planned maintenance; it is not a claim of application failure or a clean all-time error history.
+
+Remaining: configure the admin credential and scoped DATA LINE connector/source grants; verify a genuine source event in production. This milestone establishes Prediction persistence only. It does not establish DATA LINE durability, automatic off-service backup scheduling, nine-sport completion or a live production feed. Runtime configuration is not managed by the older `render.yaml` service definition; do not apply it to create a duplicate service.
+
+## Earlier observed production state
 
 The service-specific Render API reports runtime `plan: free` and build `buildPlan: starter` for Prediction `srv-dbupd249v7es73995adg`. This does not establish whether the owner has paid their Render account invoice. DATA LINE `srv-dc043t67bikc739b5e2g` reports paid runtime plan `0.5c-512mb`. Prediction starts `python app/main.py`, and reports the database under `/opt/render/project/src/data/prediction.sqlite3`, outside a dedicated mount. The existing `render.yaml` describes a different named Docker service; it is **not proof** that the existing service has a disk. Do not create a second service or apply that Blueprint as a substitute for migrating the existing service.
 

@@ -1,0 +1,62 @@
+{
+  "verified_at": "2026-11-21T11:06:23.179388+00:00",
+  "scope": "SH Prediction production database persistence; not live source-to-consumer acceptance",
+  "service_id": "srv-dbupd249v7es73995adg",
+  "runtime_commit": "a2a279776f14efab11014a6d03597f34bb723852",
+  "disk": {
+    "id": "dsk-dc0ni067bikc73bb85bg",
+    "size_gb": 1,
+    "mount_path": "/var/data",
+    "additional_usd_per_month": 0.25
+  },
+  "environment": {
+    "SH_PREDICTION_DB": "/var/data/prediction.sqlite3",
+    "SH_MEDIA_DIR": "/var/data/media"
+  },
+  "external_backup": {
+    "saved_privately": true,
+    "byte_count": 52150272,
+    "sha256": "d22540ab4179d37270392b6159aff75ffc90d8c98dc39b149baedefaf97e90c6",
+    "downloaded_copy_integrity": "ok",
+    "matches": 1474
+  },
+  "cutover": {
+    "public_maintenance_enabled_during_cutover": true,
+    "sqlite_writer_lock_during_final_snapshot": true,
+    "media_file_count_before_cutover": 0,
+    "restore_digest_matched": true,
+    "restore_integrity": "ok",
+    "original_match_ids_preserved": 1474,
+    "missing_original_match_ids": 0,
+    "independent_pristine_backup": "/var/data/backup-cutover-verified-20261121.sqlite3",
+    "independent_backup_digest_matched": true
+  },
+  "deployments": {
+    "disk_attachment": "dep-dc0ni0e7bikc73bb8630",
+    "persistent_database_configuration": "dep-dc0nkbh7lnhs7397g7ig",
+    "final_status": "live",
+    "database_verified_after_configuration_redeploy": true
+  },
+  "public_checks": {
+    "health_http": 200,
+    "health_build": "a2a279776f14",
+    "live_status_http": 200,
+    "on_mounted_disk": true,
+    "match_count": 1474,
+    "result_count": 1407,
+    "anonymous_admin_inbox_http": 403,
+    "maintenance_enabled": false
+  },
+  "regression": {
+    "github_run": 44895533081,
+    "test_count": 152,
+    "conclusion": "success"
+  },
+  "limits": {
+    "data_line_connector_configured": false,
+    "prediction_admin_key_configured": false,
+    "production_real_source_to_prediction_verified": false,
+    "sh_data_line_database_durability_not_assessed_by_this_check": true,
+    "automatic_off_service_backup_schedule_not_configured": true
+  }
+}
