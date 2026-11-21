@@ -1,35 +1,27 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Upcoming fixtures · SH Prediction</title>
+<title>Match schedule · SH Prediction</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#080f20;color:#eaf0ff}*{box-sizing:border-box}body{margin:0}main{max-width:1050px;margin:auto;padding:28px 20px 60px}a{color:#8ab7ff}header{display:flex;justify-content:space-between;align-items:center;gap:16px}h1{font-size:clamp(28px,5vw,44px);margin:34px 0 10px}p{color:#aab9d3;line-height:1.6}.tag{color:#8ab7ff;font-size:12px;letter-spacing:.12em}label{display:block;margin:24px 0 10px}select{max-width:100%;padding:10px;background:#15213b;color:inherit;border:1px solid #344360;border-radius:8px}.cards{display:grid;gap:12px;margin:24px 0}article{background:#111d34;border:1px solid #273753;border-radius:14px;padding:20px;display:grid;grid-template-columns:1fr auto;gap:12px}h2{font-size:19px;margin:6px 0 12px}.muted{font-size:13px;color:#aab9d3}.status{text-transform:capitalize;color:#bcd2ff}.notice{border-left:3px solid #4d89f5;padding:10px 16px;background:#111d34}footer{font-size:13px;line-height:1.8;border-top:1px solid #273753;padding-top:20px}@media(max-width:560px){article{grid-template-columns:1fr}header{align-items:start}main{padding:20px 16px}}
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#080f20;color:#eaf0ff}*{box-sizing:border-box}body{margin:0}main{max-width:1120px;margin:auto;padding:24px 20px 60px}a{color:#98c6ff}header{display:flex;justify-content:space-between;gap:12px}h1{font-size:clamp(28px,5vw,44px);margin:32px 0 8px}p{color:#aab9d3;line-height:1.6}button,input,select{font:inherit;color:inherit;background:#142139;border:1px solid #344360;border-radius:8px;padding:10px 12px}button{cursor:pointer}button:hover{border-color:#72b1ff}button[aria-selected=true],button[aria-pressed=true]{background:#245481;border-color:#85c9f0;color:white}label{font-size:13px;color:#bacbe3;display:grid;gap:8px}nav.tabs,.quick,.day-strip{display:flex;gap:8px;overflow:auto;padding:8px 0}.tabs{margin:24px 0 12px}.tabs button{white-space:nowrap;min-width:100px}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;background:#101d32;padding:18px;border-radius:12px}.search{grid-column:1/3}.date-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:18px 0}.date-controls label{flex:1;min-width:180px}.day-strip button{white-space:nowrap}.summary{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.day{margin-top:28px}.day>h2{font-size:18px;border-bottom:1px solid #2a3d5a;padding-bottom:12px}.competition{margin:16px 0 22px;background:#111d34;border:1px solid #273753;border-radius:12px;overflow:hidden}.competition>h3{font-size:14px;background:#182a45;margin:0;padding:12px 18px;color:#b4d3ff}.match{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:18px;border-top:1px solid #25354d}.match h4{font-size:18px;margin:0 0 8px}.meta{font-size:13px;color:#aab9d3;line-height:1.6;overflow-wrap:anywhere}.right{text-align:right}.status{display:block;margin:8px 0;text-transform:capitalize;color:#b8d4fa}.notice{border-left:3px solid #5c96db;padding:10px 14px;background:#101d32}.empty{text-align:center;background:#111d34;border-radius:12px;padding:36px 20px}.empty h2{font-size:20px}footer{font-size:13px;line-height:1.8;border-top:1px solid #273753;margin-top:30px;padding-top:20px}dialog{color:inherit;background:#111d34;border:1px solid #3f5c82;border-radius:16px;padding:24px;max-width:560px;width:calc(100% - 32px)}dialog::backdrop{background:#020817b8}dl{display:grid;grid-template-columns:100px 1fr;gap:12px;font-size:14px}dd{margin:0;overflow-wrap:anywhere}.detail-header{display:flex;justify-content:space-between;align-items:start;gap:16px}.detail-header h2{margin-top:0}.clear{background:transparent}.loading{opacity:.7}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #9ddcf5;outline-offset:3px}@media(max-width:640px){main{padding:20px 14px}.controls{grid-template-columns:1fr 1fr;padding:14px}.search{grid-column:1/-1}.timezone{grid-column:1/-1}.match{grid-template-columns:1fr}.right{text-align:left;display:flex;justify-content:space-between;gap:12px;align-items:center}.right>div{flex:1}.tabs button{min-width:92px}.quick button{white-space:nowrap}dl{grid-template-columns:85px 1fr}}
 </style>
-<main><header><a href="/">SH PREDICTION</a><a href="/#/matches">Cricket matches →</a></header>
-<h1>Upcoming fixtures</h1><p>Collected by SH DATA LINE. Source-listed football fixtures, with their original identities and scheduled times.</p>
-<p class="notice">Coverage: Bundesliga matchday 11 · Football. These are schedule observations; live scores and independently verified match status are not included.</p>
-<label for="zone">Display time zone · AM/PM</label><select id="zone"><option value="">Automatic</option></select>
-<p id="summary" role="status">Loading stored fixtures…</p><div class="cards" id="cards"></div>
-<footer>Data from <a href="https://www.openligadb.de/" target="_blank" rel="noopener">OpenLigaDB</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL 1.0</a>.<br>
-<a href="https://sh-data-line.onrender.com/open-data/openligadb-fixtures">Download the complete current fixture database</a> · <a href="/api/provider-fixtures">SH receipt and freshness data</a><p id="freshness"></p></footer></main>
-<script src="/viewer_timezone.js"></script>
-<script>
-'use strict';
-let snapshot;
-const el=id=>document.getElementById(id);
-function node(tag,text,cls){const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n}
-function render(){
- if(!snapshot)return;
- el('cards').replaceChildren();
- const items=[...snapshot.items].sort((a,b)=>(a.start_time_utc||'9999').localeCompare(b.start_time_utc||'9999')||a.id.localeCompare(b.id));
- el('summary').textContent=items.length+' stored fixtures · Times in '+(SHTime.timezone||'device time zone')+(snapshot.stale?' · STALE: showing cached observations':'');
- for(const item of items){
-  const card=document.createElement('article'),left=document.createElement('div'),right=document.createElement('div');
-  left.append(node('div',item.competition,'tag'),node('h2',item.home_team+' vs '+item.away_team),node('div','Source-listed fixture · OpenLigaDB','muted'));
-  right.append(node('div',item.start_time_utc?SHTime.format(item.start_time_utc):'Start time unknown'),node('p',item.status,'status'));
-  card.append(left,right);el('cards').append(card);
- }
- el('freshness').textContent='Last SH receipt: '+(snapshot.last_received_at?SHTime.format(snapshot.last_received_at):'Not received')+'. Source check: '+(snapshot.collection?.last_ok?SHTime.format(new Date(snapshot.collection.last_ok*1000).toISOString()):'Unknown')+'.'+(snapshot.last_error?' Sync error: '+snapshot.last_error:'')+(snapshot.upstream_error?' Source collection error: '+snapshot.upstream_error:'');
-}
-async function refresh(){try{const response=await fetch('/api/provider-fixtures',{cache:'no-store'});if(!response.ok)throw Error('unavailable');snapshot=await response.json();render()}catch(e){el('summary').textContent='Fixture update unavailable. Previously rendered observations may be stale.'}}
-(async()=>{await SHTime.ready;const zones=typeof Intl.supportedValuesOf==='function'?Intl.supportedValuesOf('timeZone'):['UTC','Asia/Kolkata','America/New_York'];for(const z of ['UTC',...zones]){const o=node('option',z);o.value=z;el('zone').append(o)}el('zone').value=SHTime.selected||'';el('zone').onchange=()=>{SHTime.select(el('zone').value);render()};await refresh();setInterval(refresh,60000)})();
-</script></html>
+<main><header><a href="/">SH PREDICTION</a><a href="/#/matches">Cricket match centre →</a></header>
+<h1>Match schedule</h1><p>Matches by day and competition. Browse current coverage and choose your display time zone.</p>
+<nav class="tabs" id="views" role="tablist" aria-label="Match status"></nav>
+<section class="controls" aria-label="Schedule filters">
+<label>Sport<select id="sport"><option value="">All sports</option></select></label>
+<label>Series / competition<select id="competition"><option value="">All competitions</option></select></label>
+<label>Format<select id="format"><option value="">All formats</option></select></label>
+<label class="search">Find a team or competition<input type="search" id="search" placeholder="Search matches" autocomplete="off"></label>
+<label class="timezone">Display time zone · AM/PM<select id="zone"><option value="">Automatic</option></select></label>
+</section>
+<div class="date-controls"><button id="previous" aria-label="Previous day">←</button><label>Match date<input type="date" id="date"></label><button id="next" aria-label="Next day">→</button><button id="reset" class="clear">Reset filters</button></div>
+<nav class="quick" id="quick" aria-label="Date range"></nav><nav class="day-strip" id="days" aria-label="Available match dates"></nav>
+<div class="summary"><p id="summary" role="status">Loading stored fixtures…</p><p id="zone-label"></p></div>
+<p class="notice" id="coverage">Current coverage: one Bundesliga matchday, nine source-listed football fixtures. No verified live-action feed is connected here.</p>
+<div id="cards" role="tabpanel" aria-label="Filtered matches"></div>
+<footer>Fixture data from <a href="https://www.openligadb.de/" target="_blank" rel="noopener">OpenLigaDB</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL 1.0</a>.<br>
+<a href="https://sh-data-line.onrender.com/open-data/openligadb-fixtures">Download current fixture database</a> · <a href="/api/provider-fixtures">Receipt and freshness data</a><p id="freshness"></p></footer>
+</main>
+<dialog id="details" aria-labelledby="detail-title"><div class="detail-header"><h2 id="detail-title">Match information</h2><button id="close-details" aria-label="Close match information">✕</button></div><div id="detail-body"></div></dialog>
+<script src="/viewer_timezone.js"></script><script src="/fixture_schedule_view.js"></script><script src="/fixture_schedule_client.js"></script>
+</html>

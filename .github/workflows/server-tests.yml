@@ -26,6 +26,8 @@ jobs:
           fi
       - name: Compile server and tests
         run: python -m compileall -q app tests
+      - name: Schedule client behaviour
+        run: node tests/fixture_schedule_view_test.cjs
       - name: Full server regression
         run: |
           set -o pipefail
@@ -44,3 +46,4 @@ jobs:
           name: sh-prediction-server-test-log
           path: server-test-results.txt
           if-no-files-found: ignore
+

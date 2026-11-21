@@ -164,6 +164,8 @@ class H(BaseHTTPRequestHandler):
     left-=len(chunk)
  def do_GET(self):
   p=urlparse(self.path).path
+  if p in ("/fixture_schedule_view.js","/fixture_schedule_client.js"):
+   b=(Path(__file__).parent/p[1:]).read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/api/provider-fixtures":
    import fixture_schedule
    from contextlib import closing
