@@ -1,11 +1,12 @@
 """SH DATA LINE connector (SH's own data service).
 
 Turned on by Render environment variables: SH_DATA_API_URL and SH_DATA_API_KEY (SH_DATA_PROVIDER=off turns it off).
-SH_DATA_API_KEY must hold the same secret as SH Data Line's SH_API_KEY. Contract (sh_data_api.py): GET /v1/matches and
+Use an SH Data Line score_read consumer key for this legacy mode. Contract (sh_data_api.py): GET /v1/matches and
 /v1/matches/<id>/balls with header X-API-Key, answers {"items": [...]}. The older /api/v1 + Bearer form is also accepted.
 Reads SH Data Line's matches and balls, links each match to the SH PREDICTION match with the same two teams
 (live or within a day), and hands the balls to the ball merge agent together with CricketData's balls.
 The key is only read on the server and never sent to the browser.
+SH_DATA_PROVIDER_MODE=events selects the separate durable provider-event consumer instead.
 """
 import datetime
 import json

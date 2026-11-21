@@ -272,7 +272,11 @@ def live_loop(db_fn, opener=None, stop=None):
             c = db_fn()
             try:
                 import shdataline
-                if shdataline.configured() and c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():
+                import sh_provider_events
+                if sh_provider_events.selected():
+                    sh_provider_events.sync(c, now, opener=opener)
+                    wait = 10
+                elif shdataline.configured() and c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():
                     shdataline.sync(c, now, opener) if opener else shdataline.sync(c, now)       # SH's own data line, merged with CricketData
                     wait = 10
                     live_mod.wake()

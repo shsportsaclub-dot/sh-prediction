@@ -1034,10 +1034,13 @@ def live_status(c):
     A = cricketdata.auto(c, {}) if c.execute("SELECT 1 FROM sqlite_master WHERE name='api_budget'").fetchone() else {}
     out = {"time": now.isoformat(), "key_set": bool(cricketdata.key()), "plan_paid": A.get("paid"), "plan_unlimited": A.get("unlimited"),
            "hits_today": cricketdata.hits_used(c) if A else None, "loop": dict(scheduler.LIVE_STATE), "matches": []}
-    import shdataline
-    out["sh_data_line"] = dict(shdataline.STATE, configured=shdataline.configured())
-    if shdataline.configured():
-        out["sh_data_line"]["auth_check"] = shdataline.ping()
+    import shdataline, sh_provider_events
+    if sh_provider_events.selected():
+        out['sh_data_line'] = sh_provider_events.status(c)
+    else:
+        out["sh_data_line"] = dict(shdataline.STATE, configured=shdataline.configured())
+        if shdataline.configured():
+            out["sh_data_line"]["auth_check"] = shdataline.ping()
     if out["loop"].get("last_ok"):
         out["loop"]["seconds_since_ok"] = age(out["loop"]["last_ok"])
     out["database"] = db_storage(c)
@@ -2186,6 +2189,9 @@ def dispatch(c, who, method, parts, q, body_fn, h=None):
                 return 200, simple[A]()
             if A == ("bridge",):
                 return 200, bridge_status(c)
+            if A == ('bridge', 'sh-events'):
+                import sh_provider_events
+                return 200, sh_provider_events.audit(c, int(q.get('after', ['0'])[0]))
             if A[:1] == ("registry",) and len(A) == 2 and A[1] in ("countries", "competitions", "sources"):
                 return 200, registry_list(c, A[1], q)
             if A == ("cricsheet",):
