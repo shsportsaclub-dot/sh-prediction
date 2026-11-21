@@ -1,0 +1,2828 @@
+{
+  "observed_at_utc": "2026-11-21T18:52:49.897932+00:00",
+  "checks": {
+    "health": {
+      "path": "/health",
+      "http_status": 200,
+      "response": {
+        "status": "ok",
+        "app": "SH PREDICTION",
+        "build": "68f428320d95",
+        "admin_key_configured": false,
+        "admin_key_length": 0
+      }
+    },
+    "cricket_today": {
+      "path": "/api/sports-schedule?timezone=Asia%2FKolkata",
+      "http_status": 200,
+      "response": {
+        "items": [
+          {
+            "id": "cricket:1569",
+            "sport_id": "S001",
+            "competition_id": "cricket:22",
+            "competition": "Plunket Shield 2026-27",
+            "format": "Test",
+            "home_team": "Central Districts",
+            "away_team": "Wellington",
+            "start_time_utc": "2026-11-18T00:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 054494ce-cd56-4327-81ca-2dae89b08713). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 054494ce-cd56-4327-81ca-2dae89b08713). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Fitzherbert Park, Palmerston North",
+            "match_no": null,
+            "match_center_url": "/#/match/1569",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.622955+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1563",
+            "sport_id": "S001",
+            "competition_id": "cricket:23",
+            "competition": "CSA Four-Day Series Division One 2026-27",
+            "format": "Test",
+            "home_team": "Titans",
+            "away_team": "Warriors",
+            "start_time_utc": "2026-11-19T08:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match ae5392dd-571b-461b-9064-53137546b7a3). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match ae5392dd-571b-461b-9064-53137546b7a3). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "LC de Villiers Oval, Pretoria",
+            "match_no": null,
+            "match_center_url": "/#/match/1563",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.616997+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1564",
+            "sport_id": "S001",
+            "competition_id": "cricket:23",
+            "competition": "CSA Four-Day Series Division One 2026-27",
+            "format": "Test",
+            "home_team": "Dolphins",
+            "away_team": "Western Province",
+            "start_time_utc": "2026-11-19T08:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 3082f812-4c40-4199-9353-f2352e6ebce0). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 3082f812-4c40-4199-9353-f2352e6ebce0). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Kingsmead, Durban",
+            "match_no": null,
+            "match_center_url": "/#/match/1564",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.617317+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1565",
+            "sport_id": "S001",
+            "competition_id": "cricket:23",
+            "competition": "CSA Four-Day Series Division One 2026-27",
+            "format": "Test",
+            "home_team": "Boland",
+            "away_team": "Knights",
+            "start_time_utc": "2026-11-19T08:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match c038aabe-bcd8-4198-ba18-26572f666880). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match c038aabe-bcd8-4198-ba18-26572f666880). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Mangaung Oval, Bloemfontein",
+            "match_no": null,
+            "match_center_url": "/#/match/1565",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.618877+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1566",
+            "sport_id": "S001",
+            "competition_id": "cricket:245",
+            "competition": "North West",
+            "format": "Test",
+            "home_team": "Lions",
+            "away_team": "North West - Eastvaal Renault Dragons",
+            "start_time_utc": "2026-11-19T08:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 717cf4eb-02f0-4148-9ee7-c32e85cb9acc). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 717cf4eb-02f0-4148-9ee7-c32e85cb9acc). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Senwes Park, Potchefstroom",
+            "match_no": null,
+            "match_center_url": "/#/match/1566",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.619770+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1568",
+            "sport_id": "S001",
+            "competition_id": "cricket:22",
+            "competition": "Plunket Shield 2026-27",
+            "format": "Test",
+            "home_team": "Canterbury",
+            "away_team": "Otago",
+            "start_time_utc": "2026-11-19T21:30:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 42eb1bd1-bb5f-460a-8fa3-9de034893e30). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 42eb1bd1-bb5f-460a-8fa3-9de034893e30). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "University Oval, Dunedin",
+            "match_no": null,
+            "match_center_url": "/#/match/1568",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.622165+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1570",
+            "sport_id": "S001",
+            "competition_id": "cricket:246",
+            "competition": "India tour of New Zealand 2026",
+            "format": "Other",
+            "home_team": "India",
+            "away_team": "New Zealand",
+            "start_time_utc": "2026-11-19T22:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 163a0512-5f23-4446-b450-fa888e36038e). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 163a0512-5f23-4446-b450-fa888e36038e). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Basin Reserve, Wellington",
+            "match_no": null,
+            "match_center_url": "/#/match/1570",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.623195+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:1567",
+            "sport_id": "S001",
+            "competition_id": "cricket:15",
+            "competition": "International League T20 2026",
+            "format": "T20",
+            "home_team": "Desert Vipers",
+            "away_team": "MI Emirates",
+            "start_time_utc": "2026-11-21T14:30:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 281c9aff-3fba-455b-a01d-f22bc22a8168). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 281c9aff-3fba-455b-a01d-f22bc22a8168). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Dubai International Cricket Stadium, Dubai",
+            "match_no": null,
+            "match_center_url": "/#/match/1567",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.621290+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:179",
+            "sport_id": "S001",
+            "competition_id": "cricket:26",
+            "competition": "Malaysia Womens T20I Tri-Series, 2026",
+            "format": "T20",
+            "home_team": "China Women",
+            "away_team": "Malaysia Women",
+            "start_time_utc": "2026-11-22T02:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "CricketData.org API (match 8e97677f-1eae-440e-bb87-d0c6153c4c84). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 8e97677f-1eae-440e-bb87-d0c6153c4c84). Team order as listed by the provider.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Bayuemas Oval, Kuala Lumpur",
+            "match_no": null,
+            "match_center_url": "/#/match/179",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:25.152602+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:160",
+            "sport_id": "S001",
+            "competition_id": "cricket:42",
+            "competition": "Womens Big Bash League 2026",
+            "format": "T20",
+            "home_team": "Brisbane Heat Women",
+            "away_team": "Adelaide Strikers Women",
+            "start_time_utc": "2026-11-22T04:40:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_label": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": null,
+            "match_no": "31",
+            "match_center_url": "/#/match/160",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:23.208543+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:178",
+            "sport_id": "S001",
+            "competition_id": "cricket:27",
+            "competition": "Group B, ACC Mens Asia Cup Rising Stars 2026",
+            "format": "ODI",
+            "home_team": "Nepal",
+            "away_team": "United Arab Emirates",
+            "start_time_utc": "2026-11-22T06:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "CricketData.org API (match fbb92c7e-d888-454b-9f21-cff468b527ea). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match fbb92c7e-d888-454b-9f21-cff468b527ea). Team order as listed by the provider.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "University of Doha for Science and Technology, Doha",
+            "match_no": null,
+            "match_center_url": "/#/match/178",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:25.152391+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:161",
+            "sport_id": "S001",
+            "competition_id": "cricket:42",
+            "competition": "Womens Big Bash League 2026",
+            "format": "T20",
+            "home_team": "Melbourne Stars Women",
+            "away_team": "Melbourne Renegades Women",
+            "start_time_utc": "2026-11-22T08:10:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_label": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": null,
+            "match_no": "32",
+            "match_center_url": "/#/match/161",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:23.208844+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:177",
+            "sport_id": "S001",
+            "competition_id": "cricket:27",
+            "competition": "Group B, ACC Mens Asia Cup Rising Stars 2026",
+            "format": "ODI",
+            "home_team": "India A",
+            "away_team": "Pakistan A",
+            "start_time_utc": "2026-11-22T10:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "CricketData.org API (match 41baa734-f7a7-4dcf-95c0-544026630c44). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 41baa734-f7a7-4dcf-95c0-544026630c44). Team order as listed by the provider.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "West End Park International Cricket Stadium, Doha",
+            "match_no": null,
+            "match_center_url": "/#/match/177",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:25.152119+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          }
+        ],
+        "total": 13,
+        "next_offset": null,
+        "sport": "S001",
+        "date": "today",
+        "timezone": "Asia/Kolkata",
+        "view": "all",
+        "formats": [
+          {
+            "value": "Test",
+            "name": "Test",
+            "count": 6,
+            "observed": true
+          },
+          {
+            "value": "ODI",
+            "name": "ODI",
+            "count": 2,
+            "observed": true
+          },
+          {
+            "value": "T20",
+            "name": "T20",
+            "count": 4,
+            "observed": true
+          },
+          {
+            "value": "T10",
+            "name": "T10",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "The Hundred",
+            "name": "The Hundred",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Super Six",
+            "name": "Super Six",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "List A",
+            "name": "List A",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "First-class",
+            "name": "First-class",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Other",
+            "name": "Other",
+            "count": 1,
+            "observed": true
+          }
+        ],
+        "leagues": [
+          {
+            "value": "cricket:23",
+            "name": "CSA Four-Day Series Division One 2026-27",
+            "count": 3
+          },
+          {
+            "value": "cricket:27",
+            "name": "Group B, ACC Mens Asia Cup Rising Stars 2026",
+            "count": 2
+          },
+          {
+            "value": "cricket:246",
+            "name": "India tour of New Zealand 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:15",
+            "name": "International League T20 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:26",
+            "name": "Malaysia Womens T20I Tri-Series, 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:245",
+            "name": "North West",
+            "count": 1
+          },
+          {
+            "value": "cricket:22",
+            "name": "Plunket Shield 2026-27",
+            "count": 2
+          },
+          {
+            "value": "cricket:42",
+            "name": "Womens Big Bash League 2026",
+            "count": 2
+          }
+        ],
+        "counts": {
+          "live": 8,
+          "upcoming": 5,
+          "results": 0,
+          "all": 13,
+          "schedule": 13
+        },
+        "sports": [
+          {
+            "sport_id": "S001",
+            "name": "Cricket",
+            "priority": 1,
+            "count": 13
+          },
+          {
+            "sport_id": "S002",
+            "name": "Football",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S003",
+            "name": "Field Hockey",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S004",
+            "name": "Kabaddi",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S005",
+            "name": "Badminton",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S006",
+            "name": "Volleyball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S007",
+            "name": "Basketball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S008",
+            "name": "Baseball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S009",
+            "name": "Rugby",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S010",
+            "name": "Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S011",
+            "name": "Table Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S012",
+            "name": "Pickleball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S013",
+            "name": "Handball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S014",
+            "name": "American Football",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S015",
+            "name": "Chess",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S016",
+            "name": "Carrom",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S017",
+            "name": "Kho-Kho",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S018",
+            "name": "Swimming",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S019",
+            "name": "Athletics \u2014 Running",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S020",
+            "name": "Athletics \u2014 Hurdles",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S021",
+            "name": "Horse Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S022",
+            "name": "Equestrian \u2014 Horse Riding",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S023",
+            "name": "Formula 1",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S024",
+            "name": "Motorcycle Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S025",
+            "name": "Cycling",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S026",
+            "name": "Golf",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S027",
+            "name": "Boxing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S028",
+            "name": "Wrestling",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S029",
+            "name": "MMA",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S030",
+            "name": "Weightlifting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S031",
+            "name": "Gymnastics",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S032",
+            "name": "Archery",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S033",
+            "name": "Shooting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S034",
+            "name": "Judo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S035",
+            "name": "Taekwondo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S036",
+            "name": "Karate",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S037",
+            "name": "Fencing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S038",
+            "name": "Rowing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S039",
+            "name": "Canoeing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S040",
+            "name": "Sailing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S041",
+            "name": "Surfing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S042",
+            "name": "Skateboarding",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S043",
+            "name": "Skiing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S044",
+            "name": "Ice Hockey",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S045",
+            "name": "Esports",
+            "priority": 3,
+            "count": 0
+          }
+        ],
+        "coverage": "Stored observations only; existing cricket catalogue plus independent SH football fixtures",
+        "source_lanes_separate": true,
+        "archive_truncated": false,
+        "football_stale": false,
+        "unassigned_start_times": 1379,
+        "last_received_at": "2026-11-21T18:51:27.694270+00:00",
+        "live_feed_verified": false
+      }
+    },
+    "cricket_t20": {
+      "path": "/api/sports-schedule?timezone=Asia%2FKolkata&format=T20",
+      "http_status": 200,
+      "response": {
+        "items": [
+          {
+            "id": "cricket:1567",
+            "sport_id": "S001",
+            "competition_id": "cricket:15",
+            "competition": "International League T20 2026",
+            "format": "T20",
+            "home_team": "Desert Vipers",
+            "away_team": "MI Emirates",
+            "start_time_utc": "2026-11-21T14:30:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "live",
+            "source": "CricketData.org API (match 281c9aff-3fba-455b-a01d-f22bc22a8168). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 281c9aff-3fba-455b-a01d-f22bc22a8168). Team order as listed by the provider.",
+            "source_live_reported": true,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Dubai International Cricket Stadium, Dubai",
+            "match_no": null,
+            "match_center_url": "/#/match/1567",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T18:30:33.621290+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": true
+          },
+          {
+            "id": "cricket:179",
+            "sport_id": "S001",
+            "competition_id": "cricket:26",
+            "competition": "Malaysia Womens T20I Tri-Series, 2026",
+            "format": "T20",
+            "home_team": "China Women",
+            "away_team": "Malaysia Women",
+            "start_time_utc": "2026-11-22T02:00:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "CricketData.org API (match 8e97677f-1eae-440e-bb87-d0c6153c4c84). Team order as listed by the provider.",
+            "source_label": "CricketData.org API (match 8e97677f-1eae-440e-bb87-d0c6153c4c84). Team order as listed by the provider.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": "Bayuemas Oval, Kuala Lumpur",
+            "match_no": null,
+            "match_center_url": "/#/match/179",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:25.152602+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:160",
+            "sport_id": "S001",
+            "competition_id": "cricket:42",
+            "competition": "Womens Big Bash League 2026",
+            "format": "T20",
+            "home_team": "Brisbane Heat Women",
+            "away_team": "Adelaide Strikers Women",
+            "start_time_utc": "2026-11-22T04:40:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_label": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": null,
+            "match_no": "31",
+            "match_center_url": "/#/match/160",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:23.208543+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:161",
+            "sport_id": "S001",
+            "competition_id": "cricket:42",
+            "competition": "Womens Big Bash League 2026",
+            "format": "T20",
+            "home_team": "Melbourne Stars Women",
+            "away_team": "Melbourne Renegades Women",
+            "start_time_utc": "2026-11-22T08:10:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_label": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": null,
+            "match_no": "32",
+            "match_center_url": "/#/match/161",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:23.208844+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          }
+        ],
+        "total": 4,
+        "next_offset": null,
+        "sport": "S001",
+        "date": "today",
+        "timezone": "Asia/Kolkata",
+        "view": "all",
+        "formats": [
+          {
+            "value": "Test",
+            "name": "Test",
+            "count": 6,
+            "observed": true
+          },
+          {
+            "value": "ODI",
+            "name": "ODI",
+            "count": 2,
+            "observed": true
+          },
+          {
+            "value": "T20",
+            "name": "T20",
+            "count": 4,
+            "observed": true
+          },
+          {
+            "value": "T10",
+            "name": "T10",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "The Hundred",
+            "name": "The Hundred",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Super Six",
+            "name": "Super Six",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "List A",
+            "name": "List A",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "First-class",
+            "name": "First-class",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Other",
+            "name": "Other",
+            "count": 1,
+            "observed": true
+          }
+        ],
+        "leagues": [
+          {
+            "value": "cricket:15",
+            "name": "International League T20 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:26",
+            "name": "Malaysia Womens T20I Tri-Series, 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:42",
+            "name": "Womens Big Bash League 2026",
+            "count": 2
+          }
+        ],
+        "counts": {
+          "live": 1,
+          "upcoming": 3,
+          "results": 0,
+          "all": 4,
+          "schedule": 4
+        },
+        "sports": [
+          {
+            "sport_id": "S001",
+            "name": "Cricket",
+            "priority": 1,
+            "count": 13
+          },
+          {
+            "sport_id": "S002",
+            "name": "Football",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S003",
+            "name": "Field Hockey",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S004",
+            "name": "Kabaddi",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S005",
+            "name": "Badminton",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S006",
+            "name": "Volleyball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S007",
+            "name": "Basketball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S008",
+            "name": "Baseball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S009",
+            "name": "Rugby",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S010",
+            "name": "Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S011",
+            "name": "Table Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S012",
+            "name": "Pickleball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S013",
+            "name": "Handball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S014",
+            "name": "American Football",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S015",
+            "name": "Chess",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S016",
+            "name": "Carrom",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S017",
+            "name": "Kho-Kho",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S018",
+            "name": "Swimming",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S019",
+            "name": "Athletics \u2014 Running",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S020",
+            "name": "Athletics \u2014 Hurdles",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S021",
+            "name": "Horse Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S022",
+            "name": "Equestrian \u2014 Horse Riding",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S023",
+            "name": "Formula 1",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S024",
+            "name": "Motorcycle Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S025",
+            "name": "Cycling",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S026",
+            "name": "Golf",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S027",
+            "name": "Boxing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S028",
+            "name": "Wrestling",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S029",
+            "name": "MMA",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S030",
+            "name": "Weightlifting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S031",
+            "name": "Gymnastics",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S032",
+            "name": "Archery",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S033",
+            "name": "Shooting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S034",
+            "name": "Judo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S035",
+            "name": "Taekwondo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S036",
+            "name": "Karate",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S037",
+            "name": "Fencing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S038",
+            "name": "Rowing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S039",
+            "name": "Canoeing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S040",
+            "name": "Sailing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S041",
+            "name": "Surfing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S042",
+            "name": "Skateboarding",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S043",
+            "name": "Skiing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S044",
+            "name": "Ice Hockey",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S045",
+            "name": "Esports",
+            "priority": 3,
+            "count": 0
+          }
+        ],
+        "coverage": "Stored observations only; existing cricket catalogue plus independent SH football fixtures",
+        "source_lanes_separate": true,
+        "archive_truncated": false,
+        "football_stale": false,
+        "unassigned_start_times": 1379,
+        "last_received_at": "2026-11-21T18:51:27.694270+00:00",
+        "live_feed_verified": false
+      }
+    },
+    "cricket_wbbl": {
+      "path": "/api/sports-schedule?timezone=Asia%2FKolkata&format=T20&competition=cricket%3A42",
+      "http_status": 200,
+      "response": {
+        "items": [
+          {
+            "id": "cricket:160",
+            "sport_id": "S001",
+            "competition_id": "cricket:42",
+            "competition": "Womens Big Bash League 2026",
+            "format": "T20",
+            "home_team": "Brisbane Heat Women",
+            "away_team": "Adelaide Strikers Women",
+            "start_time_utc": "2026-11-22T04:40:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_label": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": null,
+            "match_no": "31",
+            "match_center_url": "/#/match/160",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:23.208543+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          },
+          {
+            "id": "cricket:161",
+            "sport_id": "S001",
+            "competition_id": "cricket:42",
+            "competition": "Womens Big Bash League 2026",
+            "format": "T20",
+            "home_team": "Melbourne Stars Women",
+            "away_team": "Melbourne Renegades Women",
+            "start_time_utc": "2026-11-22T08:10:00+00:00",
+            "match_date": null,
+            "start_time_precision": "source_schedule",
+            "status": "scheduled",
+            "source": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_label": "Owner Google Sheet 'Womens Big Bash League 2026' (tab 'SH Complete Match Master'); user-supplied, not independently verified.",
+            "source_live_reported": false,
+            "live_state_verified": false,
+            "independent_sh_acquisition": false,
+            "venue": null,
+            "match_no": "32",
+            "match_center_url": "/#/match/161",
+            "coverage_label": "Existing cricket catalogue",
+            "source_updated_at": "2026-11-21T10:16:23.208844+00:00",
+            "schedule_day": "2026-11-22",
+            "ongoing_today": false
+          }
+        ],
+        "total": 2,
+        "next_offset": null,
+        "sport": "S001",
+        "date": "today",
+        "timezone": "Asia/Kolkata",
+        "view": "all",
+        "formats": [
+          {
+            "value": "Test",
+            "name": "Test",
+            "count": 6,
+            "observed": true
+          },
+          {
+            "value": "ODI",
+            "name": "ODI",
+            "count": 2,
+            "observed": true
+          },
+          {
+            "value": "T20",
+            "name": "T20",
+            "count": 4,
+            "observed": true
+          },
+          {
+            "value": "T10",
+            "name": "T10",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "The Hundred",
+            "name": "The Hundred",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Super Six",
+            "name": "Super Six",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "List A",
+            "name": "List A",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "First-class",
+            "name": "First-class",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Other",
+            "name": "Other",
+            "count": 1,
+            "observed": true
+          }
+        ],
+        "leagues": [
+          {
+            "value": "cricket:15",
+            "name": "International League T20 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:26",
+            "name": "Malaysia Womens T20I Tri-Series, 2026",
+            "count": 1
+          },
+          {
+            "value": "cricket:42",
+            "name": "Womens Big Bash League 2026",
+            "count": 2
+          }
+        ],
+        "counts": {
+          "live": 0,
+          "upcoming": 2,
+          "results": 0,
+          "all": 2,
+          "schedule": 2
+        },
+        "sports": [
+          {
+            "sport_id": "S001",
+            "name": "Cricket",
+            "priority": 1,
+            "count": 13
+          },
+          {
+            "sport_id": "S002",
+            "name": "Football",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S003",
+            "name": "Field Hockey",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S004",
+            "name": "Kabaddi",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S005",
+            "name": "Badminton",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S006",
+            "name": "Volleyball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S007",
+            "name": "Basketball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S008",
+            "name": "Baseball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S009",
+            "name": "Rugby",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S010",
+            "name": "Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S011",
+            "name": "Table Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S012",
+            "name": "Pickleball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S013",
+            "name": "Handball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S014",
+            "name": "American Football",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S015",
+            "name": "Chess",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S016",
+            "name": "Carrom",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S017",
+            "name": "Kho-Kho",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S018",
+            "name": "Swimming",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S019",
+            "name": "Athletics \u2014 Running",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S020",
+            "name": "Athletics \u2014 Hurdles",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S021",
+            "name": "Horse Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S022",
+            "name": "Equestrian \u2014 Horse Riding",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S023",
+            "name": "Formula 1",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S024",
+            "name": "Motorcycle Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S025",
+            "name": "Cycling",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S026",
+            "name": "Golf",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S027",
+            "name": "Boxing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S028",
+            "name": "Wrestling",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S029",
+            "name": "MMA",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S030",
+            "name": "Weightlifting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S031",
+            "name": "Gymnastics",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S032",
+            "name": "Archery",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S033",
+            "name": "Shooting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S034",
+            "name": "Judo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S035",
+            "name": "Taekwondo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S036",
+            "name": "Karate",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S037",
+            "name": "Fencing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S038",
+            "name": "Rowing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S039",
+            "name": "Canoeing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S040",
+            "name": "Sailing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S041",
+            "name": "Surfing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S042",
+            "name": "Skateboarding",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S043",
+            "name": "Skiing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S044",
+            "name": "Ice Hockey",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S045",
+            "name": "Esports",
+            "priority": 3,
+            "count": 0
+          }
+        ],
+        "coverage": "Stored observations only; existing cricket catalogue plus independent SH football fixtures",
+        "source_lanes_separate": true,
+        "archive_truncated": false,
+        "football_stale": false,
+        "unassigned_start_times": 1379,
+        "last_received_at": "2026-11-21T18:51:27.694270+00:00",
+        "live_feed_verified": false
+      }
+    },
+    "football_all": {
+      "path": "/api/sports-schedule?sport=S002&date=all&timezone=Asia%2FKolkata",
+      "http_status": 200,
+      "response": {
+        "items": [
+          {
+            "away_team": "Borussia M\u00f6nchengladbach",
+            "away_team_id": "openligadb:team:87",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "SV Werder Bremen",
+            "home_team_id": "openligadb:team:134",
+            "id": "shf_7a76552b66eca86d01f6e206cc87f81813b6251e2e8c5ae4cdeae6fc18acfc51",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.326908+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83253",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-27T19:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-28",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "SV 07 Elversberg",
+            "away_team_id": "openligadb:team:198",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "1. FC K\u00f6ln",
+            "home_team_id": "openligadb:team:65",
+            "id": "shf_3c81ef1a848c3215df19284c71644361fd15a0bf38ea188d79e9bcc3eaf6da23",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.356045+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83252",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-28",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "1. FC Union Berlin",
+            "away_team_id": "openligadb:team:80",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "1. FSV Mainz 05",
+            "home_team_id": "openligadb:team:81",
+            "id": "shf_9a8256d561e72f65b979c3840121dca2d37d8527d80237fe551a077acf198e46",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.336334+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83250",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-28",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "FC Schalke 04",
+            "away_team_id": "openligadb:team:9",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "SC Paderborn 07",
+            "home_team_id": "openligadb:team:31",
+            "id": "shf_e47a2dbdf8bbdaf473f852349522b10da0583c186c63dd78273b20236226cdf7",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.367373+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83254",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-28",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "FC Bayern M\u00fcnchen",
+            "away_team_id": "openligadb:team:40",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "Hamburger SV",
+            "home_team_id": "openligadb:team:100",
+            "id": "shf_fc0bda2608789d433a43134dff8f092e913f66f37ce80d3ebd6bf8a5392094b0",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.344939+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83251",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-28",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "Eintracht Frankfurt",
+            "away_team_id": "openligadb:team:91",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "VfB Stuttgart",
+            "home_team_id": "openligadb:team:16",
+            "id": "shf_6fef31e93bd4b03b10eced9659fc0e37d86263bb522ea2e4ba4e1cce01564936",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.378537+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83247",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T17:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-28",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "RB Leipzig",
+            "away_team_id": "openligadb:team:1635",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "SC Freiburg",
+            "home_team_id": "openligadb:team:112",
+            "id": "shf_e679b0b739859f911d5704ce1cfb1e3f379cfdd451d9315407c1e564b513a622",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.387307+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83249",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-29T14:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-29",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "FC Augsburg",
+            "away_team_id": "openligadb:team:95",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "TSG Hoffenheim",
+            "home_team_id": "openligadb:team:175",
+            "id": "shf_7390e91737cbf9fa782d200bea05b159f2fd94944cb96467109734d6df141db6",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.398849+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83248",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-29T16:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-29",
+            "ongoing_today": false
+          },
+          {
+            "away_team": "Bayer 04 Leverkusen",
+            "away_team_id": "openligadb:team:6",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "Borussia Dortmund",
+            "home_team_id": "openligadb:team:7",
+            "id": "shf_f517c9004b9a47b7bb128fcf5a80c60e696a4d0b3b3c02c994fa44527076b279",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.407426+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83246",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-29T18:30:00+00:00",
+            "status": "scheduled",
+            "independent_sh_acquisition": true,
+            "source_label": "OpenLigaDB via SH DATA LINE",
+            "coverage_label": "One football matchday",
+            "source_live_reported": false,
+            "schedule_day": "2026-11-30",
+            "ongoing_today": false
+          }
+        ],
+        "total": 9,
+        "next_offset": null,
+        "sport": "S002",
+        "date": "all",
+        "timezone": "Asia/Kolkata",
+        "view": "all",
+        "formats": [
+          {
+            "value": "11-a-side",
+            "name": "11-a-side",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Extra time and penalties",
+            "name": "Extra time and penalties",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "__unknown__",
+            "name": "Not provided",
+            "count": 9,
+            "observed": true
+          }
+        ],
+        "leagues": [
+          {
+            "value": "openligadb:bl1:2026",
+            "name": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "count": 9
+          }
+        ],
+        "counts": {
+          "live": 0,
+          "upcoming": 9,
+          "results": 0,
+          "all": 9,
+          "schedule": 9
+        },
+        "sports": [
+          {
+            "sport_id": "S001",
+            "name": "Cricket",
+            "priority": 1,
+            "count": 1570
+          },
+          {
+            "sport_id": "S002",
+            "name": "Football",
+            "priority": 1,
+            "count": 9
+          },
+          {
+            "sport_id": "S003",
+            "name": "Field Hockey",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S004",
+            "name": "Kabaddi",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S005",
+            "name": "Badminton",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S006",
+            "name": "Volleyball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S007",
+            "name": "Basketball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S008",
+            "name": "Baseball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S009",
+            "name": "Rugby",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S010",
+            "name": "Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S011",
+            "name": "Table Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S012",
+            "name": "Pickleball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S013",
+            "name": "Handball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S014",
+            "name": "American Football",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S015",
+            "name": "Chess",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S016",
+            "name": "Carrom",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S017",
+            "name": "Kho-Kho",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S018",
+            "name": "Swimming",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S019",
+            "name": "Athletics \u2014 Running",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S020",
+            "name": "Athletics \u2014 Hurdles",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S021",
+            "name": "Horse Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S022",
+            "name": "Equestrian \u2014 Horse Riding",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S023",
+            "name": "Formula 1",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S024",
+            "name": "Motorcycle Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S025",
+            "name": "Cycling",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S026",
+            "name": "Golf",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S027",
+            "name": "Boxing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S028",
+            "name": "Wrestling",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S029",
+            "name": "MMA",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S030",
+            "name": "Weightlifting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S031",
+            "name": "Gymnastics",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S032",
+            "name": "Archery",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S033",
+            "name": "Shooting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S034",
+            "name": "Judo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S035",
+            "name": "Taekwondo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S036",
+            "name": "Karate",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S037",
+            "name": "Fencing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S038",
+            "name": "Rowing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S039",
+            "name": "Canoeing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S040",
+            "name": "Sailing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S041",
+            "name": "Surfing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S042",
+            "name": "Skateboarding",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S043",
+            "name": "Skiing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S044",
+            "name": "Ice Hockey",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S045",
+            "name": "Esports",
+            "priority": 3,
+            "count": 0
+          }
+        ],
+        "coverage": "Stored observations only; existing cricket catalogue plus independent SH football fixtures",
+        "source_lanes_separate": true,
+        "archive_truncated": false,
+        "football_stale": false,
+        "unassigned_start_times": 1379,
+        "last_received_at": "2026-11-21T18:52:28.009398+00:00",
+        "live_feed_verified": false
+      }
+    },
+    "tennis": {
+      "path": "/api/sports-schedule?sport=S010&timezone=Asia%2FKolkata",
+      "http_status": 200,
+      "response": {
+        "items": [],
+        "total": 0,
+        "next_offset": null,
+        "sport": "S010",
+        "date": "today",
+        "timezone": "Asia/Kolkata",
+        "view": "all",
+        "formats": [
+          {
+            "value": "Best of 3",
+            "name": "Best of 3",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "Best of 5",
+            "name": "Best of 5",
+            "count": 0,
+            "observed": false
+          },
+          {
+            "value": "No-ad",
+            "name": "No-ad",
+            "count": 0,
+            "observed": false
+          }
+        ],
+        "leagues": [],
+        "counts": {
+          "live": 0,
+          "upcoming": 0,
+          "results": 0,
+          "all": 0,
+          "schedule": 0
+        },
+        "sports": [
+          {
+            "sport_id": "S001",
+            "name": "Cricket",
+            "priority": 1,
+            "count": 13
+          },
+          {
+            "sport_id": "S002",
+            "name": "Football",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S003",
+            "name": "Field Hockey",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S004",
+            "name": "Kabaddi",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S005",
+            "name": "Badminton",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S006",
+            "name": "Volleyball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S007",
+            "name": "Basketball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S008",
+            "name": "Baseball",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S009",
+            "name": "Rugby",
+            "priority": 1,
+            "count": 0
+          },
+          {
+            "sport_id": "S010",
+            "name": "Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S011",
+            "name": "Table Tennis",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S012",
+            "name": "Pickleball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S013",
+            "name": "Handball",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S014",
+            "name": "American Football",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S015",
+            "name": "Chess",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S016",
+            "name": "Carrom",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S017",
+            "name": "Kho-Kho",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S018",
+            "name": "Swimming",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S019",
+            "name": "Athletics \u2014 Running",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S020",
+            "name": "Athletics \u2014 Hurdles",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S021",
+            "name": "Horse Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S022",
+            "name": "Equestrian \u2014 Horse Riding",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S023",
+            "name": "Formula 1",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S024",
+            "name": "Motorcycle Racing",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S025",
+            "name": "Cycling",
+            "priority": 2,
+            "count": 0
+          },
+          {
+            "sport_id": "S026",
+            "name": "Golf",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S027",
+            "name": "Boxing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S028",
+            "name": "Wrestling",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S029",
+            "name": "MMA",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S030",
+            "name": "Weightlifting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S031",
+            "name": "Gymnastics",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S032",
+            "name": "Archery",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S033",
+            "name": "Shooting",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S034",
+            "name": "Judo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S035",
+            "name": "Taekwondo",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S036",
+            "name": "Karate",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S037",
+            "name": "Fencing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S038",
+            "name": "Rowing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S039",
+            "name": "Canoeing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S040",
+            "name": "Sailing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S041",
+            "name": "Surfing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S042",
+            "name": "Skateboarding",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S043",
+            "name": "Skiing",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S044",
+            "name": "Ice Hockey",
+            "priority": 3,
+            "count": 0
+          },
+          {
+            "sport_id": "S045",
+            "name": "Esports",
+            "priority": 3,
+            "count": 0
+          }
+        ],
+        "coverage": "Stored observations only; existing cricket catalogue plus independent SH football fixtures",
+        "source_lanes_separate": true,
+        "archive_truncated": false,
+        "football_stale": false,
+        "unassigned_start_times": 1379,
+        "last_received_at": "2026-11-21T18:52:28.009398+00:00",
+        "live_feed_verified": false
+      }
+    },
+    "invalid_sport": {
+      "path": "/api/sports-schedule?sport=S999",
+      "http_status": 400,
+      "response": {
+        "error": "Unknown sport ID"
+      }
+    },
+    "legacy_admin": {
+      "path": "/fixtures",
+      "http_status": 403,
+      "response": {
+        "error": "admin token required"
+      }
+    },
+    "provider_receipts": {
+      "path": "/api/provider-fixtures",
+      "http_status": 200,
+      "response": {
+        "attribution": "Data from OpenLigaDB (www.openligadb.de), licensed under ODbL 1.0",
+        "collection": {
+          "last_error": null,
+          "last_ok": 1795284239.5877233,
+          "next_due": 1795305849.055164
+        },
+        "coverage": "one_source_matchday",
+        "dataset_id": "openligadb-fixtures:bl1:2026:11",
+        "license": "ODbL-1.0",
+        "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+        "live_feed_verified": false,
+        "public_export_url": "https://sh-data-line.onrender.com/open-data/openligadb-fixtures",
+        "published_at": 1795284239.5772421,
+        "source_url": "https://api.openligadb.de/getmatchdata/bl1/2026/11",
+        "total": 9,
+        "items": [
+          {
+            "away_team": "SV 07 Elversberg",
+            "away_team_id": "openligadb:team:198",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "1. FC K\u00f6ln",
+            "home_team_id": "openligadb:team:65",
+            "id": "shf_3c81ef1a848c3215df19284c71644361fd15a0bf38ea188d79e9bcc3eaf6da23",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.356045+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83252",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "Eintracht Frankfurt",
+            "away_team_id": "openligadb:team:91",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "VfB Stuttgart",
+            "home_team_id": "openligadb:team:16",
+            "id": "shf_6fef31e93bd4b03b10eced9659fc0e37d86263bb522ea2e4ba4e1cce01564936",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.378537+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83247",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T17:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "FC Augsburg",
+            "away_team_id": "openligadb:team:95",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "TSG Hoffenheim",
+            "home_team_id": "openligadb:team:175",
+            "id": "shf_7390e91737cbf9fa782d200bea05b159f2fd94944cb96467109734d6df141db6",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.398849+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83248",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-29T16:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "Borussia M\u00f6nchengladbach",
+            "away_team_id": "openligadb:team:87",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "SV Werder Bremen",
+            "home_team_id": "openligadb:team:134",
+            "id": "shf_7a76552b66eca86d01f6e206cc87f81813b6251e2e8c5ae4cdeae6fc18acfc51",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.326908+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83253",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-27T19:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "1. FC Union Berlin",
+            "away_team_id": "openligadb:team:80",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "1. FSV Mainz 05",
+            "home_team_id": "openligadb:team:81",
+            "id": "shf_9a8256d561e72f65b979c3840121dca2d37d8527d80237fe551a077acf198e46",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.336334+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83250",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "FC Schalke 04",
+            "away_team_id": "openligadb:team:9",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "SC Paderborn 07",
+            "home_team_id": "openligadb:team:31",
+            "id": "shf_e47a2dbdf8bbdaf473f852349522b10da0583c186c63dd78273b20236226cdf7",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.367373+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83254",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "RB Leipzig",
+            "away_team_id": "openligadb:team:1635",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "SC Freiburg",
+            "home_team_id": "openligadb:team:112",
+            "id": "shf_e679b0b739859f911d5704ce1cfb1e3f379cfdd451d9315407c1e564b513a622",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.387307+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83249",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-29T14:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "Bayer 04 Leverkusen",
+            "away_team_id": "openligadb:team:6",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "Borussia Dortmund",
+            "home_team_id": "openligadb:team:7",
+            "id": "shf_f517c9004b9a47b7bb128fcf5a80c60e696a4d0b3b3c02c994fa44527076b279",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.407426+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83246",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-29T18:30:00+00:00",
+            "status": "scheduled"
+          },
+          {
+            "away_team": "FC Bayern M\u00fcnchen",
+            "away_team_id": "openligadb:team:40",
+            "competition": "1. Fu\u00dfball-Bundesliga 2026/2027",
+            "competition_id": "openligadb:bl1:2026",
+            "country": null,
+            "fixture_revision": 1,
+            "format": null,
+            "home_team": "Hamburger SV",
+            "home_team_id": "openligadb:team:100",
+            "id": "shf_fc0bda2608789d433a43134dff8f092e913f66f37ce80d3ebd6bf8a5392094b0",
+            "league_id": "openligadb:league:4937",
+            "live_state_verified": false,
+            "observed_at": "2026-11-21T15:42:37.344939+00:00",
+            "season_id": "openligadb:bl1:2026",
+            "series_id": null,
+            "source": "openligadb-fixtures:bl1:2026",
+            "source_fixture_id": "83251",
+            "source_response_at": "2026-11-21T15:42:36+00:00",
+            "source_timestamp_basis": "response",
+            "source_updated_at": null,
+            "sport_id": "S002",
+            "start_time_utc": "2026-11-28T14:30:00+00:00",
+            "status": "scheduled"
+          }
+        ],
+        "last_received_at": "2026-11-21T18:52:28.009398+00:00",
+        "last_error": null,
+        "configured": true,
+        "upstream_error": null,
+        "stale": false
+      }
+    }
+  }
+}
