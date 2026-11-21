@@ -80,3 +80,33 @@ class AbuDhabiT10Sheet(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WBBLSheet(unittest.TestCase):
+    """Owner's WBBL 2026 match master (rows copied from the sheet on 21 Nov 2026): 'DD Mon YYYY' dates, women's team codes,
+    'Live / verify' and 'Scheduled' rows never become results, DLS margin text kept."""
+    def test_wbbl_rows(self):
+        T._migrate_once()
+        WS = "1afb5WkqGQs7u-PZXnHIahQOQmFnbpl10LAbpZIfs_U4"
+        rows = [
+            ["1", "29 Oct 2026", "10:10 AM", "MR\n138/9 (20)", "VS", "ST\n140/4 (17)", "—", "A-ST", "6 wickets", "—", "—", "—", "—", "x"],
+            ["15", "08 Nov 2026", "08:10 AM", "SS\n162/2 (16)", "VS", "ST\n158/10 (15.3)", "—", "H-SS", "9 runs DLS", "—", "—", "—", "—", "x"],
+            ["27", "19 Nov 2026", "01:40 PM", "BH\n—", "VS", "ST\n—", "—", "—", "Live / verify", "—", "—", "—", "—", "x"],
+            ["31", "22 Nov 2026", "10:10 AM", "BH\n—", "VS", "AS\n—", "—", "—", "Scheduled", "—", "—", "—", "—", "x"],
+            ["43", "05 Dec 2026", "—", "TBD\n—", "VS", "TBD\n—", "—", "—", "Final", "—", "—", "—", "—", "x"]]
+        set_sheets([{"league": "Women's Big Bash League", "sheet_id": WS, "format": "T20", "gender": "women", "country": "Australia"}])
+        r = run("owner_sheets_sync", Fake({WS: lambda: xlsx({"SH Complete Match Master": [HEAD] + rows, "Matches": [["Season", "Match No", "Date"]]})}))
+        k = r["summary"]["leagues"]["Women's Big Bash League"]
+        self.assertEqual((k["rows"], k["placeholder"]), (5, 1), k)
+        c = T.db()
+        q = lambda no: c.execute("""SELECT m.id, h.name AS hn, a.name AS an, m.start_utc FROM matches m JOIN teams h ON h.id=m.home_team_id
+                                    JOIN teams a ON a.id=m.away_team_id JOIN competitions cp ON cp.id=m.competition_id
+                                    WHERE cp.name='Womens Big Bash League 2026' AND m.match_no=?""", (no,)).fetchone()
+        m1 = q("1")
+        self.assertEqual((m1["hn"], m1["an"], m1["start_utc"]), ("Melbourne Renegades Women", "Sydney Thunder Women", "2026-10-29T04:40:00+00:00"))
+        w = c.execute("SELECT t.name FROM match_results r JOIN teams t ON t.id=r.winner_team_id WHERE r.match_id=?", (m1["id"],)).fetchone()
+        self.assertEqual(w[0], "Sydney Thunder Women")
+        self.assertIsNotNone(c.execute("SELECT 1 FROM match_results WHERE match_id=?", (q("15")["id"],)).fetchone())
+        for no in ("27", "31"):
+            self.assertIsNone(c.execute("SELECT 1 FROM match_results WHERE match_id=?", (q(no)["id"],)).fetchone(), no)
+        c.close()

@@ -42,6 +42,11 @@ SHEET_EXTRAS = {
     "1ydZ1gF9u8ii_qWu8fTSj2xGSnoKg0tsToMpcVzXwdZo": {
         "competition": "Abu Dhabi T10 2026",
         "codes": {"UB": "UAE Bulls", "YL": "Yas Lions", "RDC": "Royal Desert Champions", "EE": "Emirates Eagles", "UT": "United Tigers", "AA": "Arabian Aces"}},
+    # WBBL: names as the live provider spells them, so sheet rows and live matches land on the same SH match
+    "1afb5WkqGQs7u-PZXnHIahQOQmFnbpl10LAbpZIfs_U4": {
+        "competition": "Womens Big Bash League 2026",
+        "codes": {"AS": "Adelaide Strikers Women", "BH": "Brisbane Heat Women", "HH": "Hobart Hurricanes Women", "MR": "Melbourne Renegades Women",
+                  "MS": "Melbourne Stars Women", "PS": "Perth Scorchers Women", "SS": "Sydney Sixers Women", "ST": "Sydney Thunder Women"}},
 }
 HEADER_TZ = {"ist": "+05:30", "time (ist)": "+05:30", "gst": "+04:00", "time (gst)": "+04:00", "utc": "+00:00", "time (utc)": "+00:00"}
 MARGIN_RE = re.compile(r"^\s*(\d+)\s*(runs?|wkts?|wickets?)\s*$", re.I)
