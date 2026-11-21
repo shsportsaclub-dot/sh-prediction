@@ -8,11 +8,11 @@
 <h1>Match schedule</h1><p>Matches by day and competition. Browse current coverage and choose your display time zone.</p>
 <nav class="tabs" id="views" role="tablist" aria-label="Match status"></nav>
 <section class="controls" aria-label="Schedule filters">
-<label>Sport<select id="sport"><option value="">All sports</option></select></label>
-<label>Series / competition<select id="competition"><option value="">All competitions</option></select></label>
-<label>Format<select id="format"><option value="">All formats</option></select></label>
+<label>Sport<select id="sport" aria-label="Sport"><option value="">All sports</option></select></label>
+<label>Series / competition<select id="competition" aria-label="Series / competition"><option value="">All competitions</option></select></label>
+<label>Format<select id="format" aria-label="Format"><option value="">All formats</option></select></label>
 <label class="search">Find a team or competition<input type="search" id="search" placeholder="Search matches" autocomplete="off"></label>
-<label class="timezone">Display time zone · AM/PM<select id="zone"><option value="">Automatic</option></select></label>
+<label class="timezone">Display time zone · AM/PM<select id="zone" aria-label="Display time zone · AM/PM"><option value="">Automatic</option></select></label>
 </section>
 <div class="date-controls"><button id="previous" aria-label="Previous day">←</button><label>Match date<input type="date" id="date"></label><button id="next" aria-label="Next day">→</button><button id="reset" class="clear">Reset filters</button></div>
 <nav class="quick" id="quick" aria-label="Date range"></nav><nav class="day-strip" id="days" aria-label="Available match dates"></nav>
