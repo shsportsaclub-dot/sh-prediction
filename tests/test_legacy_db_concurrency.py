@@ -16,7 +16,15 @@ class LegacyInitialization(unittest.TestCase):
     def test_simultaneous_first_requests_add_columns_once(self):
         with tempfile.TemporaryDirectory() as root:
             path = os.path.join(root, 'legacy.sqlite3')
+            # Prepare unrelated legacy tables before synchronizing the missing-column
+            # race. Otherwise table creation/WAL setup can block one worker before
+            # it reaches the barrier, testing startup scheduling instead of ALTER.
+            with patch.object(main, 'DB', path):
+                initialized = main.db()
+                initialized.close()
             with sqlite3.connect(path) as c:
+                c.execute('PRAGMA journal_mode=WAL')
+                c.execute('DROP TABLE outcomes')
                 c.execute('CREATE TABLE outcomes(fixture_id INTEGER PRIMARY KEY, toss_winner TEXT, match_winner TEXT, source TEXT NOT NULL, verified_at TEXT NOT NULL)')
             barrier = threading.Barrier(2)
             original = main.LegacyConn.execute
