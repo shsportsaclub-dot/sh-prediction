@@ -14,7 +14,8 @@ root.SHDemoLogin={
   challenge.tries++;
   if(String(value)!==challenge.otp)return false;
   challenge=null;
-  root.localStorage.setItem('shp_demo','1');
+  root.localStorage.setItem('shp_demo','0');
+  root.localStorage.setItem('shp_demo_visit','1');
   root.location.hash='#/matches';return true;
  }
 };

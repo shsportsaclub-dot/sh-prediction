@@ -222,6 +222,7 @@ nav.tabs a.nav-plus span{display:flex;align-items:center;justify-content:center;
 <div class="bar" aria-hidden="true"></div>
 <nav class="secbar" id="secbar" aria-label="Sections"></nav>
 <nav class="tabs" id="tabs" aria-label="Main navigation"></nav>
+<p id="demo-guest-banner" class="tag demo" hidden>DEMO ACCESS · Public viewing · Phone not verified</p>
 <main id="main" tabindex="-1" aria-live="polite"></main>
 <div class="muted" style="padding:8px;text-align:center;font-size:11px"><label for="viewer-timezone">Time zone (AM/PM)</label> <select id="viewer-timezone" aria-label="Display time zone"><option value="">Automatic</option></select> · <a href="https://db-ip.com" target="_blank" rel="noopener">IP Geolocation by DB-IP</a></div>
 <script src="/viewer_timezone.js?v=__SH_BUILD__"></script>
@@ -410,6 +411,7 @@ async settings(el){
 }};
 
 async function route(){
+ const guestBanner=document.getElementById("demo-guest-banner");if(guestBanner)guestBanner.hidden=!!TOKEN||ls.get("shp_demo_visit")!=="1";
  // each navigation renders into a fresh box, so a slower earlier screen can never write over the new one
  const h=(location.hash||"#/home").slice(2).split("/");const el=document.createElement("div");el.className="screen";$("#main").replaceChildren(el);
  const page=h[0]||"home";navRender(NAV_OF[page]||page);if(window.secbar)secbar(page);window.scrollTo(0,0);
