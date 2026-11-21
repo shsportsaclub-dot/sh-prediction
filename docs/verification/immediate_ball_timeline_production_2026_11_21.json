@@ -1,0 +1,41 @@
+{
+  "release_commit": "bd9ab980d698abb129c967283fec0a7cc2fbb822",
+  "render_deploy": "dep-dc0pu3p5efls73ecucm0",
+  "deploy_status": "live",
+  "live_at_utc": "2026-11-21T13:40:10.240768Z",
+  "health_build": "bd9ab980d698",
+  "javascript_bundle_checksums_match_tested_files": true,
+  "local_regression_tests": 156,
+  "local_regression_result": "OK",
+  "ci_run_id": 44909945628,
+  "ci_attempt": 2,
+  "ci_result": "success",
+  "ci_first_attempt_failure": {
+    "test": "test_simultaneous_first_requests_add_columns_once",
+    "module": "test_legacy_db_concurrency",
+    "error": "BrokenBarrierError at synthetic concurrency barrier",
+    "local_isolated_repetitions_after_failure": 12,
+    "local_repetitions_result": "OK",
+    "code_changed_for_retry": false,
+    "status": "Intermittent failure retained in original CI logs; not claimed fixed"
+  },
+  "production_after_deploy": {
+    "historical_inbox_records": 236,
+    "checkpoint": 236,
+    "last_error": null,
+    "database_on_mounted_disk": true,
+    "native_matches": 1474,
+    "sse_http_status": 200,
+    "sse_content_type": "text/event-stream; charset=utf-8",
+    "sse_initial_status_request_seconds": 7.86,
+    "browser_match_page_loaded": true,
+    "browser_match_id": 39,
+    "actual_ball_timeline_verified": false
+  },
+  "acceptance": {
+    "synthetic_local_commit_to_stream_under_150ms": true,
+    "real_live_source_to_screen_under_one_second_verified": false,
+    "upstream_blocker": "Live ball-by-ball unavailable on currently configured direct source; DATA LINE live source not configured",
+    "no_synthetic_events_written_to_production": true
+  }
+}
