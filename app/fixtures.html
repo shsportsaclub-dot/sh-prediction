@@ -6,7 +6,7 @@
 </style>
 <main><header><a href="/">SH PREDICTION</a><a href="/#/matches">Cricket matches →</a></header>
 <h1>Upcoming fixtures</h1><p>Collected by SH DATA LINE. Source-listed football fixtures, with their original identities and scheduled times.</p>
-<p class="notice">Coverage: one Bundesliga matchday · Football S002. These are schedule observations; live scores and independently verified match status are not included.</p>
+<p class="notice">Coverage: Bundesliga matchday 11 · Football. These are schedule observations; live scores and independently verified match status are not included.</p>
 <label for="zone">Display time zone · AM/PM</label><select id="zone"><option value="">Automatic</option></select>
 <p id="summary" role="status">Loading stored fixtures…</p><div class="cards" id="cards"></div>
 <footer>Data from <a href="https://www.openligadb.de/" target="_blank" rel="noopener">OpenLigaDB</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL 1.0</a>.<br>
@@ -24,7 +24,7 @@ function render(){
  el('summary').textContent=items.length+' stored fixtures · Times in '+(SHTime.timezone||'device time zone')+(snapshot.stale?' · STALE: showing cached observations':'');
  for(const item of items){
   const card=document.createElement('article'),left=document.createElement('div'),right=document.createElement('div');
-  left.append(node('div',item.competition,'tag'),node('h2',item.home_team+' vs '+item.away_team),node('div',item.id,'muted'));
+  left.append(node('div',item.competition,'tag'),node('h2',item.home_team+' vs '+item.away_team),node('div','Source-listed fixture · OpenLigaDB','muted'));
   right.append(node('div',item.start_time_utc?SHTime.format(item.start_time_utc):'Start time unknown'),node('p',item.status,'status'));
   card.append(left,right);el('cards').append(card);
  }
