@@ -319,6 +319,9 @@ def provider_detail(c, mid):
         return None
     load = lambda k: json.loads(r[k]) if r[k] else None
     balls = load("balls_json") or []
+    import ball_merge
+    balls = [dict(b, event_key=ball_merge.delivery_event_key(mid, identity), timeline_sequence=i + 1)
+             for i, (b, identity) in enumerate(zip(balls, ball_merge.keys(balls)))]
     overs = {}
     for b in balls:
         if b.get("over") is not None:

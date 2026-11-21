@@ -46,6 +46,10 @@ def stream(handler, db_fn, match_id, last_id=0, max_seconds=300, heartbeat=15):
         w.write(("event: status\ndata: %s\nretry: 3000\n\n" % json.dumps(status)).encode()); w.flush()
         last_beat = time.time()
         while time.time() - start < max_seconds:
+            # Capture before reading: a commit+notify between the empty query
+            # and the wait must cause an immediate re-read, not a heartbeat wait.
+            with _cond:
+                v = _version["n"]
             rows = c.execute("SELECT * FROM live_events WHERE match_id=? AND id>? ORDER BY id LIMIT 200", (match_id, last_id)).fetchall()
             for r in rows:
                 w.write(("id: %d\nevent: %s\ndata: %s\n\n" % (r["id"], r["kind"], r["payload"])).encode())
@@ -57,7 +61,6 @@ def stream(handler, db_fn, match_id, last_id=0, max_seconds=300, heartbeat=15):
                 w.write(b": heartbeat\n\n"); w.flush()
                 last_beat = time.time()
             with _cond:
-                v = _version["n"]
                 _cond.wait_for(lambda: _version["n"] != v, timeout=min(heartbeat, max(0.1, max_seconds - (time.time() - start))))
             c.commit()  # end the read snapshot so new rows become visible
     except (BrokenPipeError, ConnectionResetError):

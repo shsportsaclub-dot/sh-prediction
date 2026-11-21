@@ -312,10 +312,12 @@ window.mcLive=(m,tab)=>{const on=m.status==="live";
  const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(!new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash))return;const y=scrollY;route();setTimeout(()=>scrollTo(0,y),400)},1500)};
  if(ES&&ESmid===m.id)return;if(ES)ES.close();ESmid=m.id;ES=new EventSource("/api/v1/matches/"+m.id+"/stream?last_id=latest");
  ["ball","delivery","probability","status"].forEach(k=>ES.addEventListener(k,e=>{if(k==="status")return;
+  if(k==="ball"||k==="delivery"){let fact=null;try{fact=JSON.parse(e.data)}catch(x){}if(window.mcBallReceived)mcBallReceived(m.id,fact,e.lastEventId)}
   if(k==="delivery"){let ev={};try{ev=JSON.parse(e.data)}catch(x){}
-   // flash first, then the new score is projected into the plate; the rest of the tab refreshes a little later
-   if(window.shVoice)shVoice.event(m.id,ev);
-   if(window.mcFlash){ev.after=()=>{if(window.mcBoardRefresh)mcBoardRefresh(m.id)};mcFlash(ev)}clearTimeout(timer);timer=setTimeout(()=>refresh(),6000);return}
+   // Request the score immediately; celebration animation must not gate live data.
+   if(window.mcBoardRefresh)mcBoardRefresh(m.id);
+   if(window.shVoice)setTimeout(()=>{if(new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash))shVoice.event(m.id,ev)},2000);
+   if(window.mcFlash)mcFlash(ev);refresh();return}
   if(window.mcBoardRefresh)mcBoardRefresh(m.id);clearTimeout(timer);timer=setTimeout(()=>refresh(),3000)}));
  ES.onerror=()=>{if(!poll)poll=setInterval(()=>{if(new RegExp("^#/match/"+m.id+"(/|$)").test(location.hash)&&document.visibilityState==="visible")refresh();else{clearInterval(poll);poll=null}},30000)};
  ES.onopen=()=>{if(poll){clearInterval(poll);poll=null}}};

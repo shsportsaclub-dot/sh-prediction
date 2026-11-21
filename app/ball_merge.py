@@ -30,6 +30,15 @@ def keys(balls):
     return out
 
 
+def delivery_event_key(match_id, identity):
+    """The same durable identity in an SSE event and an HTTP ball snapshot."""
+    import live_bridge
+    ino, over, ball, extra, repeat = identity
+    return live_bridge.event_key({'provider': 'ball', 'match_id': str(match_id),
+                                 'innings': ino, 'event_id': '%s/%s' % (extra, repeat),
+                                 'over': over, 'ball': ball})
+
+
 def merge(*lists):
     """lists in priority order. Returns (merged balls sorted by identity, stats)."""
     best, stats = {}, {"duplicates": 0, "conflicts": 0, "added": [0] * len(lists)}

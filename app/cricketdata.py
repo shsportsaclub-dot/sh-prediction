@@ -386,8 +386,7 @@ def publish_new_balls(c, mid, balls, now_fn):
         if b.get("over") is None or b.get("ball") is None:
             continue
         ino = k[0]
-        key = live_bridge.event_key({"provider": "ball", "match_id": str(mid), "innings": ino, "event_id": "%s/%s" % (k[3], k[4]),
-                                     "over": k[1], "ball": k[2]})
+        key = ball_merge.delivery_event_key(mid, k)
         if c.execute("INSERT OR IGNORE INTO live_event_keys(event_key, match_id) VALUES(?,?)", (key, tag)).rowcount != 1:
             continue
         if first:
@@ -399,7 +398,7 @@ def publish_new_balls(c, mid, balls, now_fn):
               "extra_type": et, "is_wicket": 1 if b.get("wicket") else 0, "wicket_kind": None,
               "batter": b.get("batter"), "bowler": b.get("bowler"), "batting_team_id": None}
         text = (commentary_engine.generate([ev], "en", {}) or [{}])[0].get("text")
-        live.publish(c, mid, "delivery", {"innings": ino, "over": "%s.%s" % (b.get("over"), b.get("ball")), "runs": runs, "extra": et,
+        live.publish(c, mid, "delivery", {"innings": ino, "timeline_sequence": i + 1, "over": "%s.%s" % (b.get("over"), b.get("ball")), "runs": runs, "extra": et,
                                           "wicket": bool(b.get("wicket")), "batter": b.get("batter"), "bowler": b.get("bowler"),
                                           "commentary": text, "source": "SH Data Line" if b.get("src") == "sh" else "provider", "status": "PROVIDER_REPORTED", "event_key": key})
         sent += 1

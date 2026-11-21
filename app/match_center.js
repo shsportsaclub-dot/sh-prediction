@@ -125,12 +125,15 @@ function boardPlayers(m,pd){if(!pd||!pd.scorecard||!pd.scorecard.length||m.statu
  return '<div class="bp">'+bats.map(b=>'<span class="'+(same(b.name,lb.batter)?"on":"")+'">'+nm(b.name)+(same(b.name,lb.batter)?"*":"")+' <b>'+(b.r??0)+'</b><small>('+(b.b??0)+')</small></span>').join("")+
   (bw?'<span class="bw"><i class="bdot"></i>'+nm(bw.name)+' <b>'+(bw.w??0)+'-'+(bw.r??0)+'</b><small>('+esc(String(bw.o??"0"))+')</small></span>':'')+'</div>'}
 /* ball-by-ball strip under the board: every received ball, newest at the right, scrolled into view */
-window.mcBalls=function(m){const pd=PD(m);const B=(pd&&pd.balls)||[];if(!B.length)return "";
+window.mcBallMarkup=function(B){
  const byOv=[];B.forEach(b=>{const k=b.inning+"|"+b.over;let o=byOv[byOv.length-1];if(!o||o.k!==k){o={k,over:b.over,balls:[]};byOv.push(o)}o.balls.push(b)});
- const chipOf=b=>{const x=String(b.extra||"").toLowerCase();const v=b.wicket?"W":(x==="wd"||x==="wide"?"wd":x==="nb"||x==="noball"?"nb":(x==="lb"||x==="legbyes")?(b.runs||0)+"lb":(x==="b"||x==="byes")?(b.runs||0)+"b":String(b.runs||0));
-  const cls=b.wicket?"bw":b.runs>=6&&!x?"b6":b.runs===4&&!x?"b4":(b.runs||0)>0?"b1":"b0";return '<span class="bl '+cls+'">'+esc(v)+'</span>'};
+ const chipOf=b=>{const x=String(b.extra||"").toLowerCase();const v=b.wicket?"W":/^(wd|wide)$/.test(x)?"WD":/^(nb|noball|no_ball)$/.test(x)?"NB":/^(lb|leg_bye|legbyes)$/.test(x)?b.runs+"lb":/^(b|bye|byes)$/.test(x)?b.runs+"b":(Number.isInteger(b.runs)?String(b.runs):"—");
+  const cls=b.wicket?"bw":b.runs===6&&!x?"b6":b.runs===4&&!x?"b4":b.runs>0?"b1":"b0";return '<span class="bl '+cls+'">'+esc(v)+'</span>'};
+ return byOv.slice(-12).map(o=>'<span class="ov"><small>Ov '+(o.over+1)+'</small>'+o.balls.map(chipOf).join("")+'<em>= '+(o.balls.every(b=>Number.isInteger(b.runs))?o.balls.reduce((a,b)=>a+b.runs,0):"—")+'</em></span>').join("");
+};
+window.mcBalls=function(m){const history=m.provider_detail&&m.provider_detail.balls;const B=window.mcTimelineMerge?mcTimelineMerge(m.id,history):(history||[]);if(!B.length)return "";
  const id="bs"+m.id;setTimeout(()=>{const s=document.getElementById(id);if(s)s.scrollLeft=s.scrollWidth},50);
- return '<div class="balls" id="'+id+'" aria-label="Ball by ball">'+byOv.slice(-12).map(o=>'<span class="ov"><small>Ov '+(o.over+1)+'</small>'+o.balls.map(chipOf).join("")+'<em>= '+o.balls.reduce((a,b)=>a+(b.runs||0),0)+'</em></span>').join("")+'</div>'};
+ return '<div class="balls" id="'+id+'" aria-label="Ball by ball">'+mcBallMarkup(B)+'</div>'};
 
 function batTable(inn){return '<table class="simple sc"><thead><tr><th>Batter</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody>'+
  inn.batting.map(b=>'<tr><td><b>'+esc(b.name||"")+'</b><div class="muted dis">'+esc(b.dismissal||"")+'</div></td><td><b>'+(b.r??"—")+'</b></td><td>'+(b.b??"—")+'</td><td>'+(b.fours??"—")+'</td><td>'+(b.sixes??"—")+'</td><td>'+(b.sr??"—")+'</td></tr>').join("")+'</tbody></table>'}
@@ -209,6 +212,35 @@ window.mcTabAfter={
    (v.lowest_all_out?'<dt>Lowest all out</dt><dd>'+v.lowest_all_out.runs+' ('+v.lowest_all_out.overs+' ov) by '+esc(v.lowest_all_out.team)+'</dd>':'')+'</dl>':'<p class="muted">No completed '+esc(m.format)+' matches at this venue in our database yet.</p>')+'<p class="muted">'+esc(m.history.note)+'</p></div>'})()
 };
 })();
+
+/* Immediate delivery timeline: render received facts before fetches, voice or animation.
+   Scorecard-derived flashes are aggregate observations, never individual balls. */
+(function(){const states=new Map();
+const state=mid=>{if(!states.has(mid)){states.set(mid,{history:[],pending:new Map(),lastId:0});if(states.size>20)states.delete(states.keys().next().value)}return states.get(mid)};
+window.mcTimelineMerge=function(mid,history){const s=state(mid);if(Array.isArray(history))s.history=history;
+ const keys=new Set(s.history.map(b=>b.event_key).filter(Boolean));
+ const sequences=s.history.map(b=>b.timeline_sequence).filter(Number.isInteger),first=sequences.length?Math.min(...sequences):null;
+ for(const [key,b] of s.pending){if(keys.has(key)||(b.timeline_origin==="provider"&&first!==null&&Number.isInteger(b.timeline_sequence)&&b.timeline_sequence<first))s.pending.delete(key)}
+ return s.history.concat([...s.pending.values()]).sort((a,b)=>{
+  if(a.timeline_origin==="scorer"&&b.timeline_origin==="scorer"&&a.inning!==b.inning)return a.inning-b.inning;
+  return Number.isInteger(a.timeline_sequence)&&Number.isInteger(b.timeline_sequence)?a.timeline_sequence-b.timeline_sequence:0});
+};
+window.mcBallReceived=function(mid,ev,eventId){
+ if(!ev||ev.source==="scorecard"||!/^\d+$/.test(String(eventId||"")))return;
+ const provider=typeof ev.event_key==="string"&&ev.event_key.trim()!=="";
+ if(!provider&&(!Number.isInteger(ev.seq)||!Number.isInteger(ev.innings_no)))return;
+ const s=state(mid),id=Number(eventId);if(!Number.isSafeInteger(id)||id<1||id<=s.lastId)return;
+ const extra=String(ev.extra??ev.extra_type??"").toLowerCase();
+ const runs=Number.isInteger(ev.runs)?ev.runs:Number.isInteger(ev.runs_bat)&&Number.isInteger(ev.extras)?ev.runs_bat+ev.extras:null;
+ if(runs===null||runs<0||!/^\d+\.\d+$/.test(String(ev.over??"")))return;
+ const key=provider?ev.event_key:"scorer:"+ev.innings_no+":"+ev.seq;
+ const row={event_key:key,inning:ev.innings??ev.innings_no,over:Number(String(ev.over).split(".")[0]),runs,extra,
+  wicket:ev.wicket===true||ev.is_wicket===true||ev.is_wicket===1,timeline_sequence:provider?ev.timeline_sequence:ev.seq,timeline_origin:provider?"provider":"scorer"};
+ s.pending.set(key,row);s.lastId=id;while(s.pending.size>200)s.pending.delete(s.pending.keys().next().value);
+ const merged=mcTimelineMerge(mid),board=document.querySelector(".board");let strip=document.getElementById("bs"+mid);if(!strip&&!board)return;
+ if(!strip){strip=document.createElement("div");strip.id="bs"+mid;strip.className="balls";strip.setAttribute("aria-label","Ball by ball");board.insertAdjacentElement("afterend",strip)}
+ strip.innerHTML=mcBallMarkup(merged);strip.scrollLeft=strip.scrollWidth;
+};})();
 
 /* Board flash: each ball event shows its own animation on the score plate for ~2.5 s, then the score returns.
    Every event type has a different look and movement (SH originals). */
