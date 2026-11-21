@@ -1,0 +1,15 @@
+# IP-based display timezone
+
+The hub's shared formatter asks `GET /api/viewer-timezone` for an estimated timezone. On Render the documented X-Forwarded-For address is used as a presentation hint; elsewhere the socket address is used. This is not an identity, authorization, deadline or prediction-lock signal. Caller-supplied forwarding can affect their display. A country estimate is not proof of physical presence, especially with VPNs.
+
+A startup background task downloads DB-IP Country Lite November 2026 (https://download.db-ip.com/free/dbip-country-lite-2026-11.csv.gz), bounds compressed/decompressed sizes and rows, and atomically installs an indexed SQLite range database beside the application database. No visitor IP goes to DB-IP. Requests do local IPv4/IPv6 lookup; no IP is included in the response or additional application logs. Existing application/hosting request logs are unchanged. Download failure preserves an existing database; unresolved addresses use fallback. This is a pinned monthly release, not daily refreshed geography; a later release needs review and update.
+
+Data attribution: **IP Geolocation by DB-IP**, https://db-ip.com — CC BY 4.0, https://creativecommons.org/licenses/by/4.0/. Attribution link appears on the hub pages using it. Country timezone list is derived from the installed IANA zone.tab; no country with multiple listed zones gets a guessed single timezone.
+
+Resolution: explicit saved timezone → supported explicit phone calling code → unambiguous IP country timezone → browser/device IANA timezone. The login/register screen provides a country/calling-code dropdown, with 245 regions from phonenumbers 9.0.19 metadata (Apache-2.0; notice in docs/licenses). Selection is stored on this device as a display preference. Shared codes require country selection; multi-zone countries still use device timezone. It does not verify phone ownership, collect a full phone number or change email/password authentication. A saved manual timezone overrides estimates. Existing users can change the display timezone through the hub selector; cross-device account synchronization remains pending.
+
+Match-card times and match-center date fields use this shared timezone, with explicit hour12/AM-PM, date and zone indication. UTC database values, publication timestamps and server lock comparisons remain unchanged. IP country-only data cannot choose a precise zone inside e.g. USA/Australia: device timezone remains necessary. No location accuracy guarantee is made.
+
+Tests: IPv4/IPv6 range boundaries, missing/private/invalid addresses, timezone ambiguity, phone precedence and manual selection, phone fallback, HTTP fallback and actual JavaScript AM/PM conversion. Run `python -m unittest discover -s tests -v` and `node tests/viewer_timezone_client_test.cjs`.
+
+Owner steering: a user-selected timezone is saved locally and overrides automatic estimates. Mobile country code is preferred over IP when available. Country selection now includes 245 calling-code regions; no verified phone ownership is claimed.

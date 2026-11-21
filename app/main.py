@@ -164,6 +164,17 @@ class H(BaseHTTPRequestHandler):
     left-=len(chunk)
  def do_GET(self):
   p=urlparse(self.path).path
+  if p=="/api/viewer-timezone":
+   import viewer_timezone
+   q=parse_qs(urlparse(self.path).query)
+   result=viewer_timezone.resolve(
+    viewer_timezone.country_for_ip(viewer_timezone.request_ip(self)),
+    q.get("phone_code",[None])[0],q.get("device_timezone",[None])[0],q.get("phone_country",[None])[0])
+   result['attribution']=viewer_timezone.ATTRIBUTION
+   result['countries']=viewer_timezone.PHONE_CODES
+   return self.sendj(200,result)
+  if p=="/viewer_timezone.js":
+   b=(Path(__file__).parent/"viewer_timezone.js").read_bytes();self.send_response(200);self.send_header("Content-Type","text/javascript; charset=utf-8");self.send_header("Cache-Control","no-cache");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   sm=re.fullmatch(r"/api/v1/matches/(\d+)/stream",p)
   if sm:
    c=db();pending=__import__("schema").pending(c);c.close()
@@ -381,5 +392,6 @@ if __name__=="__main__":
   print("SH T10 fixture seed:",t10_seed.seed(db),flush=True)
  except Exception as exc:
   print("SH T10 fixture seed failed:",repr(exc),flush=True)
+ import viewer_timezone;viewer_timezone.start()
  import scheduler;scheduler.start(db)  # 24/7 data collectors (SH_COLLECTORS=0 disables)
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()

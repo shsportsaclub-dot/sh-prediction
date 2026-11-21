@@ -99,7 +99,7 @@ window.mcBoard=function(m){const pd=PD(m),L=m.live_score;let lines=[],cr="",ev="
  const sn=shortName,full=x=>x.name;
  const toss=m.toss_winner_id?full(m.toss_winner_id===m.home.id?m.home:m.away)+" opt to "+(m.toss_decision||"—"):"";
  const res=m.result_type?(m.winner_team_id?((m.winner_team_id===m.home.id?m.home.name:m.away.name)+" won"+(m.margin?" by "+m.margin:"")):m.result_type.replace(/_/g," ")):"";
- const status=res||[(L&&L.status_text)||"",toss&&!(L&&L.status_text&&/opt/i.test(L.status_text))?toss:""].filter(Boolean).join(" - ")||(m.status==="scheduled"?new Date(m.start_utc).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"");
+ const status=res||[(L&&L.status_text)||"",toss&&!(L&&L.status_text&&/opt/i.test(L.status_text))?toss:""].filter(Boolean).join(" - ")||(m.status==="scheduled"?window.SHTime.format(m.start_utc):"");
  const cur=lines[lines.length-1];
  const quota={T10:60,T20:120,"The Hundred":100,ODI:300,"List A":300}[m.format];const cells=[];
  if(cr)cells.push(["CRR",cr]);
@@ -142,7 +142,7 @@ function bowlTable(inn){return '<table class="simple sc"><thead><tr><th>Bowler</
 const extrasTxt=e=>{if(!e)return "—";const k=["b","lb","w","nb","p"].filter(x=>e[x]!=null);const tot=e.total!=null?e.total:k.reduce((a,x)=>a+(+e[x]||0),0);return tot+(k.length?' ('+k.map(x=>x+" "+e[x]).join(", ")+')':'')};
 const srcNote=pd=>'';   // no provider names on screen (owner, 20 Nov 2026)
 
-const localTime=u=>{try{return new Date(u).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return u}};
+const localTime=u=>window.SHTime.format(u);
 function scoreOnly(m){const L=m.live_score;if(!L||!L.innings||!L.innings.length)return null;
  return '<div class="card"><h3>Score</h3>'+L.innings.map(i=>'<div class="row"><b class="grow">'+esc(teamShort(m,i.inning))+'</b><span class="mc-score">'+i.r+'-'+i.w+'</span> <span class="muted">('+esc(String(i.o))+' ov)</span></div>').join("")+
   (L.status_text?'<p><b>'+esc(L.status_text)+'</b></p>':'')+'<p class="muted">Updated '+ago(L.fetched_at)+'. Batter-by-batter detail appears when the full scorecard for this match is received.</p></div>'}

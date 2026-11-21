@@ -95,6 +95,17 @@ def predict(mid, kind, team, eid, conf=60):
                                          "explanation": "test", "expert_id": eid}, A)
 
 class Security(unittest.TestCase):
+    def test_viewer_timezone_country_code_fallback(self):
+        s,r=call('/api/viewer-timezone?phone_code=%2B880&device_timezone=Europe%2FParis')
+        self.assertEqual(s,200)
+        self.assertEqual(r['timezone'],'Asia/Dhaka')
+        self.assertEqual(r['source'],'phone_country')
+        self.assertNotIn('ip',r)
+        self.assertEqual(r['attribution']['license'],'CC BY 4.0')
+        s,r=call('/api/viewer-timezone?device_timezone=not-a-zone')
+        self.assertEqual(s,200)
+        self.assertIsNone(r['timezone'])
+
     def test_auth_required_and_structured_errors(self):
         s, r = call("/api/v1/me/preferences")
         self.assertEqual(s, 401)

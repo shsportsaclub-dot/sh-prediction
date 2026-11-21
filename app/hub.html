@@ -223,6 +223,8 @@ nav.tabs a.nav-plus span{display:flex;align-items:center;justify-content:center;
 <nav class="secbar" id="secbar" aria-label="Sections"></nav>
 <nav class="tabs" id="tabs" aria-label="Main navigation"></nav>
 <main id="main" tabindex="-1" aria-live="polite"></main>
+<div class="muted" style="padding:8px;text-align:center;font-size:11px"><label for="viewer-timezone">Time zone (AM/PM)</label> <select id="viewer-timezone" aria-label="Display time zone"><option value="">Automatic</option></select> · <a href="https://db-ip.com" target="_blank" rel="noopener">IP Geolocation by DB-IP</a></div>
+<script src="/viewer_timezone.js?v=__SH_BUILD__"></script>
 <script>
 "use strict";
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
@@ -242,7 +244,7 @@ const t=k=>S[k]||k;
 window.mcLater=window.mcLater||(fn=>(window._mcq=window._mcq||[]).push(fn));
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const $=s=>document.querySelector(s);
-const when=u=>{const d=new Date(u);return isNaN(d)?"—":d.toLocaleString(LANG,{dateStyle:"medium",timeStyle:"short"})};
+const when=u=>window.SHTime.format(u,LANG);
 async function api(path,opt={}){
  const hd={"Content-Type":"application/json"};if(TOKEN)hd.Authorization="Bearer "+TOKEN;
  const o=Object.assign({headers:hd},opt);
@@ -425,7 +427,15 @@ window.addEventListener("hashchange",route);
    const go=()=>{if(!typing())reload();else setTimeout(go,4000)};setTimeout(go,2500)}}catch(e){}}
  setInterval(check,60000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)check()});window.addEventListener("online",check)})();
 window.addEventListener("online",route);window.addEventListener("offline",()=>{$("#main").insertAdjacentHTML("afterbegin",'<div class="offline" role="status">'+esc(t("state.offline"))+'</div>')});
+(function(){
+ const select=document.getElementById('viewer-timezone');
+ let zones=[];try{zones=Intl.supportedValuesOf('timeZone')}catch(e){zones=['Asia/Kolkata','Asia/Dhaka','Asia/Karachi','Europe/Paris','America/New_York','UTC']}
+ if(window.SHTime.selected&&!zones.includes(window.SHTime.selected))zones.push(window.SHTime.selected);
+ for(const zone of zones){const option=document.createElement('option');option.value=zone;option.textContent=zone;select.append(option)}
+ select.value=window.SHTime.selected;select.onchange=()=>{window.SHTime.select(select.value);route()};
+})();
 (async()=>{setTheme(ls.get("shp_theme")||"dark");await loadLang(LANG);
+ window.SHTime.ready.then(()=>{if(document.readyState!=="loading")route()});
  if(TOKEN){try{PREF=await api("/me/preferences");if(PREF.language_code!==LANG)await loadLang(PREF.language_code);setTheme(PREF.theme)}catch(e){if(e.status===401){TOKEN="";ls.del("shp_session")}}}
  // draw once, after every screen script (hub_social, match_center, shell) has loaded
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",route,{once:true});else route()})();
