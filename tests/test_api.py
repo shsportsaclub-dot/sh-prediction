@@ -14,6 +14,14 @@ def login(phone):
  s,o=call("/auth/generate",{"phone":phone});s,t=call("/auth/verify",{"phone":phone,"otp":o["otp"]});return t["token"]
 class T(unittest.TestCase):
  def test_health_public(self):self.assertEqual(call("/health")[0],200)
+ def test_sports_schedule_public_and_admin_boundary(self):
+  code,out=call('/api/sports-schedule?timezone=Asia%2FKolkata')
+  self.assertEqual(code,200);self.assertEqual(out['sport'],'S001');self.assertEqual(out['date'],'today')
+  self.assertEqual(len(out['sports']),45);self.assertTrue(out['source_lanes_separate'])
+  self.assertEqual(call('/api/sports-schedule?sport=S999')[0],400)
+  self.assertEqual(call('/api/sports-schedule?timezone=Invalid')[0],400)
+  self.assertEqual(call('/fixtures')[0],403)
+
  def test_data_needs_login(self):self.assertEqual(call("/fixtures")[0],403)
  def test_user_cannot_use_admin(self):
   tok=login("9000000001");h={"Authorization":"Bearer "+tok}
@@ -86,3 +94,4 @@ class Acc(unittest.TestCase):
   self.assertTrue(main.csv_text([dict({k:None for k in main.REG_COLS},home="=SUM(1)")]).count("'=SUM(1)")==1)
 
 if __name__=="__main__":unittest.main()
+

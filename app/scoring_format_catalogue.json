@@ -1,0 +1,73 @@
+{
+  "source_repository": "shsportsaclub-dot/mename-shs-backend",
+  "source_commit": "a2ef126218753c6f79fcfc42c3e5822e7ef31acd",
+  "source_path": "app-index.html:3828-3850",
+  "note": "Owned Scoring catalogue labels; not proof of connected feeds or scoring-engine readiness. Cricket Super Six follows owner request and existing custom 6-over wizard; other native cricket source formats remain distinct.",
+  "formats": {
+    "S001": [
+      "Test",
+      "ODI",
+      "T20",
+      "T10",
+      "The Hundred",
+      "Super Six",
+      "List A",
+      "First-class",
+      "Other"
+    ],
+    "S002": [
+      "11-a-side",
+      "Extra time and penalties"
+    ],
+    "S004": [
+      "Standard 7-a-side"
+    ],
+    "S005": [
+      "3x21",
+      "3x15 (BWF 2026)"
+    ],
+    "S006": [
+      "Indoor",
+      "Beach"
+    ],
+    "S007": [
+      "FIBA",
+      "NBA"
+    ],
+    "S009": [
+      "Union",
+      "Sevens",
+      "League"
+    ],
+    "S010": [
+      "Best of 3",
+      "Best of 5",
+      "No-ad"
+    ],
+    "S011": [
+      "Best of 5",
+      "Best of 7"
+    ],
+    "S012": [
+      "Singles",
+      "Doubles"
+    ],
+    "S014": [
+      "NFL",
+      "NCAA"
+    ],
+    "S015": [
+      "Classical",
+      "Rapid",
+      "Blitz"
+    ],
+    "S016": [
+      "Singles",
+      "Doubles"
+    ],
+    "S026": [
+      "Stroke play",
+      "Stableford"
+    ]
+  }
+}

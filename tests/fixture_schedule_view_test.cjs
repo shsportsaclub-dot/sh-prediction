@@ -8,6 +8,11 @@ const rows=[
  {id:'unknown',sport_id:'S002',competition:'Cup',competition_id:'cup',status:'unknown',start_time_utc:null,home_team:'A',away_team:'B',format:null}
 ];
 const now=Date.parse('2026-11-27T12:00:00Z');
+const defaults=v.initialState(new URLSearchParams());
+assert.equal(defaults.sport,'S001');assert.equal(defaults.date,'today');assert.equal(defaults.view,'all');
+const changed=v.changeState({...defaults,date:'all',format:'T20',competition:'IPL'},{sport:'S010'});
+assert.equal(changed.date,'today');assert.equal(changed.format,'');assert.equal(changed.competition,'');
+assert.equal(v.changeState({...defaults,competition:'IPL'},{format:'ODI'}).competition,'');
 assert.equal(v.dayKey(rows[0].start_time_utc,'Asia/Kolkata'),'2026-11-28');
 assert.equal(v.dayKey(rows[0].start_time_utc,'UTC'),'2026-11-27');
 assert.equal(v.dayKey('2026-11-01T05:30:00Z','America/New_York'),'2026-11-01');

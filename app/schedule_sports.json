@@ -1,0 +1,227 @@
+[
+  {
+    "sport_id": "S001",
+    "name": "Cricket",
+    "priority": 1
+  },
+  {
+    "sport_id": "S002",
+    "name": "Football",
+    "priority": 1
+  },
+  {
+    "sport_id": "S003",
+    "name": "Field Hockey",
+    "priority": 1
+  },
+  {
+    "sport_id": "S004",
+    "name": "Kabaddi",
+    "priority": 1
+  },
+  {
+    "sport_id": "S005",
+    "name": "Badminton",
+    "priority": 1
+  },
+  {
+    "sport_id": "S006",
+    "name": "Volleyball",
+    "priority": 1
+  },
+  {
+    "sport_id": "S007",
+    "name": "Basketball",
+    "priority": 1
+  },
+  {
+    "sport_id": "S008",
+    "name": "Baseball",
+    "priority": 1
+  },
+  {
+    "sport_id": "S009",
+    "name": "Rugby",
+    "priority": 1
+  },
+  {
+    "sport_id": "S010",
+    "name": "Tennis",
+    "priority": 2
+  },
+  {
+    "sport_id": "S011",
+    "name": "Table Tennis",
+    "priority": 2
+  },
+  {
+    "sport_id": "S012",
+    "name": "Pickleball",
+    "priority": 2
+  },
+  {
+    "sport_id": "S013",
+    "name": "Handball",
+    "priority": 2
+  },
+  {
+    "sport_id": "S014",
+    "name": "American Football",
+    "priority": 2
+  },
+  {
+    "sport_id": "S015",
+    "name": "Chess",
+    "priority": 2
+  },
+  {
+    "sport_id": "S016",
+    "name": "Carrom",
+    "priority": 2
+  },
+  {
+    "sport_id": "S017",
+    "name": "Kho-Kho",
+    "priority": 2
+  },
+  {
+    "sport_id": "S018",
+    "name": "Swimming",
+    "priority": 2
+  },
+  {
+    "sport_id": "S019",
+    "name": "Athletics — Running",
+    "priority": 2
+  },
+  {
+    "sport_id": "S020",
+    "name": "Athletics — Hurdles",
+    "priority": 2
+  },
+  {
+    "sport_id": "S021",
+    "name": "Horse Racing",
+    "priority": 2
+  },
+  {
+    "sport_id": "S022",
+    "name": "Equestrian — Horse Riding",
+    "priority": 2
+  },
+  {
+    "sport_id": "S023",
+    "name": "Formula 1",
+    "priority": 2
+  },
+  {
+    "sport_id": "S024",
+    "name": "Motorcycle Racing",
+    "priority": 2
+  },
+  {
+    "sport_id": "S025",
+    "name": "Cycling",
+    "priority": 2
+  },
+  {
+    "sport_id": "S026",
+    "name": "Golf",
+    "priority": 3
+  },
+  {
+    "sport_id": "S027",
+    "name": "Boxing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S028",
+    "name": "Wrestling",
+    "priority": 3
+  },
+  {
+    "sport_id": "S029",
+    "name": "MMA",
+    "priority": 3
+  },
+  {
+    "sport_id": "S030",
+    "name": "Weightlifting",
+    "priority": 3
+  },
+  {
+    "sport_id": "S031",
+    "name": "Gymnastics",
+    "priority": 3
+  },
+  {
+    "sport_id": "S032",
+    "name": "Archery",
+    "priority": 3
+  },
+  {
+    "sport_id": "S033",
+    "name": "Shooting",
+    "priority": 3
+  },
+  {
+    "sport_id": "S034",
+    "name": "Judo",
+    "priority": 3
+  },
+  {
+    "sport_id": "S035",
+    "name": "Taekwondo",
+    "priority": 3
+  },
+  {
+    "sport_id": "S036",
+    "name": "Karate",
+    "priority": 3
+  },
+  {
+    "sport_id": "S037",
+    "name": "Fencing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S038",
+    "name": "Rowing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S039",
+    "name": "Canoeing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S040",
+    "name": "Sailing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S041",
+    "name": "Surfing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S042",
+    "name": "Skateboarding",
+    "priority": 3
+  },
+  {
+    "sport_id": "S043",
+    "name": "Skiing",
+    "priority": 3
+  },
+  {
+    "sport_id": "S044",
+    "name": "Ice Hockey",
+    "priority": 3
+  },
+  {
+    "sport_id": "S045",
+    "name": "Esports",
+    "priority": 3
+  }
+]

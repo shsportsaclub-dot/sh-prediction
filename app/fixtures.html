@@ -8,19 +8,19 @@
 <h1>Match schedule</h1><p>Matches by day and competition. Browse current coverage and choose your display time zone.</p>
 <nav class="tabs" id="views" role="tablist" aria-label="Match status"></nav>
 <section class="controls" aria-label="Schedule filters">
-<label>Sport<select id="sport" aria-label="Sport"><option value="">All sports</option></select></label>
-<label>Series / competition<select id="competition" aria-label="Series / competition"><option value="">All competitions</option></select></label>
+<label>Sport<select id="sport" aria-label="Sport"><option value="S001">Cricket</option></select></label>
 <label>Format<select id="format" aria-label="Format"><option value="">All formats</option></select></label>
+<label>League / series<select id="competition" aria-label="League / series"><option value="">All leagues / series</option></select></label>
 <label class="search">Find a team or competition<input type="search" id="search" placeholder="Search matches" autocomplete="off"></label>
 <label class="timezone">Display time zone · AM/PM<select id="zone" aria-label="Display time zone · AM/PM"><option value="">Automatic</option></select></label>
 </section>
 <div class="date-controls"><button id="previous" aria-label="Previous day">←</button><label>Match date<input type="date" id="date"></label><button id="next" aria-label="Next day">→</button><button id="reset" class="clear">Reset filters</button></div>
 <nav class="quick" id="quick" aria-label="Date range"></nav><nav class="day-strip" id="days" aria-label="Available match dates"></nav>
 <div class="summary"><p id="summary" role="status">Loading stored fixtures…</p><p id="zone-label"></p></div>
-<p class="notice" id="coverage">Current coverage: one Bundesliga matchday, nine source-listed football fixtures. No verified live-action feed is connected here.</p>
+<p class="notice" id="coverage">Choose a sport to load its stored schedule. Source coverage and provenance are shown per sport.</p>
 <div id="cards" role="tabpanel" aria-label="Filtered matches"></div>
-<footer>Fixture data from <a href="https://www.openligadb.de/" target="_blank" rel="noopener">OpenLigaDB</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL 1.0</a>.<br>
-<a href="https://sh-data-line.onrender.com/open-data/openligadb-fixtures">Download current fixture database</a> · <a href="/api/provider-fixtures">Receipt and freshness data</a><p id="freshness"></p></footer>
+<footer>Independent football fixtures from <a href="https://www.openligadb.de/" target="_blank" rel="noopener">OpenLigaDB</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL 1.0</a>.<br>
+<a href="https://sh-data-line.onrender.com/open-data/openligadb-fixtures">Download current fixture database</a> · <a href="/api/provider-fixtures">Receipt and freshness data</a> · Cricket records keep their original source attribution; <a href="https://cricsheet.org/licensing/">Cricsheet licence</a><p id="freshness"></p></footer>
 </main>
 <dialog id="details" aria-labelledby="detail-title"><div class="detail-header"><h2 id="detail-title">Match information</h2><button id="close-details" aria-label="Close match information">✕</button></div><div id="detail-body"></div></dialog>
 <script src="/viewer_timezone.js"></script><script src="/fixture_schedule_view.js"></script><script src="/fixture_schedule_client.js"></script>
