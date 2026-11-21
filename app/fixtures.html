@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Upcoming fixtures · SH Prediction</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#080f20;color:#eaf0ff}*{box-sizing:border-box}body{margin:0}main{max-width:1050px;margin:auto;padding:28px 20px 60px}a{color:#8ab7ff}header{display:flex;justify-content:space-between;align-items:center;gap:16px}h1{font-size:clamp(28px,5vw,44px);margin:34px 0 10px}p{color:#aab9d3;line-height:1.6}.tag{color:#8ab7ff;font-size:12px;letter-spacing:.12em}label{display:block;margin:24px 0 10px}select{max-width:100%;padding:10px;background:#15213b;color:inherit;border:1px solid #344360;border-radius:8px}.cards{display:grid;gap:12px;margin:24px 0}article{background:#111d34;border:1px solid #273753;border-radius:14px;padding:20px;display:grid;grid-template-columns:1fr auto;gap:12px}h2{font-size:19px;margin:6px 0 12px}.muted{font-size:13px;color:#aab9d3}.status{text-transform:capitalize;color:#bcd2ff}.notice{border-left:3px solid #4d89f5;padding:10px 16px;background:#111d34}footer{font-size:13px;line-height:1.8;border-top:1px solid #273753;padding-top:20px}@media(max-width:560px){article{grid-template-columns:1fr}header{align-items:start}main{padding:20px 16px}}
+</style>
+<main><header><a href="/">SH PREDICTION</a><a href="/#/matches">Cricket matches →</a></header>
+<h1>Upcoming fixtures</h1><p>Collected by SH DATA LINE. Source-listed football fixtures, with their original identities and scheduled times.</p>
+<p class="notice">Coverage: one Bundesliga matchday · Football S002. These are schedule observations; live scores and independently verified match status are not included.</p>
+<label for="zone">Display time zone · AM/PM</label><select id="zone"><option value="">Automatic</option></select>
+<p id="summary" role="status">Loading stored fixtures…</p><div class="cards" id="cards"></div>
+<footer>Data from <a href="https://www.openligadb.de/" target="_blank" rel="noopener">OpenLigaDB</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL 1.0</a>.<br>
+<a href="https://sh-data-line.onrender.com/open-data/openligadb-fixtures">Download the complete current fixture database</a> · <a href="/api/provider-fixtures">SH receipt and freshness data</a><p id="freshness"></p></footer></main>
+<script src="/viewer_timezone.js"></script>
+<script>
+'use strict';
+let snapshot;
+const el=id=>document.getElementById(id);
+function node(tag,text,cls){const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n}
+function render(){
+ if(!snapshot)return;
+ el('cards').replaceChildren();
+ const items=[...snapshot.items].sort((a,b)=>(a.start_time_utc||'9999').localeCompare(b.start_time_utc||'9999')||a.id.localeCompare(b.id));
+ el('summary').textContent=items.length+' stored fixtures · Times in '+(SHTime.timezone||'device time zone')+(snapshot.stale?' · STALE: showing cached observations':'');
+ for(const item of items){
+  const card=document.createElement('article'),left=document.createElement('div'),right=document.createElement('div');
+  left.append(node('div',item.competition,'tag'),node('h2',item.home_team+' vs '+item.away_team),node('div',item.id,'muted'));
+  right.append(node('div',item.start_time_utc?SHTime.format(item.start_time_utc):'Start time unknown'),node('p',item.status,'status'));
+  card.append(left,right);el('cards').append(card);
+ }
+ el('freshness').textContent='Last SH receipt: '+(snapshot.last_received_at?SHTime.format(snapshot.last_received_at):'Not received')+'. Source check: '+(snapshot.collection?.last_ok?SHTime.format(new Date(snapshot.collection.last_ok*1000).toISOString()):'Unknown')+'.'+(snapshot.last_error?' Sync error: '+snapshot.last_error:'')+(snapshot.upstream_error?' Source collection error: '+snapshot.upstream_error:'');
+}
+async function refresh(){try{const response=await fetch('/api/provider-fixtures',{cache:'no-store'});if(!response.ok)throw Error('unavailable');snapshot=await response.json();render()}catch(e){el('summary').textContent='Fixture update unavailable. Previously rendered observations may be stale.'}}
+(async()=>{await SHTime.ready;const zones=typeof Intl.supportedValuesOf==='function'?Intl.supportedValuesOf('timeZone'):['UTC','Asia/Kolkata','America/New_York'];for(const z of ['UTC',...zones]){const o=node('option',z);o.value=z;el('zone').append(o)}el('zone').value=SHTime.selected||'';el('zone').onchange=()=>{SHTime.select(el('zone').value);render()};await refresh();setInterval(refresh,60000)})();
+</script></html>

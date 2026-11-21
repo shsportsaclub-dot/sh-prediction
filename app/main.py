@@ -164,6 +164,13 @@ class H(BaseHTTPRequestHandler):
     left-=len(chunk)
  def do_GET(self):
   p=urlparse(self.path).path
+  if p=="/api/provider-fixtures":
+   import fixture_schedule
+   from contextlib import closing
+   with closing(db()) as c:return self.sendj(200,fixture_schedule.read(c))
+  if p=="/sports-fixtures":
+   b=(Path(__file__).parent/"fixtures.html").read_bytes()
+   self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b);return
   if p=="/api/viewer-timezone":
    import viewer_timezone
    q=parse_qs(urlparse(self.path).query)
@@ -395,5 +402,7 @@ if __name__=="__main__":
  except Exception as exc:
   print("SH T10 fixture seed failed:",repr(exc),flush=True)
  import viewer_timezone;viewer_timezone.start()
+ import fixture_schedule;fixture_schedule.start(db)
  import scheduler;scheduler.start(db)  # 24/7 data collectors (SH_COLLECTORS=0 disables)
  ThreadingHTTPServer((os.getenv("HOST","0.0.0.0"),int(os.getenv("PORT","8080"))),H).serve_forever()
+
