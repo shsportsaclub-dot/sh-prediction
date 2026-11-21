@@ -39,7 +39,12 @@ def db():
  CREATE TABLE IF NOT EXISTS archive(id INTEGER PRIMARY KEY,fixture_id INTEGER,section TEXT NOT NULL,payload TEXT NOT NULL,source TEXT NOT NULL,reviewed INTEGER DEFAULT 0,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS odds(id INTEGER PRIMARY KEY,fixture_id INTEGER NOT NULL,team TEXT NOT NULL,price REAL NOT NULL CHECK(price>=1.01 AND price<=1000),observed_at TEXT NOT NULL,source TEXT NOT NULL,reviewed INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,UNIQUE(fixture_id,team,observed_at,source));""")
  for t,col,ddl in (("fixtures","venue","TEXT"),("fixtures","match_no","TEXT"),("outcomes","status","TEXT NOT NULL DEFAULT 'completed'"),("outcomes","toss_decision","TEXT"),("outcomes","remarks","TEXT")):
-  if col not in {r[1] for r in c.execute("PRAGMA table_info("+t+")")}:c.execute("ALTER TABLE "+t+" ADD COLUMN "+col+" "+ddl)
+  if col not in {r[1] for r in c.execute("PRAGMA table_info("+t+")")}:
+   try:c.execute("ALTER TABLE "+t+" ADD COLUMN "+col+" "+ddl)
+   except sqlite3.OperationalError as e:
+    # Another request may have added this column after our schema read.
+    # Only accept that specific race; other initialization failures must surface.
+    if str(e)!="duplicate column name: "+col or col not in {r[1] for r in c.execute("PRAGMA table_info("+t+")")}:raise
  c.executescript("""CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY,action TEXT NOT NULL,payload TEXT,old_value TEXT,created_at TEXT NOT NULL);
  CREATE TRIGGER IF NOT EXISTS predictions_immutable BEFORE UPDATE OF fixture_id,toss_pick,winner_pick,created_at ON legacy_predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction is immutable'); END;
  CREATE TRIGGER IF NOT EXISTS predictions_nodelete BEFORE DELETE ON legacy_predictions WHEN OLD.status='approved' BEGIN SELECT RAISE(ABORT,'approved prediction cannot be deleted'); END;""")
