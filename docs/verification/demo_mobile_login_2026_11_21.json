@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-21",
+  "runtime_commit": "df8d4eb385cc159c4455b57f96f9edbb8070f8c8",
+  "deploy": "dep-dc0r2b60tbcc73b9ngj0",
+  "deploy_status": "live",
+  "python_regression": {
+    "ran": 161,
+    "failures": 0,
+    "seconds": 31.921
+  },
+  "javascript_tests": [
+    "Demo OTP generate, invalid input, wrong code, correct code, expiry, consumption, no account token",
+    "Timezone four-country AM/PM, country selection and manual preference",
+    "External and inline syntax checks"
+  ],
+  "production_browser": {
+    "entry": "https://sh-prediction.onrender.com/#/account",
+    "country": "IN",
+    "phone": "Synthetic all-zero demo input; not sent to server or retained",
+    "otp": "Visible demo OTP generated, entered and consumed; value not retained",
+    "result_url": "https://sh-prediction.onrender.com/#/matches",
+    "banner": "DEMO ACCESS · Public viewing · Phone not verified",
+    "visible_result": "Matches page and public match cards rendered"
+  },
+  "public_matches_api_items": 50,
+  "scope": "Local demo visitor experience; no mobile ownership verification, account credential or new account writes",
+  "correction": "Production sample dataset was empty. Follow-up commit opens existing public match data with a demo-guest banner instead of an empty sample list.",
+  "sms_authentication": "deferred_by_owner",
+  "ci": "not independently confirmed"
+}
