@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -236,3 +237,32 @@ class ConsumerAuditHttpTests(unittest.TestCase):
         self.assertIsInstance(body['items'], list)
         self.assertFalse(body['status']['production_verified'])
         self.assertEqual(T.call('/api/v1/admin/bridge/sh-events?after=-1', h=T.A)[0], 400)
+
+
+class StreamDeliveryTests(unittest.TestCase):
+    def test_sync_requests_long_wait_without_changing_default_calls(self):
+        case=ConsumerTests();case.setUp()
+        try:
+            calls=[]
+            def opener(request,timeout):
+                calls.append((request.full_url,timeout))
+                return io.BytesIO(json.dumps({**page([],0),'delivery':{'mode':'long_poll'}}).encode())
+            result=consumer.sync(case.db,opener=opener,wait_ms=15000)
+            self.assertEqual(result['status'],'ok');self.assertTrue(result['wait_supported'])
+            self.assertIn('wait_ms=15000',calls[0][0]);self.assertGreater(calls[0][1],15)
+        finally:case.tearDown()
+    def test_stream_reconnects_without_fixed_ten_second_pause(self):
+        case=ConsumerTests();case.setUp()
+        try:
+            stop=threading.Event();calls=[]
+            def sync(c,*args,**kw):
+                calls.append((time.monotonic(),kw))
+                if len(calls)==2:stop.set()
+                return {'status':'ok','wait_supported':True}
+            def db():
+                c=sqlite3.connect(case.path);c.row_factory=sqlite3.Row;return c
+            with patch.object(consumer,'sync',sync):consumer.stream_loop(db,stop)
+            self.assertEqual(len(calls),2)
+            self.assertEqual(calls[0][1]['wait_ms'],15000)
+            self.assertLess(calls[1][0]-calls[0][0],1)
+        finally:case.tearDown()

@@ -151,11 +151,11 @@ def _validate(document, after, kinds):
     return records, cursor, document['has_more']
 
 
-def _fetch(config, after, opener):
-    request = urllib.request.Request(config['origin'] + '/v1/provider/events?after=' + str(after),
+def _fetch(config, after, opener, wait_ms=0):
+    request = urllib.request.Request(config['origin'] + '/v1/provider/events?after=' + str(after) + ('&wait_ms='+str(wait_ms) if wait_ms else ''),
         headers={'X-API-Key': config['key'], 'Accept': 'application/json', 'User-Agent': 'SH-PREDICTION-Provider/1.0'})
     open_request = opener or urllib.request.build_opener(NoRedirect()).open
-    with open_request(request, timeout=15) as response:
+    with open_request(request, timeout=max(15,wait_ms/1000+10)) as response:
         body = response.read(MAX_RESPONSE_BYTES + 1)
     if len(body) > MAX_RESPONSE_BYTES:
         raise InvalidPage('Oversized page')
@@ -209,7 +209,9 @@ def _retry(error):
     return 300 if error.code in (401, 403) else 60
 
 
-def sync(c, now_fn=utcnow, opener=None, max_pages=2):
+def sync(c, now_fn=utcnow, opener=None, max_pages=2, wait_ms=0):
+    if type(wait_ms) is not int or not 0<=wait_ms<=20000:
+        raise ValueError("wait_ms must be 0..20000")
     config = _config()
     if not config:
         return {'status': 'not_configured'}
@@ -224,15 +226,17 @@ def sync(c, now_fn=utcnow, opener=None, max_pages=2):
     if state['retry_at'] > time.time():
         return {'status': 'cooldown', 'retry_at': state['retry_at'], 'cursor': state['cursor']}
     cursor, inserted, duplicates, pages, more = state['cursor'], 0, 0, 0, False
+    wait_supported=False
     try:
         for _ in range(max_pages):
-            document = _fetch(config, cursor, opener)
+            document = _fetch(config, cursor, opener, wait_ms if pages==0 else 0)
+            if pages==0:wait_supported=bool(wait_ms and document.get("delivery",{}).get("mode")=="long_poll")
             records, next_cursor, more = _validate(document, cursor, config['kinds'])
             added, repeated = _save(c, config, cursor, records, next_cursor, now_fn())
             cursor, inserted, duplicates, pages = next_cursor, inserted + added, duplicates + repeated, pages + 1
             if not more:
                 break
-        return {'status': 'ok', 'cursor': cursor, 'inserted': inserted, 'duplicates': duplicates, 'pages': pages, 'has_more': more}
+        return {'status': 'ok', 'cursor': cursor, 'inserted': inserted, 'duplicates': duplicates, 'pages': pages, 'has_more': more, 'wait_supported':wait_supported}
     except ConcurrentCursor:
         c.rollback()
         return {'status': 'concurrent_skip'}
@@ -254,7 +258,7 @@ def sync(c, now_fn=utcnow, opener=None, max_pages=2):
 
 def status(c):
     config = _config()
-    out = {'mode': 'events', 'selected': selected(), 'configured': bool(config), 'cursor': 0,
+    out = {'stream_running':stream_running(), 'mode': 'events', 'selected': selected(), 'configured': bool(config), 'cursor': 0,
            'records': 0, 'last_ok': None, 'last_error': None, 'retry_at': 0, 'production_verified': False}
     if not _present(c):
         return out
@@ -285,3 +289,39 @@ def audit(c, after=0):
                              'receipt_count': receipt['receipt_count'] if receipt else 0})
     out['next_cursor'] = rows[-1]['id'] if rows else after
     return out
+
+
+# One dedicated event-reader thread; it never blocks the independent source jobs.
+import threading as _threading
+_STREAM_LOCK=_threading.Lock()
+_STREAM_THREAD=None
+_STREAM_STOP=None
+
+def stream_running():
+    return bool(_STREAM_THREAD and _STREAM_THREAD.is_alive())
+
+def stream_loop(db_fn,stop):
+    from contextlib import closing
+    while not stop.is_set():
+        try:
+            if not selected() or not _config():return
+            with closing(db_fn()) as c:
+                result=sync(c,wait_ms=15000)
+            if result.get('status')=='ok':
+                delay=.01 if result.get('wait_supported') or result.get('has_more') else 10
+            elif result.get('status')=='cooldown':
+                delay=max(1,min(30,result['retry_at']-time.time()))
+            else:delay=30
+        except Exception:
+            # Existing persisted error categories are used by sync; never log keys/URLs.
+            delay=30
+        stop.wait(delay)
+
+def start_stream(db_fn):
+    global _STREAM_THREAD,_STREAM_STOP
+    with _STREAM_LOCK:
+        if stream_running() or os.getenv('SH_COLLECTORS','1')=='0' or not selected() or not _config():return False
+        _STREAM_STOP=_threading.Event()
+        _STREAM_THREAD=_threading.Thread(target=stream_loop,args=(db_fn,_STREAM_STOP),name='sh-provider-events',daemon=True)
+        _STREAM_THREAD.start()
+        return True

@@ -291,7 +291,8 @@ def live_loop(db_fn, opener=None, stop=None):
                 import shdataline
                 import sh_provider_events
                 if sh_provider_events.selected():
-                    sh_provider_events.sync(c, now, opener=opener)
+                    if not sh_provider_events.stream_running():
+                        sh_provider_events.sync(c, now, opener=opener)
                     wait = 10
                 elif shdataline.configured() and c.execute("SELECT 1 FROM sqlite_master WHERE name='ext_match_detail'").fetchone():
                     shdataline.sync(c, now, opener) if opener else shdataline.sync(c, now)       # SH's own data line, merged with CricketData
@@ -338,6 +339,8 @@ def start(db_fn):
         if _started or os.getenv("SH_COLLECTORS", "1") == "0":
             return False
         _started = True
+    import sh_provider_events
+    sh_provider_events.start_stream(db_fn)
     threading.Thread(target=loop, args=(db_fn,), daemon=True, name="sh-collectors").start()
     threading.Thread(target=live_loop, args=(db_fn,), daemon=True, name="sh-live-loop").start()
     return True
