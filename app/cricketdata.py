@@ -152,7 +152,10 @@ def upsert(c, m, create_match, record_result, now_fn):
                       "venue": m.get("venue"), "format": fmt, "source": src, "data_origin": "imported",
                       "provider": "cricketdata", "provider_id": m["id"]})
     mid = r["match_id"]
-    c.execute("UPDATE matches SET listed_order=?, home_away_verified=0 WHERE id=?", (json.dumps(teams), mid))
+    linked = r["status"] == "linked" or bool(c.execute(
+        "SELECT 1 FROM data_provider_syncs WHERE provider<>'cricketdata' AND provider_entity='match' AND local_id=?", (mid,)).fetchone())
+    if not linked:    # a match the owner's sheet also lists keeps the sheet's home/away; only provider-only matches are flagged
+        c.execute("UPDATE matches SET listed_order=?, home_away_verified=0 WHERE id=?", (json.dumps(teams), mid))
     _store_raw(c, m["id"], "match", m, now_fn)
     started, ended = bool(m.get("matchStarted")), bool(m.get("matchEnded"))
     if started and not ended:
@@ -162,8 +165,10 @@ def upsert(c, m, create_match, record_result, now_fn):
                      ON CONFLICT(match_id) DO UPDATE SET source=excluded.source,status_text=excluded.status_text,
                      innings_json=excluded.innings_json,fetched_at=excluded.fetched_at""",
                   (mid, "cricketdata", m.get("status"), json.dumps(m.get("score") or []), now_fn()))
-    row = c.execute("SELECT home_team_id, away_team_id FROM matches WHERE id=?", (mid,)).fetchone()
-    ids = {teams[0]: row[0], teams[1]: row[1]}
+    import api_v1
+    m2 = re.search(r"^(.+?) won by", m.get("status") or "")
+    names = list(teams) + [n for n in (m.get("tossWinner"), m.get("matchWinner"), m2 and m2.group(1).strip()) if n]
+    ids = api_v1.match_team_ids(c, mid, names)       # by spelling key: a linked match may carry the sheet's spelling
     if m.get("tossWinner") in ids and not c.execute("SELECT 1 FROM toss_results WHERE match_id=?", (mid,)).fetchone():
         ch = str(m.get("tossChoice") or "").lower()
         c.execute("INSERT INTO toss_results(match_id,winner_team_id,decision,source,verified_at) VALUES(?,?,?,?,?)",

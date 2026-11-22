@@ -47,7 +47,20 @@ SHEET_EXTRAS = {
         "competition": "Womens Big Bash League 2026",
         "codes": {"AS": "Adelaide Strikers Women", "BH": "Brisbane Heat Women", "HH": "Hobart Hurricanes Women", "MR": "Melbourne Renegades Women",
                   "MS": "Melbourne Stars Women", "PS": "Perth Scorchers Women", "SS": "Sydney Sixers Women", "ST": "Sydney Thunder Women"}},
+    "1i4YlNzCEeyqwAOpLXkxVYP3Cbl7561TmmmHhwr8Tz_8": {
+        "codes": {"SR": "Sudurpaschim Royals", "LL": "Lumbini Lions", "CR": "Chitwan Rhinos", "BK": "Biratnagar Kings", "KY": "Karnali Yaks",
+                  "JB": "Janakpur Bolts", "PA": "Pokhara Avengers", "KG": "Kathmandu Gorkhas"}},
+    "1U3OlRR7HSGGLm7zXKr71c2V0lJV311Thai0n1U25_D0": {
+        "codes": {"AS": "Adelaide Strikers", "BH": "Brisbane Heat", "HH": "Hobart Hurricanes", "MR": "Melbourne Renegades",
+                  "MS": "Melbourne Stars", "PS": "Perth Scorchers", "SS": "Sydney Sixers", "ST": "Sydney Thunder"}},
+    "1dI9hLDwJq6J1bXapXI3nLYdsp7k2zvghXmMal7FKocg": {
+        "codes": {"ADKR": "Abu Dhabi Knight Riders", "DC": "Dubai Capitals", "DV": "Desert Vipers", "GG": "Gulf Giants",
+                  "MIE": "MI Emirates", "SW": "Sharjah Warriorz"}},
+    "1SX9sK5xvkt-t4EQVc8_3Ns6iJITmvXqijqJ6AW017AI": {
+        "codes": {"DSG": "Durban's Super Giants", "JSK": "Joburg Super Kings", "MICT": "MI Cape Town", "PR": "Paarl Royals",
+                  "PC": "Pretoria Capitals", "SEC": "Sunrisers Eastern Cape"}},
 }
+SHEET_ID_RE = re.compile(r"/spreadsheets/d/([A-Za-z0-9_-]{20,})")
 HEADER_TZ = {"ist": "+05:30", "time (ist)": "+05:30", "gst": "+04:00", "time (gst)": "+04:00", "utc": "+00:00", "time (utc)": "+00:00"}
 MARGIN_RE = re.compile(r"^\s*(\d+)\s*(runs?|wkts?|wickets?)\s*$", re.I)
 SCORE_RE = re.compile(r"^(\d{1,3})\s*[/-]\s*(\d{1,2})\s*(?:\((\d{1,3}(?:\.\d)?)\))?$")
@@ -310,7 +323,7 @@ def sync_league(c, league, xlsx, create_match, record_result, now_fn, dry_run=Fa
                 start = day.isoformat() + "T00:00:00+00:00"
                 tnote = " Start time not supplied in the sheet." if not tm else " Local time zone not fixed for this league; time kept as date only."
             key = row_key(league["sheet_id"], tab, {**d, "home": home, "away": away, "date": day.isoformat()})
-            raw = json.dumps({x: str(v) if v is not None else None for x, v in d.items()}, sort_keys=True)
+            raw = json.dumps(dict({x: str(v) if v is not None else None for x, v in d.items()}, _codes=codes or None), sort_keys=True)
             h = hashlib.sha256(raw.encode()).hexdigest()
             prev = c.execute("SELECT local_id, payload_hash FROM data_provider_syncs WHERE provider='owner_sheets' AND provider_entity='match' AND provider_id=?",
                              (key,)).fetchone()
@@ -327,6 +340,7 @@ def sync_league(c, league, xlsx, create_match, record_result, now_fn, dry_run=Fa
                 mid = prev[0]
                 c.execute("UPDATE matches SET start_utc=?, match_no=COALESCE(?,match_no), updated_at=? WHERE id=?",
                           (start, d.get("match_no"), now_fn(), mid))
+                _rename_teams(c, mid, home, away)
                 k["updated"] += 1
             else:
                 r = create_match({"competition": comp, "season": str(season), "home": home, "away": away, "start_utc": start,
@@ -401,6 +415,55 @@ def sync_league(c, league, xlsx, create_match, record_result, now_fn, dry_run=Fa
                                    "source": src, "reason": "owner sheet updated" if old else None})
                     k["results"] += 1
     return k
+
+
+def _rename_teams(c, mid, home, away):
+    """A row first imported with bare codes ('SR') moves to the full names once the code map knows them, so the match can
+    join the same fixture from CricketData. Only a code -> name change is applied; a different pairing is left alone."""
+    import api_v1
+    row = c.execute("SELECT h.name, a.name FROM matches m JOIN teams h ON h.id=m.home_team_id JOIN teams a ON a.id=m.away_team_id WHERE m.id=?",
+                    (mid,)).fetchone()
+    if not row or (row[0], row[1]) == (home, away):
+        return
+    sets = {}
+    for col, old, new in (("home_team_id", row[0], home), ("away_team_id", row[1], away)):
+        if old != new and len(old) <= 5 and old.upper() == old:
+            sets[col] = api_v1.get_or_create(c, "teams", ["name"], {"name": new})
+    if sets:
+        try:
+            c.execute("UPDATE matches SET %s WHERE id=?" % ", ".join("%s=?" % k for k in sets), list(sets.values()) + [mid])
+        except Exception:      # e.g. a uniqueness clash: keep the old names rather than lose the row
+            pass
+
+
+def leagues_from_index(xlsx):
+    """League sheets listed in the owner's Global League Index ('Leagues' tab: League | Category | Country | ... | Sheet Link)."""
+    out = []
+    for tab, rows in read_tabs(xlsx).items():
+        if not rows:
+            continue
+        head = [norm(x) for x in rows[0]]
+        if "league" not in head or not any("sheet" in h and "link" in h for h in head):
+            continue
+        il, ilink = head.index("league"), next(i for i, h in enumerate(head) if "sheet" in h and "link" in h)
+        col = lambda name: head.index(name) if name in head else None
+        icat, ictry = col("category"), col("country")
+        for r in rows[1:]:
+            get = lambda i: str(r[i]).strip() if i is not None and i < len(r) and r[i] is not None else ""
+            m = SHEET_ID_RE.search(get(ilink))
+            if not get(il) or not m:
+                continue
+            cat = get(icat).lower()
+            out.append({"league": get(il), "sheet_id": m.group(1), "format": "T10" if "t10" in get(il).lower() else "T20",
+                        "gender": "women" if cat.startswith("wom") else "men", "country": get(ictry) or None, "from_index": True})
+    return out
+
+
+def merge_index_leagues(current, found):
+    """Add index leagues whose sheet is not imported yet; existing entries and their settings are never changed."""
+    have = {x.get("sheet_id") for x in current}
+    added = [x for x in found if x["sheet_id"] not in have]
+    return current + added, [x["league"] for x in added]
 
 
 def sync_index_registry(c, xlsx, now_fn):

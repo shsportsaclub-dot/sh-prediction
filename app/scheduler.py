@@ -44,8 +44,25 @@ def _helpers(conn):
 
 
 # ------------------------------------------------------------------ jobs
+def _discover_index_leagues(conn, leagues, opener):
+    """New league sheets added to the owner's Global League Index ('Leagues' tab) join this job automatically."""
+    import registry
+    try:
+        found = gsheets.leagues_from_index(gsheets.fetch_xlsx(registry.INDEX_SHEET, opener))
+    except Exception as e:
+        return leagues, [], "index not read: %s" % str(e)[:160]
+    leagues, added = gsheets.merge_index_leagues(leagues, found)
+    if added:
+        conn.execute("""INSERT INTO system_settings(key,value,updated_at,updated_by) VALUES('owner_sheets',?,?,'league-index')
+                        ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by""",
+                     (json.dumps(leagues), now()))
+        conn.commit()
+    return leagues, added, None
+
+
 def job_owner_sheets_sync(conn, cfg, opener):
     leagues = json.loads((conn.execute("SELECT value FROM system_settings WHERE key='owner_sheets'").fetchone() or ["[]"])[0])
+    leagues, added, index_note = _discover_index_leagues(conn, leagues, opener)
     create_match, record_result = _helpers(conn)
     out, errors = {}, []
     for lg in leagues:
@@ -58,7 +75,7 @@ def job_owner_sheets_sync(conn, cfg, opener):
             errors.append("%s: %s" % (lg["league"], e))
     if errors and not out:
         raise RuntimeError("; ".join(errors))
-    return {"leagues": out, "errors": errors}
+    return {"leagues": out, "errors": errors, "new_from_index": added, "index_note": index_note}
 
 
 def job_registry_index_sync(conn, cfg, opener):

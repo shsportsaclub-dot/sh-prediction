@@ -905,6 +905,49 @@ def admin_team(c, who, d):
     audit(c, who["actor"], "team.upsert", "team", tid, d, dict(old) if old else None)
     return {"team_id": tid}
 
+# ------------------------------------------------------------------ one fixture, many sources
+# The owner's sheets use their own team spellings and competition names; CricketData uses the provider's. Without a join the
+# same match exists twice and a provider toss/result never reaches the sheet's match. Teams are compared on a spelling key
+# (letters/digits only, known variants folded); a match joins only on the same two teams within LINK_HOURS of each other.
+TEAM_VARIANTS = {"sharjahwarriors": "sharjahwarriorz", "durbansupergiants": "durbanssupergiants", "sudurpaschimroyal": "sudurpaschimroyals",
+                 "kathmandugurkhas": "kathmandugorkhas", "abudhabiknightrider": "abudhabiknightriders"}
+LINK_HOURS = 6
+
+
+def team_key(name):
+    k = re.sub(r"[^a-z0-9]", "", str(name or "").lower().replace("&", "and"))
+    k = re.sub(r"womens$", "women", k)
+    return TEAM_VARIANTS.get(k, k)
+
+
+def same_fixture(c, home, away, st, provider):
+    """Id of an existing match between the same two teams starting within LINK_HOURS of `st` that `provider` has not
+    already claimed for a different fixture; None when there is no such match or more than one (never guess)."""
+    want = {team_key(home), team_key(away)}
+    if len(want) != 2:
+        return None
+    lo = (st - datetime.timedelta(hours=LINK_HOURS)).isoformat()
+    hi = (st + datetime.timedelta(hours=LINK_HOURS)).isoformat()
+    hits = []
+    for r in c.execute("""SELECT m.id, h.name, a.name FROM matches m JOIN teams h ON h.id=m.home_team_id JOIN teams a ON a.id=m.away_team_id
+                          WHERE m.start_utc BETWEEN ? AND ? AND m.data_origin<>'demo'""", (lo, hi)).fetchall():
+        if {team_key(r[1]), team_key(r[2])} != want:
+            continue
+        if c.execute("SELECT 1 FROM data_provider_syncs WHERE provider=? AND provider_entity='match' AND local_id=?", (provider, r[0])).fetchone():
+            continue
+        hits.append(r[0])
+    return hits[0] if len(hits) == 1 else None
+
+
+def match_team_ids(c, mid, names):
+    """Provider team name -> this match's team id, matched on the spelling key (works for linked matches whose
+    team names were written by another source)."""
+    row = c.execute("SELECT m.home_team_id, h.name, m.away_team_id, a.name FROM matches m JOIN teams h ON h.id=m.home_team_id "
+                    "JOIN teams a ON a.id=m.away_team_id WHERE m.id=?", (mid,)).fetchone()
+    by_key = {team_key(row[1]): row[0], team_key(row[3]): row[2]}
+    return {n: by_key[team_key(n)] for n in names if team_key(n) in by_key}
+
+
 def admin_match(c, who, d):
     for k in ("competition", "home", "away", "start_utc", "source"):
         if not str(d.get(k) or "").strip():
@@ -933,8 +976,12 @@ def admin_match(c, who, d):
             return {"match_id": ex[0], "status": "duplicate_provider_id"}
     st_iso = st.isoformat()
     ex = c.execute("SELECT id FROM matches WHERE competition_id=? AND home_team_id=? AND away_team_id=? AND start_utc=?", (comp, h, a, st_iso)).fetchone()
+    linked = None if ex or not d.get("provider") else same_fixture(c, d["home"], d["away"], st, d["provider"])
     if ex:
         mid, status = ex[0], "duplicate"
+    elif linked:
+        mid, status = linked, "linked"           # same fixture already known from another source (e.g. owner sheet <-> CricketData)
+        audit(c, who["actor"], "match.link", "match", mid, d)
     else:
         try:
             c.execute("""INSERT INTO matches(competition_id,season_id,venue_id,home_team_id,away_team_id,match_no,format,start_utc,source,data_origin,
