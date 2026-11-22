@@ -1,0 +1,16 @@
+{
+  "observed_at_utc": "2026-11-22T00:35:49.085221+00:00",
+  "http_status": 200,
+  "sh_data_line": {
+    "stream_running": true,
+    "mode": "events",
+    "selected": true,
+    "configured": true,
+    "cursor": 236,
+    "records": 236,
+    "last_ok": "2026-11-22T00:35:43.478311+00:00",
+    "last_error": null,
+    "retry_at": 0.0,
+    "production_verified": false
+  }
+}
